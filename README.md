@@ -1,5 +1,5 @@
 # HFS
-HTTP File Server by Rejetto
+HTTP File Server by https://github.com/rejetto
 
 http://rejetto.com/hfs/
 
