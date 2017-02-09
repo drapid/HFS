@@ -48,8 +48,9 @@ procedure resetLog();
 implementation
 
 uses
-  windows, utilLib, trayLib, parserLib, graphics, classes, sysutils, StrUtils,
-  hslib, comctrls, math, controls, forms, clipbrd, MMsystem, RDFileUtil, RDUtils;
+  windows, utilLib, parserLib, graphics, classes, sysutils, StrUtils,
+  hslib, comctrls, math, controls, forms, clipbrd, MMsystem,
+  RnQtrayLib, RDFileUtil, RDUtils;
 
 const
   HEADER = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><style>'
@@ -190,24 +191,26 @@ var
   var
     i: integer;
   begin
-  result:='';
-  if name > '' then
-    begin
-    i:=pars.IndexOfName(name);
-    if i >= 0 then
+    result:='';
+    if name > '' then
       begin
-      result:=pars.valueFromIndex[i];
-      if doTrim then result:=trim(result);
-      exit;
+      i:=pars.IndexOfName(name);
+      if i >= 0 then
+        begin
+        result:=pars.valueFromIndex[i];
+        if doTrim then
+          result:=trim(result);
+        exit;
+        end;
       end;
-    end;
-  if (idx < 0) // no numeric index accept
-  or (idx >= pars.count) // invalid index
-  or (name > '') and (pars.names[idx] > '') and not anycharIn(' '#13#10, pars.names[idx]) // this numerical index was already taken by a valid mnemonic name
-  then
-    raise Exception.create('invalid parameter index');
-  result:=pars[idx];
-  if doTrim then result:=trim(result);
+    if (idx < 0) // no numeric index accept
+    or (idx >= pars.count) // invalid index
+    or (name > '') and (pars.names[idx] > '') and not anycharIn(' '#13#10, pars.names[idx]) // this numerical index was already taken by a valid mnemonic name
+    then
+      raise Exception.create('invalid parameter index');
+    result:=pars[idx];
+    if doTrim then
+      result:=trim(result);
   end; // parEx
 
   function parEx(name:string; doTrim:boolean=TRUE):string; overload;
@@ -215,8 +218,13 @@ var
 
   function par(idx:integer; name:string=''; doTrim:boolean=TRUE):string; overload;
   begin
-  try result:=parEx(idx, name, doTrim)
-  except result:='' end
+    if ((idx < 0) or (idx >= pars.count)) and (name = '') then
+      Exit('');
+    try
+      result:=parEx(idx, name, doTrim)
+     except
+      result:=''
+    end
   end;
 
   function par(name:string=''; doTrim:boolean=TRUE; defval:string=''):string; overload;
@@ -1411,21 +1419,24 @@ var
   procedure actionAllowed(action:TfileAction);
   var
     f: Tfile;
+    s: String;
     local: boolean;
   begin // note: "delete" is meant for files inside the folder bearing the permission
-  local:=FALSE;
-  result:='';
-  try
-    f:=mainfrm.findFileByURL(parEx('path'), md.folder);
-    if f = NIL then exit;
-    local:=TRUE;
-  except
-    if action = FA_ACCESS then f:=md.f
-    else f:=md.folder;
-    end;
-  trueIf(accountAllowed(action, md.cd, f));
-  if local then
-    freeIfTemp(f);
+    local := FALSE;
+    result := '';
+    try
+      s := parEx('path');
+      f := mainfrm.findFileByURL(s, md.folder);
+      if f = NIL then
+        exit;
+      local:=TRUE;
+    except
+      if action = FA_ACCESS then f:=md.f
+      else f:=md.folder;
+      end;
+    trueIf(accountAllowed(action, md.cd, f));
+    if local then
+      freeIfTemp(f);
   end; // actionAllowed
 
   procedure cookie();
@@ -1739,6 +1750,7 @@ var
     result:=macroQuote(result);
   end; // handleSymbol
 
+{ Commented by Rapid D
   function stringTotrayMessageType(s:string):TtrayMessageType;
   begin
   if compareText(s,'warning') = 0 then
@@ -1749,6 +1761,18 @@ var
     result:=TM_INFO
   else
     result:=TM_NONE
+  end; // stringTotrayMessageType
+}
+  function stringTotrayMessageType(s:string): TBalloonIconType;
+  begin
+  if compareText(s,'warning') = 0 then
+    result:= bitWarning
+  else if compareText(s,'error') = 0 then
+    result:= bitError
+  else if compareText(s,'info') = 0 then
+    result:= bitInfo
+  else
+    result:= bitNone
   end; // stringTotrayMessageType
 
 var
@@ -1992,7 +2016,7 @@ try
       encodeuri();
 
     if name = 'decodeuri' then
-      result:=decodeURL(p);
+      result := decodeURL(p);
 
     if name = 'dialog' then
       dialog();

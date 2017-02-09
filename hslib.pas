@@ -367,12 +367,14 @@ function ipos(ss, s: string; ofs:integer=1):integer; overload;
   procedure initTab();
   var
     i: char;
+    ia: AnsiChar;
     tmp: string;
   begin
-  for i:=#0 to #255 do
+  for ia:=#0 to #255 do
     begin
-    tmp:=ansiUppercase(i);
-    upcaseTab[i]:=tmp[1];
+      i := Char(ia);
+      tmp:=ansiUppercase(i);
+      upcaseTab[i]:=tmp[1];
     end;
   end;
 
@@ -380,7 +382,8 @@ var
   rss, rs, rss1, p: pchar;
   l: integer;
 begin
-if upcaseTab[#1] = #0 then initTab();
+  if upcaseTab[#1] = #0 then
+    initTab();
 result:=0;
 l:=length(s);
 if (l < ofs) or (l = 0) or (ss = '') then exit;
@@ -422,36 +425,52 @@ begin
   until false;
 end; // nonQuotedPos
 
-function decodeURL(url:string; utf8:boolean=TRUE):string;
+function decodeURL(url: string; utf8: boolean=TRUE):string;
 var
   i, l: integer;
   c: char;
+  resA: RawByteString;
+  ca: AnsiChar;
 begin
-setLength(result, length(url));
-l:=0;
-i:=1;
+  setLength(result, length(url));
+  setLength(resA, length(url));
+  l := 0;
+  i := 1;
 while i<=length(url) do
   begin
   if (url[i] = '%') and (i+2 <= length(url)) then
     try
-      c:=char(strToInt( '$'+url[i+1]+url[i+2] ));
+      if utf8 then
+        ca := AnsiChar(strToInt( '$'+url[i+1]+url[i+2] ))
+       else
+        c:=char(strToInt( '$'+url[i+1]+url[i+2] ));
       inc(i,2); // three chars for one
-    except c:=url[i]
+    except
+      if utf8 then
+        ca := AnsiChar(url[i])
+       else
+        c := url[i];
     end
   else
-    c:=url[i];
+      if utf8 then
+        ca := AnsiChar(url[i])
+       else
+        c := url[i];
 
   inc(i);
   inc(l);
-  result[l]:=c;
+      if utf8 then
+        resA[l] := ca
+       else
+        result[l] := c;
   end;
-setLength(result, l);
-if utf8 then
-  begin
-  url:=utf8ToAnsi(result);
-  // if the string is not UTF8 compliant, the result is empty
-  if url > '' then result:=url;
-  end;
+  if utf8 then
+    begin
+     setLength(resA, l);
+     Result := UnUTF(resA);
+    end
+   else
+    setLength(result, l);
 end; // decodeURL
 
 function encodeURL(url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
@@ -1358,6 +1377,7 @@ end; // partialBodySize
 function ThttpConn.initInputStream():boolean;
 var
   i: integer;
+  s: String;
 begin
 result:=FALSE;
 FreeAndNil(stream);
@@ -1366,10 +1386,11 @@ try
     RBM_STRING: stream := TAnsiStringStream.create(reply.bodyB);
     RBM_FILE:
       begin
-      i := fileopen(reply.bodyB, fmOpenRead+fmShareDenyNone);
-      if i = -1 then
-        exit;
-      stream := TFileStream.Create(i);
+        s := UnUTF(reply.bodyB);
+        i := fileopen(s, fmOpenRead+fmShareDenyNone);
+        if i = -1 then
+          exit;
+        stream := TFileStream.Create(i);
       end;
     RBM_STREAM: stream:=reply.bodyStream;
     end;

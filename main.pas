@@ -33,12 +33,13 @@ uses
   OverbyteIcsWSocket, OverbyteIcsHttpProt, OverbyteicsMD5,// GIFimage, zlibex,
   regexpr,
   gifImg, RnQzip, //RegularExpressions,
+  rnqtraylib,
   OverbyteIcsZLibHigh,
   // rejetto libs
-  HSlib, traylib, monoLib, progFrmLib, classesLib, System.ImageList;
+  HSlib, monoLib, progFrmLib, classesLib, System.ImageList;
 
 const
-  VERSION = '2.3i';
+  VERSION = '2.3i RD';
   VERSION_BUILD = '297';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
@@ -91,7 +92,7 @@ const
   BG_ERROR = $BBBBFF;
   ENCODED_TABLE_HEADER = 'this is an encoded table'+CRLF;
 
-  DEFAULT_MIME_TYPES: array [0..21] of string = (
+  DEFAULT_MIME_TYPES: array [0..23] of string = (
     '*.htm;*.html', 'text/html',
     '*.jpg;*.jpeg;*.jpe', 'image/jpeg',
     '*.gif', 'image/gif',
@@ -102,7 +103,8 @@ const
     '*.avi', 'video/x-msvideo',
     '*.txt', 'text/plain',
     '*.css', 'text/css',
-    '*.js',  'text/javascript'
+    '*.js',  'text/javascript',
+    '*.webp', 'image/webp'
   );
 
   ICONMENU_NEW = 1;
@@ -276,6 +278,8 @@ type
     speed:integer;
     size: int64;
     end;
+
+  TmyTrayicon = TTrayicon;
 
   TconnData = class  // data associated to a client connection
   private
@@ -915,7 +919,7 @@ type
       message WM_ENDSESSION;
     procedure WMNCLButtonDown(var msg:TWMNCLButtonDown);
       message WM_NCLBUTTONDOWN;
-    procedure trayEvent(sender:Tobject; ev:TtrayEvent);
+    procedure trayEvent(sender:Tobject; ev: TtrayEvent);
     procedure downloadtrayEvent(sender:Tobject; ev:TtrayEvent);
     procedure httpEvent(event:ThttpEvent; conn:ThttpConn);
     function  addFileRecur(f:Tfile; parent:Ttreenode=NIL):Tfile;
@@ -3197,8 +3201,8 @@ var
   end; // workDots
 
 begin
-result:=NIL;
-if (url = '') or anycharIn(#0, url) then exit;
+  result := NIL;
+  if (url = '') or anycharIn(#0, url) then exit;
 if parent = NIL then
   parent:=rootFile;
 url:=xtpl(url, ['//', '/']);
@@ -3394,7 +3398,7 @@ var
     inc(idx);
     idxS:=intToStr(idx);
     delete(result, p, length(PATTERN)-length(idxS));
-    move(idxS[1], result[p], length(idxS));
+    MoveChars(idxS[1], result[p], length(idxS));
     until false;
   end; // applySequential
 
@@ -3449,8 +3453,10 @@ var
   if fingerprintsChk.checked and f.isFile() then
     begin
     s:=loadMD5for(f.resource);
-    if s = '' then s:=hasher.getHashFor(f.resource);
-    if s > '' then fingerprint:='#!md5!'+s;
+    if s = '' then
+      s:=hasher.getHashFor(f.resource);
+    if s > '' then
+      fingerprint:='#!md5!'+s;
     end;
   if f.isLink() then
     begin
@@ -3500,7 +3506,7 @@ var
     end
   else
     begin
-    s:=diffTpl.getTxtByExt(ExtractFileExt(f.name));
+    s := diffTpl.getTxtByExt(ExtractFileExt(f.name));
     if s = '' then s:=fileTpl;
     inc(numberFiles);
     type_:='file';
@@ -3585,7 +3591,8 @@ try
     for i:=0 to length(listing.dir)-1 do
       begin
       application.ProcessMessages();
-      if cd.conn.state = HCS_DISCONNECTED then exit;
+      if cd.conn.state = HCS_DISCONNECTED then
+        exit;
       cd.lastActivityTime:=now();
       handleItem(listing.dir[i])
       end;
@@ -3596,14 +3603,15 @@ try
     hasher.free;
     end;
 
-  if cd.conn.state = HCS_DISCONNECTED then exit;
+  if cd.conn.state = HCS_DISCONNECTED then
+    exit;
 
   // build final page
   if not oneAccessible then md.archiveAvailable:=FALSE;
   md.table:=toSA([
     '%upload-link%', if_(accountAllowed(FA_UPLOAD, cd, folder), diffTpl['upload-link']),
     '%files%', if_(list='', diffTpl['nofiles'], diffTpl['files']),
-    '%list%',list,
+    '%list%', list,
     '%number%', intToStr(numberFiles+numberFolders+numberLinks),
     '%number-files%', intToStr(numberFiles),
     '%number-folders%', intToStr(numberFolders),
@@ -3870,7 +3878,7 @@ var
   s, url: string;
   special: (no, graph);
 begin
-url:=decodeURL(cd.conn.request.url);
+  url := decodeURL(cd.conn.request.url);
 result:=FALSE;
 special:=no;
 if idx < 0 then
@@ -3988,10 +3996,10 @@ if not data.countAsDownload then exit;
 
 if data.tray = NIL then
   begin
-  data.tray:=TmyTrayIcon.create(mainfrm);
-  data.tray.data:=data;
-  data.tray_ico:=Ticon.create();
-  data.tray.onEvent:=mainfrm.downloadTrayEvent;
+  data.tray:= TmyTrayicon.create(mainfrm.handle);
+  data.tray.UsrData := data;
+  data.tray_ico := Ticon.create();
+  data.tray.onEvent := mainfrm.downloadTrayEvent;
   end;
 if mainfrm.trayfordownloadChk.checked and isSendingFile(data) then
   paintIcon()
@@ -4646,12 +4654,13 @@ var
     s: string;
     i: integer;
   begin
-  s:=url;
-  url:=chop('?',s);
-  data.urlvars.clear();
-  if s > '' then extractStrings(['&'], [], @s[1], data.urlvars);
-  for i:=0 to data.urlvars.count-1 do
-    data.urlvars[i]:=decodeURL(xtpl(data.urlvars[i],['+',' ']));
+    s:=url;
+    url:=chop('?',s);
+    data.urlvars.clear();
+    if s > '' then
+      extractStrings(['&'], [], @s[1], data.urlvars);
+    for i:=0 to data.urlvars.count-1 do
+      data.urlvars[i]:=decodeURL(xtpl(data.urlvars[i],['+',' ']));
   end; // extractParams
 
   procedure closeUploadingFile();
@@ -5102,11 +5111,12 @@ var
     end;
   inc(hitsLogged);
 
-  if data.preReply <> PR_NONE then exit;
+  if data.preReply <> PR_NONE then
+    exit;
 
-  url:=conn.request.url;
+  url := conn.request.url;
   extractParams();
-  url:=decodeURL(url);
+  url := decodeURL(url, True);
 
   data.lastFN:=extractFileName( xtpl(url,['/','\']) );
   data.agent:=getAgentID(conn);
@@ -5162,8 +5172,8 @@ var
     end;
 
   // this is better to be refresh, because a user may be deleted meantime
-  data.account:=getAccount(data.usr);
-  conn.ignoreSpeedLimit:=noLimitsFor(data.account);
+  data.account := getAccount(data.usr);
+  conn.ignoreSpeedLimit := noLimitsFor(data.account);
 
   // all URIs must begin with /
   if (url = '') or (url[1] <> '/') then
@@ -5226,7 +5236,7 @@ var
     begin
     if sameText(url, '/robots.txt') and stopSpidersChk.checked then
       replyWithString('User-agent: *'+CRLF+'Disallow: /')
-    else
+     else
       getPage('not found', data);
     exit;
     end;
@@ -5387,13 +5397,13 @@ var
     if DMbrowserTplChk.Checked and isDownloadManagerBrowser() then
       s:=getFolderPage(f, data, dmBrowserTpl)
     else
-      s:=getFolderPage(f, data, tpl);
+      s := getFolderPage(f, data, tpl);
     if conn.reply.mode <> HRM_REDIRECT then
       replyWithString(s);
     exit;
     end;
 
-  httpDate:=dateToHTTP(getMtimeUTC(f.resource));
+  httpDate := dateToHTTP(getMtimeUTC(f.resource));
 
   data.countAsDownload:=f.shouldCountAsDownload();
   if data.countAsDownload and limitsExceededOnDownload() then
@@ -5406,8 +5416,8 @@ var
   data.eta.idx:=0;
   conn.reply.contentType:=name2mimetype(f.name, DEFAULT_MIME);
   conn.reply.bodyMode:=RBM_FILE;
-  conn.reply.bodyB := f.resource;
-  data.downloadingWhat:=DW_FILE;
+  conn.reply.bodyB := UTF8Encode(f.resource);
+  data.downloadingWhat := DW_FILE;
   { I guess this would not help in any way for files since we are already handling the 'if-modified-since' field
   try
     conn.addHeader('ETag: '+getEtag(f.resource));
@@ -8786,7 +8796,7 @@ begin
 if userInteraction.disabled then exit;
 
 for i:=connBox.items.count-1 downto 0 do
-    if conn2data(i) = (sender as TmyTrayIcon).data then
+    if conn2data(i) = (sender as TmyTrayicon).usrData then
       connBox.itemIndex:=i;
 
 case ev of
@@ -9218,7 +9228,7 @@ while not tlv.isOver() do
       f.name:= data2;
       node.text := data2;
       end;
-    FK_FLAGS: move(data2[1], f.flags, length(data2));
+    FK_FLAGS: move(data2[1], f.flags, min(length(data2), SizeOf(f.flags)));
   	FK_ADDEDTIME: f.atime:=dt_(data2);
     FK_COMMENT: f.comment:=data2;
     FK_USERPWD:
@@ -9440,7 +9450,7 @@ var
   end; // addColor
 
 begin
-options:=copy(decodeURL(cd.conn.request.url), 12, MAXINT);
+  options := copy(decodeURL(cd.conn.request.url), 12, MAXINT);
 delete(options, pos('?',options), MAXINT);
 bmp:=Tbitmap.create();
 bmp.Width:=graphBox.Width;
@@ -11577,7 +11587,7 @@ srv.autoFreeDisconnectedClients:=FALSE;
 srv.limiters.add(globalLimiter);
 srv.onEvent:=httpEvent;
 tray_ico:=Ticon.create();
-tray:=TmyTrayicon.create(self);
+tray:=TmyTrayicon.create(self.Handle);
 DragAcceptFiles(handle, true);
 caption:=format('HFS ~ HTTP File Server %s%sBuild %s',
   [VERSION, stringOfChar(' ',80), VERSION_BUILD]);
@@ -12194,10 +12204,10 @@ else tmpPath:=getTempDir();
 lastUpdateCheckFN:=tmpPath+'HFS last update check.tmp';
 setCurrentDir(exePath); // sometimes people mess with the working directory, so we force it to the exe path
 if fileExists('default.tpl') then
-  defaultTpl:=loadfile('default.tpl')
+  defaultTpl:= loadfile('default.tpl')
 else
   defaultTpl:=getRes('defaultTpl');
-tpl_help:=getRes('tplHlp');
+tpl_help := UnUTF(getRes('tplHlp'));
 tpl:=Ttpl.create();
 defSorting:='name';
 dmBrowserTpl:=Ttpl.create(getRes('dmBrowserTpl'));
@@ -12214,7 +12224,7 @@ logMaxLines:=2000;
 trayShows:='downloads';
 flashOn:='download';
 forwardedMask:='127.0.0.1';
-runningOnRemovable:=DRIVE_REMOVABLE = GetDriveTypeA(PansiChar(exePath[1]+':\'));
+runningOnRemovable:=DRIVE_REMOVABLE = GetDriveType(PChar(exePath[1]+':\'));
 mtimes.values['exe']:=dateToHTTP(getMtimeUTC(paramStr(0)));
 
 dll:=GetModuleHandle('kernel32.dll');

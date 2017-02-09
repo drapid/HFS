@@ -159,7 +159,7 @@ type
     function getCursor():integer;
     function getPerc():real;
     function isOver():boolean;
-    function getTheRest():string;
+    function getTheRest():RawByteString;
     end;
 
 implementation
@@ -374,22 +374,26 @@ end; // append
 procedure Thasher.loadFrom(path:string);
 var
   sr: TsearchRec;
-  s, l, h: string;
+  sA, l, h: RawByteString;
+  f: String;
 begin
-if path='' then exit;
-path:=includeTrailingPathDelimiter(lowercase(path));
-if findFirst(path+'*.md5', faAnyFile-faDirectory, sr) <> 0 then exit;
+  if path='' then
+    exit;
+  path := includeTrailingPathDelimiter(lowercase(path));
+  if findFirst(path+'*.md5', faAnyFile-faDirectory, sr) <> 0 then exit;
   repeat
-  s:=loadfile(path+sr.name);
-  while s > '' do
+   sA := loadfile(path+sr.name);
+  while sA > '' do
     begin
-    l:=chopline(s);
-    h:=trim(chop('*',l));
-    if h = '' then break;
-    if l = '' then
-      // assume it is referring to the filename without the extention
-      l:=copy(sr.name, 1, length(sr.name)-4);
-    add(path+lowercase(l)+'='+h);
+      l := chopline(sA);
+      h:=trim(chop(RawByteString('*'),l));
+      if h = '' then break;
+      if l = '' then
+        // assume it is referring to the filename without the extention
+        f := copy(sr.name, 1, length(sr.name)-4)
+       else
+        f := UnUTF(l);
+      add(path+lowercase(f)+'='+h);
     end;
   until findnext(sr) <> 0;
 sysutils.findClose(sr);
@@ -719,7 +723,9 @@ updateUTF8();
 end; // setOver
 
 procedure Ttpl.updateUTF8();
-begin fUTF8:=assigned(over) and over.utf8 or utf8test(fullText) end;
+begin
+  fUTF8 := assigned(over) and over.utf8 or utf8test(fullText)
+end;
 
 function Ttpl.getSections():TStringDynArray;
 var
@@ -808,7 +814,7 @@ end; // getPerc
 function Ttlv.isOver():boolean;
 begin result:=(cur+8 > bound) end;
 
-function Ttlv.getTheRest():string;
+function Ttlv.getTheRest(): RawByteString;
 begin result:=substr(whole, cur, bound) end;
 
 end.

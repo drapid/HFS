@@ -229,6 +229,7 @@ function first(a,b:string):string; overload;
 function first(a:array of string):string; overload;
 function stripChars(s:string; cs:Tcharset; invert:boolean=FALSE):string;
 function strAt(s, ss:string; at:integer):boolean; inline;
+function substr(s: RawByteString; start:integer; upTo:integer=0): RawByteString; inline; OverLoad;
 function substr(s:string; start:integer; upTo:integer=0):string; inline; overload;
 function substr(s:string; after:string):string; overload;
 function reduceSpaces(s:string; replacement:string=' '; spaces:TcharSet=[]):string;
@@ -256,7 +257,8 @@ procedure enforceNUL(var s: RawbyteString); OverLoad;
 implementation
 
 uses
-  RDUtils, clipbrd, AnsiStringReplaceJOHIA32Unit13, JclNTFS, JclWin32,
+  RDUtils, clipbrd, AnsiStringReplaceJOHIA32Unit13, //JclNTFS, JclWin32,
+  HFSJclNTFS, hfsJclOthers,
   parserLib, newuserpassDlg, winsock, AnsiClasses, OverbyteicsMD5;
 
 var
@@ -335,18 +337,23 @@ var
     end;
   BytesReturned: DWORD;
 begin
-Result := False;
-if not NtfsFileHasReparsePoint(Source) then exit;
-handle := CreateFile(PChar(Source), GENERIC_READ, 0, nil, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS or FILE_FLAG_OPEN_REPARSE_POINT, 0);
-if handle = INVALID_HANDLE_VALUE then exit;
-try
-  BytesReturned := 0;
-  if not DeviceIoControl(Handle, FSCTL_GET_REPARSE_POINT, nil, 0, @ReparseData, MAXIMUM_REPARSE_DATA_BUFFER_SIZE, BytesReturned, nil) then exit;
-  if BytesReturned < DWORD(ReparseData.Reparse.SubstituteNameLength + SizeOf(WideChar)) then exit;
-  SetLength(Destination, (ReparseData.Reparse.SubstituteNameLength div SizeOf(WideChar)));
-  Move(ReparseData.Reparse.PathBuffer[0], Destination[1], ReparseData.Reparse.SubstituteNameLength);
-  Result := True;
-finally CloseHandle(Handle) end
+  Result := False;
+  if not NtfsFileHasReparsePoint(Source) then
+    exit;
+  handle := CreateFile(PChar(Source), GENERIC_READ, 0, nil, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS or FILE_FLAG_OPEN_REPARSE_POINT, 0);
+  if handle = INVALID_HANDLE_VALUE then exit;
+  try
+    BytesReturned := 0;
+    if not DeviceIoControl(Handle, FSCTL_GET_REPARSE_POINT, nil, 0, @ReparseData, MAXIMUM_REPARSE_DATA_BUFFER_SIZE, BytesReturned, nil) then
+      exit;
+    if BytesReturned < DWORD(ReparseData.Reparse.SubstituteNameLength + SizeOf(WideChar)) then
+      exit;
+    SetLength(Destination, (ReparseData.Reparse.SubstituteNameLength div SizeOf(WideChar)));
+    Move(ReparseData.Reparse.PathBuffer[0], Destination[1], ReparseData.Reparse.SubstituteNameLength);
+    Result := True;
+   finally
+    CloseHandle(Handle)
+  end
 end; // NtfsGetJunctionPointDestination
 
 function getDrive(fn:string):string;
@@ -541,8 +548,8 @@ end; // reReplace
 // converts from integer to string[4]
 function str_(i:integer): RawByteString; overload;
 begin
-setlength(result, 4 div sizeOf(char));
-move(i, result[1], 4 div sizeOf(char));
+  setlength(result, 4 div sizeOf(AnsiChar));
+  move(i, result[1], 4 div sizeOf(AnsiChar));
 end; // str_
 
 // converts from boolean to string[1]
@@ -556,8 +563,8 @@ begin result:=str_(integer(fa)) end;
 // converts from Tdatetime to string[8]
 function str_(t:Tdatetime): RawByteString; overload;
 begin
-setlength(result, 8 div sizeOf(char));
-move(t, result[1], 8 div sizeOf(char));
+  setlength(result, 8 div sizeOf(AnsiChar));
+  move(t, result[1], 8 div sizeOf(AnsiChar));
 end; // str_
 
 // converts from string[4] to integer
@@ -741,28 +748,33 @@ end; // dotted
 function getRes(name:pchar; typ:string='TEXT'): RawByteString;
 var
   h1, h2: Thandle;
-  p: pchar;
+  p: pByte;
   l: integer;
   ansi: RawByteString;
 begin
-result:='';
-h1:=FindResource(HInstance, name, pchar(typ));
-h2:=LoadResource(HInstance, h1);
-if h2=0 then exit;
-l:=SizeOfResource(HInstance, h1);
-p:=LockResource(h2);
-setLength(ansi, l);
-move(p^, ansi[1], l);
-UnlockResource(h2);
-FreeResource(h2);
-result:=ansi;
+  result:='';
+  h1:=FindResource(HInstance, name, pchar(typ));
+  h2:=LoadResource(HInstance, h1);
+  if h2=0 then
+    exit;
+  l:=SizeOfResource(HInstance, h1);
+  p := LockResource(h2);
+  setLength(ansi, l);
+  move(p^, ansi[1], l);
+  UnlockResource(h2);
+  FreeResource(h2);
+  result := ansi;
 end; // getRes
 
 function compare_(i1,i2:int64):integer; overload;
 begin
-if i1 < i2 then result:=-1 else
-if i1 > i2 then result:=1 else
-  result:=0
+  if i1 < i2 then
+    result:=-1
+   else
+    if i1 > i2 then
+      result:=1
+     else
+      result:=0
 end; // compare_
 
 function compare_(i1,i2:integer):integer; overload;
@@ -2299,13 +2311,15 @@ function replace(var s:string; ss:string; start,upTo:integer):integer;
 var
   common, oldL, surplus: integer;
 begin
-oldL:=upTo-start+1;
-common:=min(length(ss), oldL);
-move(ss[1], s[start], common*SizeOf(char));
-surplus:=oldL-length(ss);
-if surplus > 0 then delete(s, start+length(ss), surplus)
-else insert(copy(ss, common+1, -surplus), s, start+common);
-result:=-surplus;
+  oldL := upTo-start+1;
+  common := min(length(ss), oldL);
+  MoveChars(ss[1], s[start], common);
+  surplus := oldL-length(ss);
+  if surplus > 0 then
+    delete(s, start+length(ss), surplus)
+   else
+    insert(copy(ss, common+1, -surplus), s, start+common);
+  result := -surplus;
 end; // replace
 
 function substr(s:string; start:integer; upTo:integer=0):string; inline;
@@ -2317,6 +2331,21 @@ if start = 0 then inc(start)
 else if start < 0 then start:=l+start+1;
 if upTo <= 0 then upTo:=l+upTo;
 result:=copy(s, start, upTo-start+1)
+end; // substr
+
+function substr(s: RawByteString; start:integer; upTo:integer=0): RawByteString; inline;
+var
+  l: integer;
+begin
+  l := length(s);
+  if start = 0 then
+    inc(start)
+   else
+    if start < 0 then
+      start := l+start+1;
+  if upTo <= 0 then
+    upTo := l+upTo;
+  result := copy(s, start, upTo-start+1)
 end; // substr
 
 function substr(s:string; after:string):string;
@@ -2335,7 +2364,7 @@ begin
 i:=0;
 while i < length(table) do
   begin
-  src:=stringReplace(src,table[i],table[i+1],[rfReplaceAll,rfIgnoreCase]);
+  src := SysUtils.StringReplace(src,table[i],table[i+1],[rfReplaceAll,rfIgnoreCase]);
   inc(i, 2);
   end;
 result:=src;
@@ -2888,11 +2917,13 @@ end; // allocatedMemory
 }
 
 function allocatedMemory():int64;
-var
+{var
   mm: TMemoryManagerUsageSummary;
 begin
   getMemoryManagerUsageSummary(mm);
-  result:=mm.allocatedBytes;
+  result:=mm.allocatedBytes;}
+begin
+ result := -1;
 end; // allocatedMemory
 
 function removeStartingStr(ss,s:string):string;
@@ -3145,7 +3176,7 @@ trayMsg:='%ip%'
   +trayNL+'Uptime: %uptime%'
   +trayNL+'Downloads: %downloads%';
 
-fastmm4.SuppressMessageBoxes:=TRUE;
+//fastmm4.SuppressMessageBoxes:=TRUE;
 
 FINALIZATION
 freeAndNIL(ipToInt_cache);

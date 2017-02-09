@@ -24,7 +24,7 @@ program hfs;
 {$R 'data.res' 'res\data.rc'}
 
 uses
-  FastMM4,
+//  FastMM4,
   {$IFDEF EX_DEBUG}
   ftmExceptionForm,
   {$ENDIF }
@@ -50,7 +50,8 @@ uses
   listSelectDlg in 'listSelectDlg.pas' {listSelectFrm},
   filepropDlg in 'filepropDlg.pas' {filepropFrm},
   runscriptDlg in 'runscriptDlg.pas' {runScriptFrm},
-  scriptLib in 'scriptLib.pas';
+  scriptLib in 'scriptLib.pas',
+  hfsJclOthers in 'hfsJclOthers.pas';
 
 {$R *.res}
 
