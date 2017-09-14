@@ -32,15 +32,15 @@ uses
   // 3rd part libs. ensure you have all of these, the same version reported in dev-notes.txt
   OverbyteIcsWSocket, OverbyteIcsHttpProt, OverbyteicsMD5,// GIFimage, zlibex,
   regexpr,
-  gifImg, RnQzip, //RegularExpressions,
+  System.ImageList, gifImg, RnQzip, //RegularExpressions,
   rnqtraylib,
   OverbyteIcsZLibHigh,
   // rejetto libs
-  HSlib, monoLib, progFrmLib, classesLib, System.ImageList;
+  HSlib, monoLib, progFrmLib, classesLib;
 
 const
-  VERSION = '2.3i RD';
-  VERSION_BUILD = '297';
+  VERSION = '2.3k RD';
+  VERSION_BUILD = '299';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
@@ -62,7 +62,7 @@ const
   MACROS_LOG_FILE = 'macros-log.html';
   PREVIOUS_VERSION = 'hfs.old.exe';
   SESSION_COOKIE = 'HFS_SID_';
-  PROTECTED_FILES_MASK = 'hfs.*;*.htm*;descript.ion;*.comment;*.md5;*.corrupted';
+  PROTECTED_FILES_MASK = 'hfs.*;*.htm*;descript.ion;*.comment;*.md5;*.corrupted;*.lnk';
   G_VAR_PREFIX = '#';
   HOURS = 24;
   MINUTES = HOURS*60;
@@ -900,7 +900,7 @@ type
     procedure Changeport1Click(Sender: TObject);
     procedure trayiconforeachdownload1Click(Sender: TObject);
     procedure Defaultpointtoaddfiles1Click(Sender: TObject);
-    function appEventsHelp(Command: Word; Data: Integer;
+    function appEventsHelp(Command: Word; Data: NativeInt;
       var CallHelp: Boolean): Boolean;
     procedure connBoxData(Sender: TObject; Item: TListItem);
     procedure connBoxAdvancedCustomDrawSubItem(Sender: TCustomListView;
@@ -926,7 +926,7 @@ type
     function  pointedFile(strict:boolean=TRUE):Tfile;
     function  pointedConnection():TconnData;
     procedure updateSbar();
-    function  getFolderPage(folder: Tfile; cd: TconnData; otpl: Tobject):string;
+    function  getFolderPage(folder: Tfile; cd: TconnData; otpl: Tobject): String;
     procedure getPage(sectionName:string; data:TconnData; f:Tfile=NIL; tpl2use:Ttpl=NIL);
     function  selectedConnection():TconnData;
     function  sendPic(cd:TconnData; idx:integer=-1):boolean;
@@ -1064,7 +1064,7 @@ implementation
 { $R data.res }
 
 uses
-  RDFileUtil, RDUtils, RnQNet.Uploads, Base64,
+  RDFileUtil, RDUtils, RnQNet.Uploads, Base64, RnQGraphics32,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib, MMsystem,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib;
 
@@ -1078,7 +1078,7 @@ var
   clock: integer;       // program ticks (tenths of second)
   // workaround for splitters' bad behaviour
   lastGoodLogWidth, lastGoodConnHeight: integer;
-  mtimes: THashedStringList;   // used for last-modified http header
+  etags: THashedStringList; 
   tray_ico: Ticon;             // the actual icon shown in tray
   usingFreePort: boolean=TRUE; // the actual server port set was 0
   upTime: Tdatetime;           // the server is up since...
@@ -1990,7 +1990,7 @@ begin
   gif := stringToGif(s);
   try
     result := mainfrm.images.addMasked(gif.bitmap, gif.Bitmap.TransparentColor);
-    mtimes.values['icon.'+intToStr(result)] := dateToHTTP(now());
+    etags.values['icon.'+intToStr(result)] := strMD5(s);
    finally
     gif.free
   end;
@@ -2029,10 +2029,10 @@ ico:=Ticon.create();
 try
   systemimages.getIcon(shfi.iIcon, ico);
   i:=mainfrm.images.addIcon(ico);
-  mtimes.values['icon.'+intToStr(i)] := dateToHTTP(now());
+  s:=pic2str(i);
+  etags.values['icon.'+intToStr(i)] := strMD5(s);
 finally ico.free end;
 // now we can search if the icon was already there, by byte comparison
-s:=pic2str(i);
 n:=0;
 while n < length(sysidx2index) do
   begin
@@ -2101,7 +2101,8 @@ if s = 'ips' then s:=intToStr(countIPs());
 if s = 'ips-ever' then s:=intToStr(ipsEverConnected.count);
 
 drawTrayIconString(bmp.canvas, s);
-tray_ico.Handle:=bmpToHico(bmp);
+//tray_ico.Handle:=bmpToHico(bmp);
+tray_ico.Handle := bmp2ico32(bmp);
 tray_ico.Transparent:=FALSE;
 bmp.free;
 tray.setIcon(tray_ico);
@@ -2500,7 +2501,10 @@ if not isTemp() then
 path:=resource+COMMENT_FILE_EXT;
 if fileExists(path) then
   begin
-  saveFile(path, cmt);
+  if cmt='' then
+    deleteFile(path)
+  else
+    saveFile(path, cmt);
   exit;
   end;
 name:=extractFileName(resource);
@@ -3864,14 +3868,24 @@ with sender as TMenuItem do
     checked:= msgDlg(MSG, MB_ICONWARNING+MB_YESNO) = MRYES;
 end;
 
-function notModified(conn:ThttpConn; ts:string):boolean;
+function notModified(conn:ThttpConn; etag, ts:string):boolean; overload;
 begin
-result:=ts = conn.getHeader('If-Modified-Since');
+result:= (etag>'') and (etag = conn.getHeader('If-None-Match'));
 if result then
-  conn.reply.mode:=HRM_NOT_MODIFIED
-else
+  begin
+  conn.reply.mode:=HRM_NOT_MODIFIED;
+  exit;
+  end;
+conn.addHeader('ETag: '+etag);
+if ts > '' then
   conn.addHeader('Last-Modified: '+ts);
 end; // notModified
+
+function notModified(conn:ThttpConn; f:string):boolean; overload;
+begin result:=notModified(conn, getEtag(f), dateToHTTP(f)) end;
+
+function notModified(conn:ThttpConn; f:Tfile):boolean; overload;
+begin result:=notModified(conn, f.resource) end;
 
 function Tmainfrm.sendPic(cd:TconnData; idx:integer=-1):boolean;
 var
@@ -3903,10 +3917,13 @@ case special of
   end;
 
 result:=TRUE;
-
+{**
 // browser caching support
-{** something is wrong and the browser goes crazy, so it's temporarily disabled
-if notModified(cd.conn, mtimes.values[ifThen(idx < startingImagesCount, 'exe', 'icon.'+intToStr(idx))]) then
+if idx < startingImagesCount then
+  s:=intToStr(idx)+':'+etags.values['exe']
+else
+  s:=etags.values['icon.'+intToStr(idx)];
+if notModified(cd.conn, s, '') then
   exit;
 }
 cd.conn.reply.mode:=HRM_REPLY;
@@ -3967,7 +3984,8 @@ procedure setupDownloadIcon(data:TconnData);
   s:=intToStr( trunc(perc*100) )+'%';
   bmp:=getBaseTrayIcon(perc);
   drawTrayIconString(bmp.canvas, s);
-  data.tray_ico.Handle:=bmpToHico(bmp);
+//  data.tray_ico.Handle:=bmpToHico(bmp);
+  data.tray_ico.Handle := bmp2ico32(bmp);
   bmp.free;
   data.tray.setIcon(data.tray_ico);
   data.tray.setTip(
@@ -4282,7 +4300,7 @@ end; // apacheLogCb
 procedure removeFilesFromComments(files:TStringDynArray);
 var
   fn, lastPath, path: string;
-  trancheStart, trancheEnd: integer;
+  trancheStart, trancheEnd: integer; // the tranche is a window within 'files' of items sharing the same path
   ss: TstringList;
 
   procedure doTheTranche();
@@ -5403,13 +5421,11 @@ var
     exit;
     end;
 
-  httpDate := dateToHTTP(getMtimeUTC(f.resource));
-
   data.countAsDownload:=f.shouldCountAsDownload();
   if data.countAsDownload and limitsExceededOnDownload() then
     exit;
 
-  if notModified(conn, httpDate) then
+  if notModified(conn, f) then
     exit;
 
   setupDownloadIcon(data);
@@ -5494,6 +5510,7 @@ var
   begin
   result:=validFilename(data.uploadSrc)
     and not sameText(data.uploadSrc, DIFF_TPL_FILE) // never allow this
+    and not isExtension(data.uploadSrc, '.lnk')  // security matters (by mars)
     and fileMatch(getMask(), data.uploadSrc);
   if not result then
     data.uploadFailed:='File name or extension forbidden.';
@@ -5506,7 +5523,7 @@ var
   result:=IOresult=0;
   if result then exit;
   data.uploadFailed:='Error creating file.';
-  end; // complyUploadFilter
+  end; // canCreateFile
 
 var
   ur: TuploadResult;
@@ -7641,7 +7658,9 @@ var
   if assigned(monitor) then  // checking here because the following line once thrown this AV http://www.rejetto.com/forum/?topic=5568
     for i:=0 to monitor.MonitorNum do
       dec(outside, screen.monitors[i].width);
-  if outside > 0 then
+  if (outside > 0)
+  or (boundsRect.bottom < 0)
+  or (boundsRect.right < 0) then
     makeFullyVisible();
 
   if dyndns.active and (dyndns.url > '') then
@@ -7934,7 +7953,8 @@ for i:=0 to length(a)-1 do
 while Acceptconnectionson1.count > INDEX_FOR_NIC  do
   Acceptconnectionson1.delete(INDEX_FOR_NIC);
 Anyaddress1.checked:= listenOn = '';
-a:=listToArray(localIPlist);
+//a:=listToArray(localIPlist);
+a := listToArray(localIPlist(sfAny));
 addUniqueString('127.0.0.1', a);
 for i:=0 to length(a)-1 do
   Acceptconnectionson1.Insert(INDEX_FOR_NIC,
@@ -8747,10 +8767,11 @@ item.subItems[3]:=getETA(data);
 item.subItems[4]:=if_(progress<0,'', format('%d%%', [trunc(progress*100)]));
 end;
 
-function TmainFrm.appEventsHelp(Command: Word; Data: Integer; var CallHelp: Boolean): Boolean;
+function TmainFrm.appEventsHelp(Command: Word; Data: NativeInt;
+  var CallHelp: Boolean): Boolean;
 begin
 callHelp:=FALSE; // avoid exception to be thrown
-result:=FALSE; 
+result:=FALSE;
 end;
 
 procedure TmainFrm.appEventsMinimize(Sender: TObject);
@@ -12214,7 +12235,7 @@ dmBrowserTpl:=Ttpl.create(getRes('dmBrowserTpl'));
 filelistTpl:=Ttpl.create(getRes('filelistTpl'));
 globalLimiter:=TspeedLimiter.create();
 ip2obj:=THashedStringList.create();
-mtimes:=THashedStringList.create();
+etags:=THashedStringList.create();
 sessions:=THashedStringList.create();
 ipsEverConnected:=THashedStringList.create();
 ipsEverConnected.sorted:=TRUE;
@@ -12225,7 +12246,8 @@ trayShows:='downloads';
 flashOn:='download';
 forwardedMask:='127.0.0.1';
 runningOnRemovable:=DRIVE_REMOVABLE = GetDriveType(PChar(exePath[1]+':\'));
-mtimes.values['exe']:=dateToHTTP(getMtimeUTC(paramStr(0)));
+etags.values['exe']:=strMD5(dateToHTTP(getMtimeUTC(paramStr(0))));
+
 
 dll:=GetModuleHandle('kernel32.dll');
 if dll <> HINSTANCE_ERROR then
@@ -12275,6 +12297,6 @@ usersInVFS.free;
 globalLimiter.Free;
 ip2obj.free;
 ipsEverConnected.free;
-mtimes.free;
+etags.free;
 
 end.

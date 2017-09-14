@@ -24,7 +24,7 @@ object filepropFrm: TfilepropFrm
     Top = 0
     Width = 393
     Height = 366
-    ActivePage = permTab
+    ActivePage = flagsTab
     Align = alClient
     ParentShowHint = False
     RaggedRight = True

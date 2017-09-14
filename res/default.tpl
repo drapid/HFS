@@ -446,8 +446,8 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 {.check session.}
 {.break|if={.not|{.can comment.}.} |result=forbidden.}
 {.for each|fn|{.replace|:|{.no pipe||.}|{.postvar|files.}.}|{:
-	{.break|if={.is file protected|var=fn.}|result=forbidden.}
-    {.set item|{.force ansi|%folder%{.^fn.}.}|comment={.encode html|{.force ansi|{.postvar|text.}.}.}.}
+     {.break|if={.is file protected|var=fn.}|result=forbidden.}
+     {.set item|{.force ansi|%folder%{.^fn.}.}|comment={.encode html|{.force ansi|{.postvar|text.}.}.}.}
 :}.}
 {.pipe|ok.}
 
@@ -673,7 +673,7 @@ function selectedChanged() {
 function getItemName(el) {
     if (typeof el == 'undefined')
         return false;
-    // we handle elements, not jquery sets  
+    // we handle elements, not jquery sets
     if (el.jquery)
         if (el.size())
             el = el[0];
@@ -748,7 +748,7 @@ function ezprompt(msg, options, cb) {
     }
     if (!$.prompt) { // load on demand
         include('/?mode=section&id=impromptu.css');
-        include('/?mode=section&id=jquery.impromptu.js'); 
+        include('/?mode=section&id=jquery.impromptu.js');
     }
     var v;
     if (v = options.type) {
@@ -763,17 +763,17 @@ function ezprompt(msg, options, cb) {
     $.prompt(msg, {
         opacity: 0.9,
         overlayspeed: 'fast',
-        loaded: function(){  
+        loaded: function(){
             $('#jqibox').find(':input').keypress(function (e) {
                 var c = (e.keyCode || e.which);
                 if (options.keypress && options.keypress(c, this, e) === false) return;
                 if (c != 13 || this.tagName == 'TEXTAREA') return; // ENTER key is like submit, but not in textarea
                 $('.jqibuttons button:first').click();
                 return false;
-            }).filter(':first').focus()[0].select(); 
+            }).filter(':first').focus()[0].select();
         },
         submit: function(val,div,form) {
-            var res = cb(options.type ? form.txt : form, $('#jqibox'), options.cbData );
+            var res = cb(options.type ? $.trim(form.txt) : form, $('#jqibox'), options.cbData );
             if (res === false) {
                 $('#jqibox').find(':input:first').focus();
                 return false;
@@ -918,7 +918,7 @@ function delCookie(name) {
 	setCookie(name,"",-1);
 } // delCookie
 
-    
+
 [jquery.impromptu.js|no log]
 /*
  * jQuery Impromptu

@@ -1,4 +1,8 @@
+* consider letting comment "protected" files. Can it really cause harm? 
+* flag to enable lnk files in a folder (disabled by default)
+experiment session login in place of http authentication
 + add mkv mime type http://www.rejetto.com/forum/html-templates/online-video-mkv-player/msg1061237/?topicseen#msg1061237
++ sign exe http://www.rejetto.com/forum/hfs-~-http-file-server/'unsafe'/msg1061437/#msg1061437
 cache reReplace
 - comments are not updated when moving or renaming files http://www.rejetto.com/forum/bug-reports/descript-ion-and-comment-not-cleaned-up-after-moving-file/
 + hash&salt passwords

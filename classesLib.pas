@@ -166,7 +166,8 @@ implementation
 
 uses
   RDFileUtil, RDUtils,
-  ansiStrings, utilLib, main, windows, dateUtils, forms;
+  ansiStrings,
+  utilLib, main, windows, dateUtils, forms;
 
 constructor TperIp.create();
 begin
@@ -190,7 +191,7 @@ for i:=0 to count-1 do
   objects[i].free;
 end;
 
-function TcachedTpls.getTplFor(fn: string):Ttpl;
+function TcachedTpls.getTplFor(fn: String): Ttpl;
 var
   i: integer;
   o: TcachedTplObj;
@@ -292,7 +293,7 @@ e:=n-1;
 result:=b;
 end; // idxOf
 
-function TiconsCache.get(data: String):PcachedIcon;
+function TiconsCache.get(data: String): PcachedIcon;
 var
   i: integer;
 begin
@@ -302,7 +303,7 @@ if (i >= 0) and (i < n) and (icons[i].data = data) then
   result:=@icons[i];
 end; // get
 
-procedure TiconsCache.put(data: string; idx:integer; time:Tdatetime);
+procedure TiconsCache.put(data: String; idx: Integer; time: Tdatetime);
 var
   i, w: integer;
 begin

@@ -183,6 +183,7 @@ COMMENT with these you can disable some features of the template. Please note th
 		<button id='commentBtn' onclick='setComment.call(this)'>{.!Comment.}</button>
 		.}
 		{.if|{.get|can delete.}|
+		<button id='deleteBtn' onclick='if (confirm("{.!confirm.}")) submit({action:"delete"}, "{.get|url.}")'>{.!Delete.}</button>
 
 		{.if|{.and|{.!option.move.}|{.can move.}.}| <button id='moveBtn' onclick='moveClicked()'>{.!Move.}</button> .}
 		.}
@@ -465,6 +466,7 @@ can move=or|1|1
 escape attr=replace|"|&quot;|$1
 commentNL=if|{.pos|<br|$1.}|$1|{.replace|{.chr|10.}|<br />|$1.}
 add bytes=switch|{.cut|-1||$1.}|,|0,1,2,3,4,5,6,7,8,9|$1 Bytes|K,M,G,T|$1Bytes
+quote={:"$1":}
 
 [special:import]
 {.new account|can change password|enabled=1|is group=1|notes=accounts members of this group will be allowed to change their password.}

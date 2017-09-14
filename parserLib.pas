@@ -6,7 +6,7 @@ uses
   strutils, sysutils, classes, types, utilLib, windows, intlist;
 
 type
-  TmacroCB = function(fullMacro:string; pars:Tstrings; cbData:pointer):string;
+  TmacroCB = function(const fullMacro:string; pars:Tstrings; cbData:pointer):string;
   EtplError = class(Exception)
     pos, row, col: integer;
     code: string;
@@ -20,8 +20,8 @@ const
   MARKER_UNQUOTE = ':}';
   MARKERS: array [0..4] of string = ( MARKER_OPEN, MARKER_CLOSE, MARKER_SEP, MARKER_QUOTE, MARKER_UNQUOTE );
 
-function anyMacroMarkerIn(s:string):boolean;
-function findMacroMarker(s:string; ofs:integer=1):integer;
+function anyMacroMarkerIn(const s:string):boolean;
+function findMacroMarker(const s:string; ofs:integer=1):integer;
 procedure applyMacrosAndSymbols(var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
 
 implementation
@@ -238,10 +238,10 @@ if removeQuotings then
   txt:=xtpl(txt, [MARKER_QUOTE, '', MARKER_UNQUOTE, ''])
 end;
 
-function findMacroMarker(s:string; ofs:integer=1):integer;
+function findMacroMarker(const s:string; ofs:integer=1):integer;
 begin result:=reMatch(s, '\{[.:]|[.:]\}|\|', 'm!', ofs) end;
 
-function anyMacroMarkerIn(s:string):boolean;
+function anyMacroMarkerIn(const s:string):boolean;
 begin result:=findMacroMarker(s) > 0 end;
 
 end.

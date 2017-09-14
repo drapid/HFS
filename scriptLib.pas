@@ -41,15 +41,15 @@ var
 
 function tryApplyMacrosAndSymbols(var txt:string; var md:TmacroData; removeQuotings:boolean=true):boolean;
 function macroQuote(s:string):string;
-function runScript(script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnData=NIL):string;
-function runEventScript(event:string; table:TStringDynArray=NIL; cd:TconnData=NIL):string;
+function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnData=NIL):string;
+function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnData=NIL):string;
 procedure resetLog();
 
 implementation
 
 uses
   windows, utilLib, parserLib, graphics, classes, sysutils, StrUtils,
-  hslib, comctrls, math, controls, forms, clipbrd, MMsystem,
+  hslib, comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
   RnQtrayLib, RDFileUtil, RDUtils;
 
 const
@@ -138,7 +138,7 @@ s:=reReplace(s,'%([-a-z0-9]+%)','&#37;$1', 'mi');
 result:=s;
 end; // noMacrosAllowed
 
-function isMacroQuoted(s:string):boolean;
+function isMacroQuoted(const s:string):boolean;
 begin result:=ansiStartsStr(MARKER_QUOTE, s) and ansiEndsStr(MARKER_UNQUOTE, s) end;
 
 function macroQuote(s:string):string;
@@ -165,7 +165,7 @@ if isMacroQuoted(s) then
   result:=copy(s, length(MARKER_QUOTE)+1, length(s)-length(MARKER_QUOTE)-length(MARKER_UNQUOTE) );
 end; // macroDequote
 
-function cbMacros(fullMacro:string; pars:Tstrings; cbData:pointer):string;
+function cbMacros(const fullMacro:string; pars:Tstrings; cbData:pointer):string;
 var
   md: ^TmacroData;
   name, p: string;
@@ -187,7 +187,7 @@ var
   procedure unsatisfied(b:boolean=TRUE);
   begin if b then macroError('cannot be used here') end;
 
-  function parEx(idx:integer; name:string=''; doTrim:boolean=TRUE):string; overload;
+  function parEx(idx:integer; const name:string=''; doTrim:boolean=TRUE):string; overload;
   var
     i: integer;
   begin
@@ -271,10 +271,10 @@ var
   procedure spaceIf(condition:boolean);
   begin if condition then result:=' ' else result:='' end;
 
-  function isFalse(s:string):boolean;
+  function isFalse(const s:string):boolean;
   begin result:=(s='') or (strToFloatDef(s,1) = 0) end;
 
-  function isTrue(s:string):boolean; inline;
+  function isTrue(const s:string):boolean; inline;
   begin result:=not isFalse(s) end;
 
   function getVarSpace(var varname:string):THashedStringList;
@@ -335,7 +335,7 @@ var
   end; // setVar
 
   // we wrap pos() to switch between case sensitivity
-  function pos_(caseSensitive:boolean; ss, s:string; ofs:integer=1):integer;
+  function pos_(caseSensitive:boolean; const ss, s:string; ofs:integer=1):integer;
   begin
     if caseSensitive then
       result:=posEx(ss,s,ofs)
@@ -1775,6 +1775,18 @@ var
     result:= bitNone
   end; // stringTotrayMessageType
 
+  function renameIt(src,dst:string):boolean;
+  var
+    srcReal, dstReal: string;
+  begin
+  srcReal:=uri2diskMaybe(src,NIL,FALSE);
+  dstReal:=uri2diskMaybeFolder(dst);
+  if isExtension(srcReal, '.lnk') 
+  and not isExtension(src, '.lnk') then
+    dstReal := dstReal + '.lnk';
+  result:=renameFile(srcReal, dstReal)
+  end; // renameIt
+
 var
   i64: int64;
   i: integer;
@@ -2001,7 +2013,7 @@ try
 
     if name = 'mkdir' then
       begin
-      s:=uri2diskMaybeFolder(p);
+      s:=trim(uri2diskMaybeFolder(p));
       spaceIf(not directoryExists(s) and forceDirectory(s));
       end;
 
@@ -2035,7 +2047,8 @@ try
 
     if name = 'force ansi' then
       if satisfied(md.tpl) and md.tpl.utf8 then
-        result:=noMacrosAllowed(UTF8toAnsi(p))
+//        result:=noMacrosAllowed(UTF8toAnsi(p))
+        result:=noMacrosAllowed(AnsiString(p))
       else
         result:=p;
 
@@ -2197,10 +2210,13 @@ try
       end;
 
     if name = 'delete' then
+      begin
+      s:=uri2diskMaybe(p,NIL,FALSE);
       if isTrue(par('bin',TRUE,'1')) then
-        spaceIf(moveToBin(uri2diskMaybe(p), isTrue(par('forced'))))
+        spaceIf(moveToBin(s, isTrue(par('forced'))))
       else
-        spaceIf(deltree(uri2diskMaybe(p)));
+        spaceIf(deltree(s));
+      end;
 
     if name = 'disk free' then
       result:=intToStr(diskSpaceAt(uri2diskMaybe(p)));
@@ -2292,7 +2308,7 @@ try
             url:=trim(substr(p, ':'))
             end
         else
-          md.cd.conn.addHeader(p, isTrue(par('overwrite',true,'1')));
+          md.cd.conn.addHeader(p);
         end;
 
     if name = 'get ini' then
@@ -2360,7 +2376,8 @@ try
 
     if name = 'rename' then
       begin
-      spaceIf(renameFile(uri2diskMaybe(p), uri2diskMaybeFolder(par(1))));
+      spaceIf( not isExtension(par(1), '.lnk') and // security matters (by mars)
+        renameIt(p, par(1)) );
       if (result > '') and not stopOnMacroRename then // should we stop recursion?
         try
           // by default, we'll stop after first stacked [on macro rename], but recursive=1 will remove this limit
@@ -2374,7 +2391,7 @@ try
     if name = 'move' then
       begin
       s:=uri2diskMaybeFolder(par(1));
-      spaceIf((s>'') and movefile(uri2diskMaybe(p), s));
+      spaceIf((s>'') and movefile(uri2diskMaybe(p,NIL,FALSE), s));
       end;
 
     if name = 'copy' then
@@ -2517,7 +2534,7 @@ finally
   end;
 end; // tryApplyMacrosAndSymbols
 
-function runScript(script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnData=NIL):string;
+function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnData=NIL):string;
 var
   md: TmacroData;
 begin
@@ -2532,7 +2549,7 @@ md.table:=table;
 tryApplyMacrosAndSymbols(result, md);
 end; // runScript
 
-function runEventScript(event:string; table:TStringDynArray=NIL; cd:TconnData=NIL):string;
+function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnData=NIL):string;
 begin
 addArray(table, ['%event%', event]);
 result:=runScript(eventScripts[event], table, eventScripts, NIL, NIL, cd);

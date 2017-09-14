@@ -536,14 +536,18 @@ result:=FALSE;
 if active or not assigned(sock) then exit;
 try
   if onAddress = '' then onAddress:='*';
-  if (onAddress = '') or (onAddress = '*') then sock.addr:='0.0.0.0'
-  else sock.addr:=onAddress;
+  if (onAddress = '') or (onAddress = '*') then
+    sock.addr := '0.0.0.0'
+   else
+    sock.addr := onAddress;
   sock.port:=port;
-  sock.proto:='6';
+//  sock.proto:='6';
+  sock.proto := 'tcp';
+  sock.SocketFamily := sfAny;
   sock.listen();
   if port = '0' then
-    P_port:=sock.getxport();
-  result:=TRUE;
+    P_port := sock.getxport();
+  result := TRUE;
   notify(HE_OPEN, NIL);
 except
   end;
@@ -556,7 +560,10 @@ if assigned(sock) then
 end;
 
 procedure ThttpSrv.connected(Sender: TObject; Error: Word);
-begin if error=0 then ThttpConn.create(self) end;
+begin
+  if error=0 then
+    ThttpConn.create(self)
+end;
 
 procedure ThttpSrv.disconnected(Sender: TObject; Error: Word);
 begin notify(HE_CLOSE, NIL) end;
@@ -1507,7 +1514,7 @@ begin result:=replyHeader_code(HRM2CODE[mode]) end;
 
 procedure ThttpConn.addHeader(s:string; overwrite:boolean=TRUE);
 var
-    i, j: integer;
+    i, j, from: integer;
     name, was: string;
 begin
 was:=reply.additionalHeaders; // handy shortcut
@@ -1519,12 +1526,15 @@ if overwrite then
         i:=length(s);
     name:=copy(s, 1, i);
     // see if it already exists
-    i:=ipos(name, was);
-    if (i = 1) or ((i>1) and (was[i-1] = #10)) then // yes it does
-        begin
+    from:=1;
+      repeat
+      i:=ipos(name, was, from);
+      if (i=0) or (i>1) and (was[i-1] <> #10) then break;
+      // yes it does
         j:=posEx(#10, was, i)+1;
-        delete(was, i, j-i+1); // remove it
-        end;
+      delete(was, i, j-i); // remove it
+      from:=i;
+      until false;
     end;
 reply.additionalHeaders:=was+s+CRLF;
 end;
