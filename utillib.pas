@@ -130,8 +130,10 @@ function fileOrDirExists(fn:string):boolean;
 function sizeOfFile(fn:string):int64; overload;
 function sizeOfFile(fh:Thandle):int64; overload;
 //function loadFile(fn:string; from:int64=0; size:int64=-1):ansistring;  // Use RDFileUtil instead!
-function saveFile(fn:string; data:string; append:boolean=FALSE):boolean; overload;
-function saveFile(var f:file; data:string):boolean; overload;
+function saveFileU(fn:string; data:string; append:boolean=FALSE):boolean; overload;   // Use RDFileUtil instead!
+//function saveFile(var f:file; data:string):boolean; overload;    // Use RDFileUtil instead!
+function saveFileA(fn:string; data: RawByteString; append:boolean=FALSE): boolean; overload;   // Use RDFileUtil instead!
+function saveFileA(var f:file; data:RawByteString): boolean; overload;
 function moveFile(src, dst:string; op:UINT=FO_MOVE):boolean;
 function copyFile(src, dst:string):boolean;
 function resolveLnk(fn:string):string;
@@ -139,7 +141,8 @@ function validFilename(s:string):boolean;
 function validFilepath(fn:string; acceptUnits:boolean=TRUE):boolean;
 function match(mask, txt:pchar; fullMatch:boolean=TRUE; charsNotWildcard:Tcharset=[]):integer;
 function filematch(mask, fn:string):boolean;
-function appendFile(fn:string; data:string):boolean;
+function appendFileU(fn:string; data:string):boolean;
+function appendFileA(fn:string; data:RawByteString):boolean;
 function getFilename(var f:file):string;
 function filenameToDriveByte(fn:string):byte;
 function selectFile(var fn:string; title:string=''; filter:string=''; options:TOpenOptions=[]):boolean;
@@ -259,6 +262,7 @@ implementation
 uses
   RDUtils, clipbrd, //AnsiStringReplaceJOHIA32Unit13,
   OverbyteicsMD5, //JclNTFS, JclWin32,
+  RDFileUtil,
   HFSJclNTFS, hfsJclOthers,
   AnsiClasses, ansiStrings,
   parserLib, newuserpassDlg, winsock;
@@ -976,10 +980,10 @@ finally
   end;
 end; // loadFile
 }
-function saveFile(var f:file; data:string):boolean; overload;
+function saveFileA(var f:file; data: RawByteString):boolean; overload;
 begin
-blockWrite(f, data[1], length(data));
-result:=IOresult=0;
+  blockWrite(f, data[1], length(data));
+  result:=IOresult=0;
 end;
 
 function forceDirectory(path:string):boolean;
@@ -996,7 +1000,8 @@ forceDirectory(s);
 result:=createDir(path);
 end; // forceDirectory
 
-function saveFile(fn:string; data:string; append:boolean=FALSE):boolean;
+
+function saveFileU(fn:string; data:string; append:boolean=FALSE):boolean;
 var
   f: file;
   path, temp: string;
@@ -1026,7 +1031,7 @@ try
     end;
 
   if IOresult() <> 0 then exit;
-  if not saveFile(f, data) then exit;
+  if not saveFileA(f, UTF8Encode(data)) then exit;
   closeFile(f);
   if not append then
     begin
@@ -1037,8 +1042,61 @@ try
 except end;
 end; // saveFile
 
-function appendFile(fn:string; data:string):boolean;
-begin result:=saveFile(fn, data, TRUE) end;
+function saveFileA(fn: string; data: RawByteString; append:boolean=FALSE):boolean; overload;
+var
+  f: file;
+  path, temp: string;
+begin
+result:=FALSE;
+try
+  if not validFilepath(fn) then
+    exit;
+  if not isAbsolutePath(fn) then
+    chDir(exePath);
+  path := extractFilePath(fn);
+  if (path > '') and not forceDirectory(path) then
+    exit;
+  IOresult();
+  if append then
+    begin
+      assignFile(f, fn);
+      reset(f,1);
+      if IOresult() <> 0 then
+        rewrite(f,1)
+       else
+        seek(f, fileSize(f));
+    end
+  else
+    begin
+    // in this case, we save to a temp file, and overwrite the previous one (if it exists) only after the saving is complete
+      temp := format('%s~%d.tmp', [fn, random(MAXINT)]);
+      if not validFilepath(temp) then // fn may be too long to append something
+        temp := format('hfs~%d.tmp', [fn, random(999)]);
+      assignFile(f, temp);
+      rewrite(f,1)
+    end;
+
+  if IOresult() <> 0 then
+    exit;
+  if not saveFileA(f, data) then
+    exit;
+  closeFile(f);
+  if not append then
+    begin
+    deleteFile(fn); // this may fail if the file didn't exist already
+    renameFile(temp, fn);
+    end;
+  result:=TRUE;
+except end;
+end; // saveFile
+
+function appendFileU(fn:string; data:string):boolean;
+begin result:=saveFileU(fn, data, TRUE) end;
+
+function appendFileA(fn:string; data: RawByteString):boolean;
+begin
+  result := saveFileA(fn, data, TRUE)
+end;
 
 function getTempFilename():string;
 var
@@ -1056,7 +1114,8 @@ end; // getTempFilename
 function saveTempFile(data:string):string;
 begin
   result:=getTempFilename();
-  if result > '' then saveFile(result, data);
+  if result > '' then
+    saveFile2(result, data);
 end; // saveTempFile
 
 function loadregistry(key,value:string; root:HKEY=0):string;

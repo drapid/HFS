@@ -1064,8 +1064,9 @@ implementation
 { $R data.res }
 
 uses
+  AnsiStrings, MMsystem,
   RDFileUtil, RDUtils, RnQNet.Uploads, Base64, RnQGraphics32,
-  newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib, MMsystem,
+  newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib;
 
 // global variables
@@ -2504,7 +2505,7 @@ if fileExists(path) then
   if cmt='' then
     deleteFile(path)
   else
-    saveFile(path, cmt);
+    saveFile2(path, cmt);
   exit;
   end;
 name:=extractFileName(resource);
@@ -2514,7 +2515,7 @@ name:=extractFileName(resource);
 path:=extractFilePath(resource)+COMMENTS_FILE;
 if not mainfrm.supportDescriptionChk.checked
 or fileExists(path) and not fileExists(extractFilePath(resource)+'descript.ion') then
-  savefile(path, setKeyInString(loadfile(path), name, escapeNL(cmt)));
+  saveTextFile(path, setKeyInString(loadfile(path), name, escapeNL(cmt)));
 
 if not mainfrm.supportDescriptionChk.checked then exit;
 
@@ -2539,7 +2540,7 @@ try
   if s='' then
     deleteFile(path)
   else
-    saveFile(path, s);
+    saveTextFile(path, s);
 except end;
 end; // setDynamicComment
 
@@ -4097,7 +4098,7 @@ if (logFile.filename > '') and (logFile.apacheFormat = '') then
   else s:=s+CRLF+rest;
 
   includeTrailingString(s,CRLF);
-  appendFile(getDynLogFilename(cd), s);
+  appendFileU(getDynLogFilename(cd), s);
   end;
 
 if not logOnVideoChk.checked then exit;
@@ -4329,7 +4330,7 @@ var
       if b > 0 then
         delete(s, b, findEOL(s,b)-b+1);
       end;
-    savefile(path+'descript.ion', s);
+    saveTextFile(path+'descript.ion', s);
   except end;
   end; // doTheTranche
 
@@ -4417,7 +4418,7 @@ if fileExists(tplFilename) then
   begin
   if newMtime(tplFilename, tplLast) then
     if setTplText(loadFile(tplFilename)) then
-      saveFile(tplFilename, tpl.fullText);
+      saveFile2(tplFilename, tpl.fullText);
   end
 else if tplLast <> 0 then
   begin
@@ -4628,7 +4629,7 @@ var
     '\\', '\'
   ]);
   s:=reCB('%(!?[0-9,]+)?(\{([^}]+)\})?>?([a-z])', s, apacheLogCb, data);
-  appendFile(getDynLogFilename(data), s+CRLF);
+  appendFileU(getDynLogFilename(data), s+CRLF);
   end; // doLog
 
   function limitsExceededOnConnection():boolean;
@@ -5538,7 +5539,7 @@ if assigned(data) then
   data.lastActivityTime:=now();
 
 if dumpTrafficChk.Checked and (event in [HE_GOT, HE_SENT]) then
-  appendFile(exePath+'hfs-dump.bin', TLV(if_(event=HE_GOT,1,2),
+  appendFileA(exePath+'hfs-dump.bin', TLV(if_(event=HE_GOT,1,2),
     TLV(10, str_(now()))+TLV(11, data.address)+TLV(12, conn.port)+TLV(13, conn.eventData)
   ));
 
@@ -5676,7 +5677,7 @@ case event of
       getUploadDestinationFileName();
 
       if complyUploadFilter() and canWriteFile() and canCreateFile() then
-        saveFile(data.f^, conn.post.data);
+        saveFileA(data.f^, conn.post.data);
       repaintTray();
       end;
     if data.uploadFailed > '' then
@@ -5684,7 +5685,7 @@ case event of
     end;
   HE_POST_MORE_FILE:
     if canWriteFile() then
-      saveFile(data.f^, conn.post.data);
+      saveFileA(data.f^, conn.post.data);
   HE_POST_END_FILE:
     begin
     // fill the record
@@ -5926,7 +5927,8 @@ if f.isFile() and fingerprintsChk.checked and (autoFingerprint > 0) then
     and (loadFingerprint(f.resource) = '') then
       begin
       s:=createFingerprint(f.resource);
-      if s > '' then saveFile(f.resource+'.md5', s);
+      if s > '' then
+        saveFileU(f.resource+'.md5', s);
       end;
   except
   end;
@@ -6950,7 +6952,7 @@ function loadCfg(var ini,tpl:string):boolean;
   result:=FALSE;
   if (tplFilename > '') or (tpl = '') then exit;
   tplFilename:=cfgPath+TPL_FILE;
-  result:=saveFile(tplFilename, tpl);
+  result := saveFileU(tplFilename, tpl);
   end; // moveLegacyTpl
 
 begin
@@ -7196,7 +7198,7 @@ else
 case saveMode of
 	SM_FILE:
   	begin
-    if not savefile(cfgPath+CFG_FILE, cfg) then
+    if not savefileU(cfgPath+CFG_FILE, cfg) then
       begin
       proposeUserRegistry();
       exit;
@@ -7221,7 +7223,7 @@ case saveMode of
     end;
   end;
 if ipsEverConnected.Count >= IPS_THRESHOLD  then
-  saveFile(IPS_FILE, ipsEverConnected.text)
+  saveFileU(IPS_FILE, ipsEverConnected.text)
 else
   deleteFile(IPS_FILE);
 
@@ -7389,7 +7391,7 @@ if progFrm.cancelRequested then
 
 try
   progFrm.show('Processing...');
-  saveFile(UPDATE_BATCH_FILE, format(UPDATE_BATCH, [
+  saveFileU(UPDATE_BATCH_FILE, format(UPDATE_BATCH, [
     if_(isNT(), '""'),
     paramStr(0),
     if_(not mainfrm.keepBakUpdatingChk.checked,'REM '),
@@ -7425,7 +7427,7 @@ var
   s: string;
 begin
 lastUpdateCheck:=now();
-saveFile(lastUpdateCheckFN, '');
+saveFileA(lastUpdateCheckFN, '');
 fileSetAttr(lastUpdateCheckFN, faHidden);
 
 result:=NIL;
@@ -8568,12 +8570,12 @@ var
 begin
 fn:='';
 if PromptForFileName(fn, 'Text file|*.txt', 'txt', 'Save log', '', TRUE) then
-  savefile(fn, logBox.text);
+  savefileU(fn, logBox.text);
 end;
 
 procedure TmainFrm.Save1Click(Sender: TObject);
 begin
-savefile('hfs.log', logBox.text) end;
+  savefileU('hfs.log', logBox.text) end;
 
 procedure deleteCFG();
 begin
@@ -8896,7 +8898,7 @@ const
 begin
 try
   progFrm.show('Processing...');
-  saveFile(FN, format(REVERT_BATCH, [
+  saveFileU(FN, format(REVERT_BATCH, [
     if_(isNT(), '""'),
     paramStr(0),
     exePath
@@ -10282,7 +10284,7 @@ try
       try hash:=createFingerprint(f.resource);
       finally progFrm.pop() end;
       if saveNewFingerprintsChk.checked and (hash > '') then
-        saveFile(f.resource+'.md5', hash);
+        saveFileU(f.resource+'.md5', hash);
       end;
     if progFrm.cancelRequested then exit;
     s:=s + f.fullURL() + nonEmptyConcat('#!md5!', hash) + CRLF;
@@ -10315,7 +10317,7 @@ if fn = '' then
 lastFileOpen:=fn;
 deleteFile(fn+BAK_EXT);
 renameFile(fn, fn+BAK_EXT);
-if not savefile(fn, addVFSheader(getVFS())) then
+if not savefileA(fn, addVFSheader(getVFS())) then
   begin
   deleteFile(fn);
   renameFile(fn+BAK_EXT, fn);
@@ -10620,13 +10622,13 @@ const
     +'DEL "%0:s"'+CRLF
     +'DEL %%0'+CRLF;
 begin
-if checkMultiInstance() then exit;
-mainfrm.autosaveoptionsChk.checked:=FALSE;
-disintegrateShell();
-deleteCFG();
-saveFile(BATCH_FILE, format(BATCH,[paramStr(0)]));
-quitASAP:=TRUE;
-execNew(BATCH_FILE);
+  if checkMultiInstance() then exit;
+  mainfrm.autosaveoptionsChk.checked:=FALSE;
+  disintegrateShell();
+  deleteCFG();
+  saveFileU(BATCH_FILE, format(BATCH,[paramStr(0)]));
+  quitASAP:=TRUE;
+  execNew(BATCH_FILE);
 end; // uninstall
 
 procedure processParams_before(var params:TStringDynArray; allowed:string='');
@@ -11308,7 +11310,7 @@ begin
 if not fileExists(tplFilename) then
   begin
   tplFilename:=TPL_FILE;
-  saveFile(tplFilename, defaultTpl);
+  saveFileU(tplFilename, defaultTpl);
   end;
 exec(getTplEditor(), '"'+tplFilename+'"');
 end;
@@ -11321,7 +11323,7 @@ var
 begin
 fn:=cfgPath+EVENTSCRIPTS_FILE;
 if not fileExists(fn) then
-  saveFile(fn, HELP);
+  saveFileU(fn, HELP);
 exec(getTplEditor(), '"'+fn+'"');
 end;
 
@@ -12015,7 +12017,7 @@ end;
 procedure TmainFrm.Runscript1Click(Sender: TObject);
 begin
 if not fileExists(tempScriptFilename) then
-  saveFile(tempScriptFilename, '');
+  saveFileA(tempScriptFilename, '');
 runScriptLast:=getMtime(tempScriptFilename);
 if runScriptFrm = NIL then
   runScriptFrm:=TrunScriptFrm.create(self);
@@ -12220,8 +12222,10 @@ exePath:=extractFilePath(ExpandFileName(paramStr(0)));
 cfgPath:=exePath;
 // we give priority to exePath because some people often clear the temp folder
 tmpPath:=exePath;
-if savefile(tmpPath+'test.tmp','') then deleteFile(tmpPath+'test.tmp')
-else tmpPath:=getTempDir();
+if savefileA(tmpPath+'test.tmp','') then
+  deleteFile(tmpPath+'test.tmp')
+ else
+  tmpPath:=getTempDir();
 lastUpdateCheckFN:=tmpPath+'HFS last update check.tmp';
 setCurrentDir(exePath); // sometimes people mess with the working directory, so we force it to the exe path
 if fileExists('default.tpl') then

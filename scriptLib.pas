@@ -53,9 +53,9 @@ uses
   RnQtrayLib, RDFileUtil, RDUtils;
 
 const
-  HEADER = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><style>'
+  HEADER: RawByteString = RawByteString('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><style>'
   +#13'dt, dd { margin:0; padding:0.2em 0.5em; white-space:pre; display:block; font-family:monospace; } dt { background:#dfd; } dd { background:#fdd; }'
-  +#13'</style></head><body>';
+  +#13'</style></head><body>');
 
 var
   stopOnMacroRename: boolean; // this ugly global var is used to avoid endless recursion on a renaming rename event. this method won't work on a multithreaded system, but i opted for it because otherwise the changes would have been big.
@@ -78,7 +78,7 @@ if flog = NIL then
   if IOresult() <> 0 then rewrite(flog^,1)
   else seek(flog^,fileSize(flog^));
   end;
-result:=saveFile(flog^, s)
+result := saveFileA(flog^, UTF8Encode(s))
 end; // macrosLog
 
 procedure resetLog();
@@ -1060,7 +1060,7 @@ var
     try result:=httpGet(fn, from, size)
     except result:='' end
   else
-    result:=loadFile(uri2diskMaybe(fn), from, size);
+    result := UnUTF(loadFile(uri2diskMaybe(fn), from, size));
 
   if varname = '' then
     begin
@@ -1127,7 +1127,7 @@ var
         finally free end;
     end;
   // now we have in 's' the content to be saved
-  spaceIf(saveFile(uri2diskMaybeFolder(p), s, name='append'));
+  spaceIf(saveFile2(uri2diskMaybeFolder(p), UTF8Encode(s), name='append'));
   end; // save
 
   procedure replace();
@@ -2481,7 +2481,7 @@ try
     if mainfrm.macrosLogChk.checked then
       begin
       if not fileExists(MACROS_LOG_FILE) then
-        saveFile(MACROS_LOG_FILE, HEADER);
+        saveFile2(MACROS_LOG_FILE, HEADER);
       macrosLog(fullMacro, result, md.logTS);
       md.logTS:=FALSE;
       end;
