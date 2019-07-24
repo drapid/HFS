@@ -48,7 +48,7 @@ COMMENT with these you can disable some features of the template. Please note th
 [list]
 <div id='files_outer'>
 	<div style='height:1.6em;'></div> {.comment| this is quite ugly, i know, but if i use any vertical padding with height:100% i'll get a scrollbar .} 
-	{.if not| %number% |{: <div style='font-size:200%; padding:1em;'>{.!No {.if|{.length|{.?search.}.}|results|files.}.}</div> :}|{:
+	{.if not| %number% |{: <div style='font-size:200%; padding:1em;'>{.!{.if|{.length|{.?search.}.}|No results|No files.}.}</div> :}|{:
         <form method='post'>
             <table id='files'>
             {.set|sortlink| {:<a href="{.trim|
@@ -93,7 +93,7 @@ COMMENT with these you can disable some features of the template. Please note th
                 <button onclick='changePwd.call(this)' style='font-size:x-small;'>{.!Change password.}</button>
             .}
             :}
-            | <a href="~login">Login</a>
+            | <a href="~login">{.!Login.}</a>
         .}
 		</center>
 	</fieldset>                                       
@@ -155,7 +155,7 @@ COMMENT with these you can disable some features of the template. Please note th
 			selectedChanged();
             ">{.!Invert.}</button>
     	<button onclick='selectionMask.call(this)'>{.!Mask.}</button>
-		<p style='display:none; margin-top:1em;'><span id='selected-number'>0</span> items selected</p>
+		<p style='display:none; margin-top:1em;'><span id='selected-number'>0</span> {.!items selected.}</p>
 		</center>
 	</fieldset>
 
@@ -270,7 +270,7 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 <td>%item-size%B<td>%item-modified%<td>%item-dl-count%
 
 [+folder]
-<td class='nosize'>folder<td>%item-modified%<td>%item-dl-count%
+<td class='nosize'>{.!folder-item|folder.}<td>%item-modified%<td>%item-dl-count%
 
 [+link]
 <td class='nosize'>link<td colspan='2'>
@@ -377,7 +377,7 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 
 [progress-upload-file]
 {.if not|{.{.?only.} = down.}|{:
-	<li> Uploading %total% @ %speed-kb% KB/s
+	<li> {.!Uploading.} %total% @ %speed-kb% KB/s
 	<br /><span class='fn'>%filename%</span>
     <br />{.!Time left.} %time-left%"
 	<br /><div class='out_bar'><div class='in_bar' style="width:%perc%px"></div></div> %perc%%
@@ -465,7 +465,7 @@ can change pwd=member of|can change password
 can move=or|1|1
 escape attr=replace|"|&quot;|$1
 commentNL=if|{.pos|<br|$1.}|$1|{.replace|{.chr|10.}|<br />|$1.}
-add bytes=switch|{.cut|-1||$1.}|,|0,1,2,3,4,5,6,7,8,9|$1 Bytes|K,M,G,T|$1Bytes
+add bytes=switch|{.cut|-1||$1.}|,|0,1,2,3,4,5,6,7,8,9|$1 {.!Bytes.}|K,M,G,T|$1{.!Bytes.}
 
 [special:import]
 {.new account|can change password|enabled=1|is group=1|notes=accounts members of this group will be allowed to change their password.}
@@ -516,7 +516,7 @@ $(function(){
             if (!$("[name=file]").val()) return false; // no file, no submit
             $(this).hide(); // we don't need the form anymore, make space for the progress bars
             // build the gui
-            x.append("<div id='progress'>in progress...</div>");
+            x.append("<div id='progress'>{.!in progress....}</div>");
             x.append($("<button style='float:right'>{.!Cancel.}</button>").click(function(){
                 // stop submit/upload
                 if (typeof stop == 'function')

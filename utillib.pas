@@ -24,11 +24,13 @@ unit utilLib;
 interface
 
 uses
-	main, hslib, types, windows, graphics, dialogs, registry, classes, dateUtils,
-  gifimg, regexpr,
-  shlobj, shellapi, activex, comobj, strutils, forms, stdctrls, controls, psAPI, menus, math,
-  longinputDlg, OverbyteIcsWSocket, OverbyteIcshttpProt, comCtrls,
-  iniFiles, richedit, sysutils, classesLib;
+  main, hslib, types, windows, graphics, dialogs, registry, classes, dateUtils,
+  comCtrls, shlobj, shellapi, activex, comobj, forms, stdctrls, controls, psAPI,
+  menus, math, iniFiles, richedit, sysutils, strutils,
+  OverbyteIcsWSocket, OverbyteIcshttpProt, gifimg,
+  regexpr,
+  longinputDlg,
+  classesLib;
 
 const
   ILLEGAL_FILE_CHARS = [#0..#31,'/','\',':','?','*','"','<','>','|'];
@@ -67,11 +69,11 @@ function evalFormula(s:string):real;
 function boolOnce(var b:boolean):boolean;
 procedure drawCentered(cnv:Tcanvas; r:Trect; text:string);
 function minmax(min, max, v:integer):integer;
-function isLocalIP(ip:string):boolean;
+function isLocalIP(const ip:string):boolean;
 function clearAndReturn(var v:string):string;
 function swapMem(var src,dest; count:dword; cond:boolean=TRUE):boolean;
 function pid2file(pid:integer):string;
-function port2pid(port:string):integer;
+function port2pid(const port:string):integer;
 function holdingKey(key:integer):boolean;
 function blend(from,to_:Tcolor; perc:real):Tcolor;
 function isNT():boolean;
@@ -81,7 +83,7 @@ function safeDiv(a,b:real; default:real=0):real; overload;
 function safeDiv(a,b:int64; default:int64=0):int64; overload;
 function safeMod(a,b:int64; default:int64=0):int64;
 function smartsize(size:int64):string;
-function httpGet(url:string; from:int64=0; size:int64=-1): RawByteString;
+function httpGet(const url:string; from:int64=0; size:int64=-1): RawByteString;
 function httpGetFile(url, filename:string; tryTimes:integer=1; notify:TdocDataEvent=NIL):boolean;
 function httpFileSize(url:string):int64;
 function getIPs():TStringDynArray;
@@ -94,7 +96,7 @@ procedure purgeVFSaccounts();
 function exec(cmd:string; pars:string=''; showCmd:integer=SW_SHOW):boolean;
 function execNew(cmd:string):boolean;
 function captureExec(DosApp : string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
-function openURL(url:string):boolean;
+function openURL(const url:string):boolean;
 function getRes(name:pchar; typ:string='TEXT'): RawByteString;
 //function bmpToHico(bitmap:Tbitmap):hicon;
 function compare_(i1,i2:double):integer; overload;
@@ -215,8 +217,10 @@ function anycharIn(chars, s:string):boolean; overload;
 function anycharIn(chars:Tcharset; s:string):boolean; overload;
 function int0(i,digits:integer):string;
 function addressmatch(mask, address:string):boolean;
-function getTill(ss, s:string; included:boolean=FALSE):string; overload;
-function getTill(i:integer; s:string):string; overload;
+function getTill(const ss, s:string; included:boolean=FALSE):string; overload;
+function getTill(i:integer; const s:string):string; overload;
+function getTill(const ss, s: RawByteString; included:boolean=FALSE): RawByteString; OverLoad;
+function getTill(i:integer; const s: RawByteString): RawByteString; OverLoad;
 function singleLine(s:string):boolean;
 function poss(chars:TcharSet; s:string; ofs:integer=1):integer;
 //function optUTF8(bool:boolean; s:string):string; overload;
@@ -239,7 +243,8 @@ function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSet=[]
 function replace(var s:string; const ss:string; start,upTo:integer):integer;
 function countSubstr(const ss:string; const s:string):integer;
 function trim2(const s:string; chars:Tcharset):string;
-procedure urlToStrings(const s:string; sl:Tstrings);
+procedure urlToStrings(const s:string; sl:Tstrings); OverLoad;
+procedure urlToStrings(const s: RawByteString; sl:Tstrings); OverLoad;
 function reCB(const expr, subj:string; cb:TreCB; data:pointer=NIL):string;
 function reMatch(const s, exp:string; mods:string='m'; ofs:integer=1; subexp:PstringDynArray=NIL):integer;
 function reReplace(subj, exp, repl:string; mods:string='m'):string;
@@ -261,8 +266,11 @@ implementation
 
 uses
   RDUtils, clipbrd, //AnsiStringReplaceJOHIA32Unit13,
-  OverbyteicsMD5, //JclNTFS, JclWin32,
-  RDFileUtil,
+//  OverbyteicsMD5, //JclNTFS, JclWin32,
+  {$IFDEF HAS_FASTMM}
+  fastmm4,
+  {$ENDIF HAS_FASTMM}
+  RDFileUtil, RnQCrypt,
   HFSJclNTFS, hfsJclOthers,
   AnsiClasses, ansiStrings,
   parserLib, newuserpassDlg, winsock;
@@ -1540,20 +1548,26 @@ var
   append: string;
 begin
 // don't consider wildcard-part when resolving
-i:=reMatch(url, '[?*]', '!');
-if i = 0 then
-  append:=''
-else
-  begin
-  i:=lastDelimiter('/', url);
-  append:=substr(url,i);
-  if i>0 then append[1]:='\';
-  delete(url,i, MaxInt);
-  end;
+  i:=reMatch(url, '[?*]', '!');
+  if i = 0 then
+    append:=''
+   else
+    begin
+      i:=lastDelimiter('/', url);
+      append:=substr(url,i);
+      if i>0 then append[1]:='\';
+      delete(url, i, MaxInt);
+    end;
 try
   fi:=mainfrm.findFilebyURL(url, parent);
-  try result:=ifThen(resolveLnk or (fi.lnk=''), fi.resource, fi.lnk) +append;
-  finally freeIfTemp(fi) end;
+  if fi <> NIL then
+    try
+      result:=ifThen(resolveLnk or (fi.lnk=''), fi.resource, fi.lnk) +append;
+     finally
+      freeIfTemp(fi)
+    end
+   else
+    Result := '';
 except result:='' end;
 end; // uri2disk
 
@@ -1687,7 +1701,7 @@ result:=inputQueryLongdlg.ShowModal() = mrOk;
 if result then value:=inputQueryLongdlg.inputBox.Text;
 end; // inputQueryLong
 
-function httpGet(url:string; from:int64=0; size:int64=-1): RawByteString;
+function httpGet(const url:string; from:int64=0; size:int64=-1): RawByteString;
 var
   http: THttpCli;
   reply: TAnsiStringStream;
@@ -1952,7 +1966,7 @@ begin if b=0 then result:=default else result:=a/b end;
 function isExtension(filename, ext:string):boolean;
 begin result:= 0=ansiCompareText(ext, extractFileExt(filename)) end;
 
-function getTill(ss, s:string; included:boolean=FALSE):string;
+function getTill(const ss, s:string; included:boolean=FALSE):string;
 var
   i: integer;
 begin
@@ -1961,10 +1975,29 @@ if i = 0 then result:=s
 else result:=copy(s,1,i-1+if_(included,length(ss)));
 end; // getTill
 
-function getTill(i:integer; s:string):string;
+function getTill(const ss, s: RawByteString; included:boolean=FALSE): RawByteString;
+var
+  i: integer;
+begin
+  i := pos(ss, s);
+  if i = 0 then
+    result := s
+   else
+    result := copy(s,1,i-1+if_(included,length(ss)));
+end; // getTill
+
+
+function getTill(i:integer; const s:string):string;
 begin
 if i < 0 then i:=length(s)+i;
 result:=copy(s, 1, i);
+end; // getTill
+
+function getTill(i:integer; const s: RawByteString): RawByteString;
+begin
+  if i < 0 then
+    i:=length(s)+i;
+  result:=copy(s, 1, i);
 end; // getTill
 
 function dateToHTTP(filename:string):string; overload;
@@ -1987,7 +2020,7 @@ begin
   FileTimeToSystemTime(sr.FindData.ftLastWriteTime, st);
   result:=intToStr(sr.Size)+':'+floatToStr(SystemTimeToDateTime(st))+':'+expandFileName(filename);
   findClose(sr);
-  result := StrMD5(result);
+  result := MD5PassHS(result);
 end; // getEtag
 
 function getMtimeUTC(filename:string):Tdatetime;
@@ -2304,7 +2337,7 @@ finally
   end;
 end; // captureExec
 
-function port2pid(port:string):integer;
+function port2pid(const port:string):integer;
 var
   s, l, p: string;
   code: cardinal;
@@ -2363,7 +2396,7 @@ setLength(s, l-ofs);
 result:=s;
 end; // stripChars
 
-function openURL(url:string):boolean;
+function openURL(const url:string):boolean;
 begin
 result:=exec(url);
 end; // openURL
@@ -2482,7 +2515,7 @@ else if v > max then result:=max
 else result:=v
 end;
 
-function isLocalIP(ip:string):boolean;
+function isLocalIP(const ip:string):boolean;
 begin result:=checkAddressSyntax(ip, FALSE) and HSlib.isLocalIP(ip) end;
 
 function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSet=[]):string;
@@ -2557,6 +2590,25 @@ while i <= l do
   sl.add(t);
   if p = 0 then exit;
   i:=p+1;
+  end;
+end; // urlToStrings
+
+procedure urlToStrings(const s: RawByteString; sl: Tstrings);
+var
+  i, l, p: integer;
+  t: string;
+begin
+  i:=1;
+  l:=length(s);
+  while i <= l do
+  begin
+    p := posEx('&',s,i);
+    t := decodeURL(xtpl(substr(s,i,if_(p=0,0,p-1)), ['+',' ']));
+     // TODO should we instead try to decode utf-8? doing so may affect calls to {.force ansi.} in the template
+    sl.add(t);
+    if p = 0 then
+      exit;
+    i := p+1;
   end;
 end; // urlToStrings
 
@@ -2878,7 +2930,7 @@ result:=def;
 includeTrailingString(key, '=');
 i:=1;
   repeat
-  i:= HSLib.ipos(key, s, i);
+  i:= ipos(key, s, i);
   if i = 0 then exit; // not found
   until (i = 1) or (s[i-1] in [#13,#10]); // ensure we are at the very beginning of the line
 inc(i, length(key));
@@ -2900,7 +2952,7 @@ else if val = '' then
   end;
 // now key has a trailing '='. Let's find where it is.
 i:=0;
-  repeat i:= HSLib.ipos(key, s, i+1);
+  repeat i:= ipos(key, s, i+1);
   until (i <= 1) or (s[i-1] in [#13,#10]); // we accept cases 0,1 as they are. Other cases must comply with being at start of line.
 if i = 0 then // missing, then add
   begin
@@ -2983,7 +3035,8 @@ try
 finally ss.free end;
 end; // stringToGif
 
-{// this is to be used with the standard memory manager, while we are currently using a different one
+{$IFNDEF HAS_FASTMM}
+// this is to be used with the standard memory manager, while we are currently using a different one
 function allocatedMemory():int64;
 var
   mms: TMemoryManagerState;
@@ -2997,17 +3050,17 @@ for i:=0 to high(mms.SmallBlockTypeStates)-1 do
     inc(result, internalBlockSize*allocatedBlockCount);
 inc(result, mms.TotalAllocatedLargeBlockSize+mms.TotalAllocatedMediumBlockSize);
 end; // allocatedMemory
-}
+
+{$ELSE HAS_FASTMM}
 
 function allocatedMemory():int64;
-{var
+var
   mm: TMemoryManagerUsageSummary;
 begin
   getMemoryManagerUsageSummary(mm);
-  result:=mm.allocatedBytes;}
-begin
- result := -1;
+  result := mm.allocatedBytes;
 end; // allocatedMemory
+{$ENDIF HAS_FASTMM}
 
 function removeStartingStr(ss,s:string):string;
 begin

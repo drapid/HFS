@@ -7,6 +7,16 @@ LEGEND
 -   bug fix
 AV  access violation
 
+VER 2.3m
+propaganda
+  Bug fixes
+/propaganda
++ initial localization support http://www.rejetto.com/forum/programmers-corner/translations-to-other-languages/
++ {.remove header.}
+- fixed error pages' loading problem http://www.rejetto.com/forum/bug-reports/httpauth-challenge-http-headers-bug/
+- fixed error with {.load.} with size exceeding real size http://rejetto.com/forum/index.php?topic=12059.msg1062781#msg1062781
+- fixed template translation issues http://rejetto.com/forum/index.php?topic=11880.msg1062167#msg1062167
+
 VER 2.3k
 propaganda
   Bug fixes

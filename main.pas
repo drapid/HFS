@@ -29,18 +29,18 @@ uses
   Windows, Messages, SysUtils, Forms, Menus, Graphics, Controls, ComCtrls, Dialogs, math,
   registry, ExtCtrls, shellapi, ImgList, ToolWin, StdCtrls, strutils, AppEvnts, types,
   winsock, clipbrd, shlobj, activex, Buttons, FileCtrl, dateutils, iniFiles, Classes,
+  System.ImageList,
   // 3rd part libs. ensure you have all of these, the same version reported in dev-notes.txt
-  OverbyteIcsWSocket, OverbyteIcsHttpProt, OverbyteicsMD5,// GIFimage, zlibex,
+  OverbyteIcsWSocket, OverbyteIcsHttpProt, //OverbyteicsMD5,// GIFimage, zlibex,
+   //RegularExpressions,
   regexpr,
-  System.ImageList, gifImg, RnQzip, //RegularExpressions,
-  rnqtraylib,
-  OverbyteIcsZLibHigh,
+  rnqTraylib,
   // rejetto libs
   HSlib, monoLib, progFrmLib, classesLib;
 
 const
-  VERSION = '2.3k RD';
-  VERSION_BUILD = '299';
+  VERSION = '2.3m RD';
+  VERSION_BUILD = '300';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
@@ -1064,8 +1064,11 @@ implementation
 { $R data.res }
 
 uses
-  AnsiStrings, MMsystem,
-  RDFileUtil, RDUtils, RnQNet.Uploads, Base64, RnQGraphics32,
+  AnsiStrings, MMsystem, UITypes,
+  OverbyteIcsZLibHigh,
+  Base64, gifImg,
+  RDFileUtil, RDUtils,
+  RnQzip, RnQCrypt, RnQNet.Uploads, RnQGraphics32,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib;
 
@@ -1936,19 +1939,19 @@ begin
 { icon cache system was introduced, but a real fix would be nice. }
 //stream:=Tstringstream.create('');
   str := TMemorystream.Create;
-gif:=TGIFImage.Create();
+  gif := TGIFImage.Create();
 
-gif.ColorReduction:=rmQuantize;
-//gif.Compression:=gcLZW;
-gif.Assign(bmp);
-gif.SaveToStream(str);
-gif.free;
+  gif.ColorReduction := rmQuantize;
+  //gif.Compression := gcLZW;
+  gif.Assign(bmp);
+  gif.SaveToStream(str);
+  gif.free;
   SetLength(Result, str.Size);
   str.Position := 0;
   CopyMemory(@result[1], str.Memory, Length(Result));
 //result:=stream.DataString;
 
-str.free;
+  str.free;
 end; // bmp2str
 
 function pic2str(idx:integer): RawByteString;
@@ -1991,7 +1994,7 @@ begin
   gif := stringToGif(s);
   try
     result := mainfrm.images.addMasked(gif.bitmap, gif.Bitmap.TransparentColor);
-    etags.values['icon.'+intToStr(result)] := strMD5(s);
+    etags.values['icon.'+intToStr(result)] := MD5PassHS(s);
    finally
     gif.free
   end;
@@ -2004,7 +2007,7 @@ var
   shfi: TShFileInfo;
   s: string;
 begin
-fillChar(shfi, SizeOf(TShFileInfo), 0);
+  ZeroMemory(@shfi, SizeOf(TShFileInfo));
 // documentation reports shGetFileInfo() to be working with relative paths too,
 // but it does not actually work without the expandFileName()
 shGetFileInfo( pchar(expandFileName(fn)), 0, shfi, SizeOf(shfi), SHGFI_SYSICONINDEX);
@@ -2031,7 +2034,7 @@ try
   systemimages.getIcon(shfi.iIcon, ico);
   i:=mainfrm.images.addIcon(ico);
   s:=pic2str(i);
-  etags.values['icon.'+intToStr(i)] := strMD5(s);
+  etags.values['icon.'+intToStr(i)] := MD5PassHS(s);
 finally ico.free end;
 // now we can search if the icon was already there, by byte comparison
 n:=0;
@@ -2103,7 +2106,8 @@ if s = 'ips-ever' then s:=intToStr(ipsEverConnected.count);
 
 drawTrayIconString(bmp.canvas, s);
 //tray_ico.Handle:=bmpToHico(bmp);
-tray_ico.Handle := bmp2ico32(bmp);
+//tray_ico.Handle := bmp2ico32(bmp);
+tray_ico.Handle := bmp2ico4M(bmp);
 tray_ico.Transparent:=FALSE;
 bmp.free;
 tray.setIcon(tray_ico);
@@ -2326,6 +2330,7 @@ begin
 fullpath:=ExcludeTrailingPathDelimiter(fullpath);
 icon:=-1;
 size:=-1;
+node := NIL;
 atime:=now();
 mtime:=atime;
 flags:=[];
@@ -2343,6 +2348,7 @@ end; // createTemp
 constructor Tfile.createVirtualFolder(name:string);
 begin
 icon:=-1;
+node := NIL;
 setResource('');
 flags:=[FA_FOLDER, FA_VIRTUAL, FA_BROWSABLE];
 self.name:=name;
@@ -2353,6 +2359,7 @@ end; // createVirtualFolder
 constructor Tfile.createLink(name:string);
 begin
 icon:=-1;
+node := NIL;
 setName(name);
 atime:=now();
 mtime:=atime;
@@ -2546,10 +2553,18 @@ end; // setDynamicComment
 
 function Tfile.getParent():Tfile;
 begin
-if node = NIL then result:=NIL
-else if isTemp() then result:=nodeToFile(node)
-else if node.parent = NIL then result:=NIL
-else result:=node.parent.data
+  if node = NIL then result:=NIL
+   else if isTemp() then result:=nodeToFile(node)
+    else
+      try
+        if node.parent = NIL then
+          result:=NIL
+         else
+          result := node.parent.data
+       except
+//         add2log()
+         Result := NIL;
+      end;
 end; // getParent
 
 function Tfile.getDLcount():integer;
@@ -3318,33 +3333,25 @@ if (i > 0) and (msgDlg(format(MSG,[i]), MB_ICONQUESTION+MB_YESNO) = IDYES) then
 result:=TRUE;
 end; // banAddress
 
+function prog(p: real): Boolean;
+begin
+   Result := True;
+   if not progFrm.visible then
+     Exit;
+   progFrm.progress := p;
+   application.processMessages();
+   Result := not progFrm.cancelRequested;
+end;
+
 function createFingerprint(fn:string):string;
 var
-  fs: Tfilestream;
-  digest: TMD5Digest;
-  context: TMD5Context;
-  buf: array [1..32*1024] of byte;
-  i: integer;
+  b: TBytes;
+  i: Integer;
 begin
-result:='';
-fs:=TfileStream.create(fn, fmOpenRead+fmShareDenyWrite);
-for i:=0 to 15 do byte(digest[i]):=succ(i);
-MD5init(context);
-try
-  repeat
-  i:=fs.Read(buf, sizeof(buf));
-  MD5updateBuffer(context, @buf, i);
-  if not progFrm.visible then continue;
-  progFrm.progress:=safeDiv(0.0+fs.position, fs.size);
-  application.processMessages();
-  if progFrm.cancelRequested then exit;
-  until i < sizeof(buf);
-finally
-  fs.free;
-  MD5final(digest, context);
+  result := '';
+  b := getFileMD5(fn, prog);
   for i:=0 to 15 do
-    result:=result+intToHex(byte(digest[i]), 2);
-  end;
+    result:=result+intToHex(byte(b[i]), 2);
 end; // createFingerprint
 
 function uptimestr():string;
@@ -3398,7 +3405,7 @@ var
   idx:=0;
   p:=1;
     repeat
-    p:= HSLib.ipos(PATTERN, result, p);
+    p := ipos(PATTERN, result, p);
     if p = 0 then exit;
     inc(idx);
     idxS:=intToStr(idx);
@@ -3563,7 +3570,7 @@ try
   if not folder.isRoot() then
     inc(ofsRelItemUrl, 2);
 
-  fillChar(md, sizeOf(md), 0);
+  ZeroMemory(@md, sizeOf(md));
   md.cd:=cd;
   md.tpl:=diffTpl;
   md.folder:=folder;
@@ -3806,14 +3813,14 @@ if assigned(data.tpl) then
 try
   data.conn.reply.mode:=HRM_REPLY;
   data.conn.reply.bodyMode:=RBM_STRING;
-  data.conn.reply.bodyB := '';
+  data.conn.reply.body := '';
 except end;
 
 section:=tpl2use.getSection(sectionName);
 if section = NIL then exit;
 
 try
-  fillChar(md, sizeOf(md), 0);
+  ZeroMemory(@md, sizeOf(md));
   addUploadSymbols();
   addProgressSymbols();
   addUploadResultsSymbols();
@@ -3848,7 +3855,7 @@ try
 
   tryApplyMacrosAndSymbols(s, md);
 
-  data.conn.reply.bodyB := xtpl(s, [
+  data.conn.reply.bodyU := xtpl(s, [
     '%build-time%', floatToStrF((now()-buildTime)*SECONDS, ffFixed, 7,3)
   ]);
   if section.nolog then data.dontLog:=TRUE;
@@ -3913,8 +3920,8 @@ if idx < 0 then
 if (special = no) and ((idx < 0) or (idx >= images.count)) then exit;
 
 case special of
-  no: cd.conn.reply.bodyB := pic2str(idx);
-  graph: cd.conn.reply.bodyB := getGraphPic(cd);
+  no: cd.conn.reply.body := pic2str(idx);
+  graph: cd.conn.reply.body := getGraphPic(cd);
   end;
 
 result:=TRUE;
@@ -4443,6 +4450,9 @@ var
   f: Tfile;
   url, httpDate: string;
 
+  Freq, StartCount, StopCount: Int64;
+  TimingSeconds: real;
+
   procedure switchToDefaultFile();
   var
     default: Tfile;
@@ -4464,7 +4474,7 @@ var
   begin
   result:=trim(eventScripts[event]);
   if result = '' then exit;
-  fillChar(md, sizeOf(md), 0);
+  ZeroMemory(@md, sizeOf(md));
   md.cd:=data;
   md.table:=toSA(table);
   md.tpl:=eventScripts;
@@ -4980,6 +4990,8 @@ var
     end; // isAllowedReferer
 
     procedure replyWithString(s:string);
+    var
+      a: String;
     begin
     if (data.disconnectReason > '') and not data.disconnectAfterReply then
       begin
@@ -4989,11 +5001,58 @@ var
     
     if conn.reply.contentType = '' then
       conn.reply.contentType:=if_(trim(getTill('<', s))='', 'text/html', 'text/plain');
+    a := conn.getHeader('Accept-Charset');
+    if (a <> '') and ( (ipos('utf-8', a) = 0) and (pos('*', a) = 0)) then
+      conn.reply.body := s
+     else
+      conn.reply.bodyU := s;
+
     conn.reply.mode:=HRM_REPLY;
     conn.reply.bodyMode:=RBM_STRING;
-    conn.reply.bodyB := UTF8Encode(s);
     compressReply(data);
     end; // replyWithString
+
+    procedure replyWithStringB(const s: RawByteString);
+    begin
+    if (data.disconnectReason > '') and not data.disconnectAfterReply then
+      begin
+      getPage('deny', data);
+      exit;
+      end;
+
+    if conn.reply.contentType = '' then
+      conn.reply.contentType:=if_(trim(getTill(RawByteString('<'), s))='', 'text/html', 'text/plain');
+    conn.reply.mode:=HRM_REPLY;
+    conn.reply.bodyMode:=RBM_STRING;
+    conn.reply.body := s;
+    compressReply(data);
+    end; // replyWithStringB
+
+    procedure replyWithRes(const res: String; contType: RawByteString);
+    var
+      s: RawByteString;
+      isGZ: Boolean;
+    begin
+      if (data.disconnectReason > '') and not data.disconnectAfterReply then
+        begin
+        getPage('deny', data);
+        exit;
+        end;
+
+        s := getRes(pchar(res), 'ZTEXT');
+        isGZ := s <> '';
+        if not isGZ then
+          s := getRes(pchar(res));
+      if contType <> '' then
+        conn.reply.contentType := contType;
+      if conn.reply.contentType = '' then
+        conn.reply.contentType:=if_(trim(getTill(RawByteString('<'), s))='', 'text/html', 'text/plain');
+      conn.reply.mode:=HRM_REPLY;
+      conn.reply.bodyMode:=RBM_STRING;
+      conn.reply.body := s;
+      conn.reply.IsGZiped := isGZ;
+      compressReply(data);
+    end; // replyWithRes
 
     procedure deletion();
     var
@@ -5168,7 +5227,7 @@ var
         In such case we would not be able to calculate pwd+sessionID because we'd had no clear pwd.
         By relying on md5(pwd) instead of pwd, we will avoid such problem. }
       s:=data.postVars.values['__PASSWORD_MD5'];
-      if (s > '') and (s = strMD5(strMD5(data.account.pwd)+data.sessionID))
+      if (s > '') and (s = MD5PassHS(MD5PassH(data.account.pwd)+RawByteString(data.sessionID)))
           or (data.postVars.values['__PASSWORD'] = data.account.pwd) then
         begin
         s:='ok';
@@ -5218,9 +5277,8 @@ var
     end;
   if data.urlvars.values['mode'] = 'jquery' then
     begin
-    replyWithString(getRes('jquery'));
-    conn.reply.contentType:='text/javascript';
-    exit;
+      replyWithRes('jquery', 'text/javascript');
+      exit;
     end;
 
   // forbid using invalid credentials
@@ -5254,7 +5312,7 @@ var
   if f = NIL then
     begin
     if sameText(url, '/robots.txt') and stopSpidersChk.checked then
-      replyWithString('User-agent: *'+CRLF+'Disallow: /')
+      replyWithStringB('User-agent: *'+CRLF+'Disallow: /')
      else
       getPage('not found', data);
     exit;
@@ -5413,12 +5471,17 @@ var
     deletion();
 
     data.downloadingWhat:=DW_FOLDERPAGE;
+QueryPerformanceFrequency(Freq);
+QueryPerformanceCounter(StartCount);
     if DMbrowserTplChk.Checked and isDownloadManagerBrowser() then
       s:=getFolderPage(f, data, dmBrowserTpl)
     else
       s := getFolderPage(f, data, tpl);
     if conn.reply.mode <> HRM_REDIRECT then
       replyWithString(s);
+QueryPerformanceCounter(StopCount);
+TimingSeconds := (StopCount - StartCount) / Freq;
+OutputDebugString(PChar('Prepared reply for folder by ' + floattostr(TimingSeconds)));
     exit;
     end;
 
@@ -5433,7 +5496,7 @@ var
   data.eta.idx:=0;
   conn.reply.contentType:=name2mimetype(f.name, DEFAULT_MIME);
   conn.reply.bodyMode:=RBM_FILE;
-  conn.reply.bodyB := UTF8Encode(f.resource);
+  conn.reply.bodyU := f.resource;
   data.downloadingWhat := DW_FILE;
   { I guess this would not help in any way for files since we are already handling the 'if-modified-since' field
   try
@@ -5581,7 +5644,12 @@ case event of
   HE_REQUESTED:
     begin
     data.dontLog:=FALSE;
+//QueryPerformanceFrequency(Freq);
+//QueryPerformanceCounter(StartCount);
     handleRequest();
+//QueryPerformanceCounter(StopCount);
+//TimingSeconds := (StopCount - StartCount) / Freq;
+//OutputDebugString(PChar('Prepared request answer by ' + floattostr(TimingSeconds)));
     // we save the value because we need it also in HE_REPLY, and temp files are not avaliable there
     data.dontLog:=data.dontLog or assigned(f) and f.hasRecursive(FA_DONT_LOG);
     if f <> data.lastFile then
@@ -7899,8 +7967,8 @@ var
 var
   tempText: string;
 begin
-if quitting then exit;
-fillChar(sbarIdxs, sizeof(sbarIdxs), -1);
+  if quitting then exit;
+  FillMemory(@sbarIdxs, sizeOf(sbarIdxs), Byte(-1));
 if sbarTextTimeout < now() then tempText:=''
 else tempText:=sbar.Panels[sbar.Panels.Count-1].text;
 pn:=0;
@@ -9177,15 +9245,16 @@ var
   end; // parseAutoupdatedFiles
 
 begin
-if vfs = '' then exit;
-if node = NIL then // this is supposed to be always true when loading a vfs, and never recurring
-  begin
-  node:=rootNode;
-  uploadPaths:=NIL;
-  usersInVFS.reset();
-  if isAnyMacroIn(vfs) then loadingVFS.macrosFound:=TRUE;
-  end;
-fillchar(after, sizeof(after), 0);
+  if vfs = '' then exit;
+  if node = NIL then // this is supposed to be always true when loading a vfs, and never recurring
+    begin
+      node:=rootNode;
+      uploadPaths:=NIL;
+      usersInVFS.reset();
+      if isAnyMacroIn(vfs) then
+        loadingVFS.macrosFound:=TRUE;
+    end;
+  ZeroMemory(@after, sizeof(after));
 node.DeleteChildren();
 f:=Tfile(node.data);
 f.node:=node;
@@ -9308,7 +9377,7 @@ if after.resetLetBrowse then
   f.recursiveApply(setBrowsable, integer(FA_BROWSABLE in f.flags));
 end; // setVFS
 
-function addVFSheader(vfsdata:string):string;
+function addVFSheader(vfsdata: RawByteString): RawByteString;
 begin
 if length(vfsdata) > COMPRESSION_THRESHOLD then
   vfsdata:=TLV(FK_COMPRESSED_ZLIB,
@@ -9613,8 +9682,8 @@ if graph.rate = v then exit;
 graph.rate:=v;
 Graphrefreshrate1.caption:=format(MSG, [v]);
 // changing rate invalidates previous data
-fillChar(graph.samplesOut, sizeof(graph.samplesOut), 0);
-fillChar(graph.samplesIn, sizeof(graph.samplesIn), 0);
+  ZeroMemory(@graph.samplesIn, sizeof(graph.samplesIn));
+  ZeroMemory(@graph.samplesOut, sizeof(graph.samplesOut));
 graph.maxV:=0;
 end; // setGraphRate
 
@@ -9798,15 +9867,19 @@ var
   a: TStringDynArray;
   onlyAnon: boolean;
 begin
-if not sender.visible then exit;
-f:=Tfile(node.data);
-if f = NIL then exit;
-if f.hasRecursive([FA_HIDDEN, FA_HIDDENTREE], TRUE) then
-	with sender.Canvas.Font do
-  	style:=style+[fsItalic];
-a:=f.accounts[FA_ACCESS];
-onlyAnon:= onlyString(USER_ANONYMOUS, a);
-node.stateIndex := RDUtils.ifThen((f.user > '') or (assigned(a) and not onlyAnon), ICON_LOCK, -1);
+  if not sender.visible then
+    exit;
+  if not Self.Visible then
+    Exit;
+  f := Tfile(node.data);
+  if f = NIL then
+    exit;
+  if f.hasRecursive([FA_HIDDEN, FA_HIDDENTREE], TRUE) then
+	  with sender.Canvas.Font do
+  	  style:=style+[fsItalic];
+  a := f.accounts[FA_ACCESS];
+  onlyAnon := onlyString(USER_ANONYMOUS, a);
+  node.stateIndex := RDUtils.ifThen((f.user > '') or (assigned(a) and not onlyAnon), ICON_LOCK, -1);
 end;
 
 function Tmainfrm.fileAttributeInSelection(fa:TfileAttribute):boolean;
@@ -9949,7 +10022,7 @@ filesBox.hide(); // it seems to speed up a lot
 progFrm.show('Loading VFS...', TRUE);
 disableUserInteraction();
 try
-  fillchar(loadingVFS, sizeof(loadingVFS), 0);
+  ZeroMemory(@loadingVFS, sizeof(loadingVFS));
   took:=now();
   data2 := loadfile(fn);
   loadingVfs.bakAvailable:=fileExists(fn+BAK_EXT);
@@ -10710,14 +10783,20 @@ const
   BAD_IE_THRESHOLD = 2000; // under this size (few bytes less, really) old IE versions will go nuts with UTF-8 pages
 var
   s: RawByteString;
+  lToGZip: Boolean;
 begin
-  if not compressedbrowsingChk.checked then
-    exit;
-  s := cd.conn.reply.bodyB;
+  lToGZip := compressedbrowsingChk.checked;
+//  if not compressedbrowsingChk.checked then
+//    exit;
+  lToGZip := lToGZip and (cd.conn.reply.body <> '');
+  lToGZip := lToGZip and (ipos('gzip', cd.conn.getHeader('Accept-Encoding')) <> 0);
+  if not lToGZip and not cd.conn.reply.IsGZiped then
+    Exit;
+  s := cd.conn.reply.body;
   if s = '' then
     exit;
-  if ipos('gzip', cd.conn.getHeader('Accept-Encoding')) = 0 then
-    exit;
+//  if ipos('gzip', cd.conn.getHeader('Accept-Encoding')) = 0 then
+//    exit;
 // workaround for IE6 pre-SP2 bug
 if (cd.workaroundForIEutf8  = toDetect) and (cd.agent > '') then
   if reMatch(cd.agent, '^MSIE [4-6]\.', '!') > 0 then // version 6 and before
@@ -10725,11 +10804,25 @@ if (cd.workaroundForIEutf8  = toDetect) and (cd.agent > '') then
   else
     cd.workaroundForIEutf8:=no;
 //s:=ZcompressStr2(s, zcFastest, 31,8,zsDefault);
-s := ZcompressStr(s, clFastest, zsGZip);
-if (cd.workaroundForIEutf8  = yes) and (length(s) < BAD_IE_THRESHOLD) then
-  exit;
-cd.conn.addHeader('Content-Encoding: gzip');
-cd.conn.reply.bodyB:=s;
+  if lToGZip and not cd.conn.reply.IsGZiped then
+    s := ZcompressStr(s, clDefault, zsGZip);
+
+  if (cd.workaroundForIEutf8  = yes) and (length(s) < BAD_IE_THRESHOLD) then
+    lToGZip := false;
+  if lToGZip then
+    begin
+      cd.conn.addHeader('Content-Encoding: gzip');
+      cd.conn.reply.body := s;
+    end
+   else
+    begin
+      if cd.conn.reply.IsGZiped then
+        begin
+          cd.conn.reply.body := ZDecompressStr3(cd.conn.reply.body);
+          cd.conn.reply.IsGZiped := False;
+        end;
+
+    end;
 end; // compressReply
 
 procedure TmainFrm.Flagfilesaddedrecently1Click(Sender: TObject);
@@ -12250,7 +12343,7 @@ trayShows:='downloads';
 flashOn:='download';
 forwardedMask:='127.0.0.1';
 runningOnRemovable:=DRIVE_REMOVABLE = GetDriveType(PChar(exePath[1]+':\'));
-etags.values['exe']:=strMD5(dateToHTTP(getMtimeUTC(paramStr(0))));
+etags.values['exe']:= MD5PassHS(dateToHTTP(getMtimeUTC(paramStr(0))));
 
 
 dll:=GetModuleHandle('kernel32.dll');

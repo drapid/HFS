@@ -500,7 +500,7 @@ i:=length(fileExts);
 setLength(fileExts, i+2);
 delete(section, 1, 4);
 fileExts[i]:=section;
-fileExts[i+1]:=str_(last.idx);
+fileExts[i+1] := unUtf(str_(last.idx));
 lastExt.section:=section;
 lastExt.idx:=last.idx;
 end; // newSection
@@ -540,24 +540,27 @@ function Ttpl.getTxtByExt(fileExt:string):string;
 var
   i: integer;
 begin
-result:='';
-if (lastExt.section > '') and (fileExt = lastExt.section) then
-  begin
-  if lastExt.idx >= 0 then result:=sections[lastExt.idx].txt;
-  exit;
-  end;
-i:=idxOf(fileExt, fileExts);
-if (i < 0) and assigned(over) then
-  begin
-  result:=over.getTxtByExt(fileExt);
-  if result > '' then exit;
-  end;
-lastExt.section:=fileExt;
-lastExt.idx:=i;
-if i < 0 then exit;
-i:=int_(fileExts[i+1]);
-lastExt.idx:=i;
-result:=sections[i].txt;
+  result := '';
+  if (lastExt.section > '') and (fileExt = lastExt.section) then
+    begin
+      if lastExt.idx >= 0 then
+        result := sections[lastExt.idx].txt;
+      exit;
+    end;
+  i := idxOf(fileExt, fileExts);
+  if (i < 0) and assigned(over) then
+    begin
+      result := over.getTxtByExt(fileExt);
+      if result > '' then
+        exit;
+    end;
+  lastExt.section := fileExt;
+  lastExt.idx := i;
+  if i < 0 then
+    exit;
+  i := int_(StrToUTF8(fileExts[i+1]));
+  lastExt.idx := i;
+  result := sections[i].txt;
 end; // getTxtByExt
 
 procedure Ttpl.fromRaw(txt: RawByteString);

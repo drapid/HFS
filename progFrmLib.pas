@@ -68,46 +68,46 @@ begin if a > b then result:=a else result:=b end;
 
 constructor TprogressForm.create;
 begin
-frm:=Tform.create(NIL);
-frm.Position:=poScreenCenter;
-frm.Width:=200;
-frm.BorderStyle:=bsNone;
-frm.BorderWidth:=15;
-frm.Height:=25+frm.BorderWidth*2;
-frm.OnResize:=onResize;
-//frm.FormStyle:=fsStayOnTop;
+  frm:=Tform.create(NIL);
+  frm.Position:=poScreenCenter;
+  frm.Width := trunc(200 * frm.CurrentPPI / 96);
+  frm.BorderStyle:=bsNone;
+  frm.BorderWidth:= trunc(15 * frm.CurrentPPI / 96);
+  frm.Height:= trunc(25 * frm.CurrentPPI / 96)+frm.BorderWidth*2;
+  frm.OnResize:=onResize;
+  //frm.FormStyle:=fsStayOnTop;
 
-msgPnl:=Tpanel.create(frm);
-msgPnl.Parent:=frm;
-msgPnl.align:=alTop;
-msgPnl.height:=20;
-msgPnl.BevelOuter:=bvLowered;
+  msgPnl:=Tpanel.create(frm);
+  msgPnl.Parent:=frm;
+  msgPnl.align:=alTop;
+  msgPnl.height:= trunc(20 * frm.CurrentPPI / 96);
+  msgPnl.BevelOuter:=bvLowered;
 
-prog:=TProgressBar.Create(frm);
-prog.Parent:=frm;
-prog.BorderWidth:=3;
-prog.Min:=0;
-prog.max:=100; // resolution
-prog.Align:=alClient;
-prog.smooth:=TRUE;
+  prog:=TProgressBar.Create(frm);
+  prog.Parent:=frm;
+  prog.BorderWidth:=trunc(3 * frm.CurrentPPI / 96);;
+  prog.Min:=0;
+  prog.max:=100; // resolution
+  prog.Align:=alClient;
+  prog.smooth:=TRUE;
 
-btnPnl:=Tpanel.create(frm);
-btnPnl.parent:=frm;
-btnPnl.Align:=alBottom;
-btnPnl.BevelOuter:=bvLowered;
+  btnPnl:=Tpanel.create(frm);
+  btnPnl.parent:=frm;
+  btnPnl.Align:=alBottom;
+  btnPnl.BevelOuter:=bvLowered;
 
-cancelBtn:=TbitBtn.create(frm);
-cancelBtn.parent:=btnPnl;
-cancelBtn.Kind:=bkCancel;
-cancelBtn.top:=10;
-cancelBtn.OnClick:=onCancel;
+  cancelBtn:=TbitBtn.create(frm);
+  cancelBtn.parent:=btnPnl;
+  cancelBtn.Kind:=bkCancel;
+  cancelBtn.top:=trunc(10 * frm.CurrentPPI / 96);;
+  cancelBtn.OnClick:=onCancel;
 
-btnPnl.Height:=cancelBtn.Height+cancelBtn.top*2;
-btnPnl.Hide();
+  btnPnl.Height:=cancelBtn.Height+cancelBtn.top*2;
+  btnPnl.Hide();
 
-partialLength:=1;
-push(1); // init stack
-frm.Height:=frm.Height+msgPnl.Height;
+  partialLength:=1;
+  push(1); // init stack
+  frm.Height:=frm.Height+msgPnl.Height;
 end; // constructor
 
 function TprogressForm.getVisible():boolean;

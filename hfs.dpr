@@ -18,7 +18,9 @@ This file is part of HFS ~ HTTP File Server.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 }
 {$INCLUDE defs.inc }
-{$SetPEOptFlags $100 } //IMAGE_DLLCHARACTERISTICS_NX_COMPAT
+{ $SetPEOptFlags $100 } //IMAGE_DLLCHARACTERISTICS_NX_COMPAT
+ {$SETPEOPTFLAGS $140} // NX + ASLR
+{$STRINGCHECKS OFF}
 program hfs;
 
 {$R 'data.res' 'res\data.rc'}

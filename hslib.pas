@@ -92,6 +92,12 @@ type
   );
 
   ThttpReply = record
+   private
+    bodyBr: RawByteString;    // specifies reply body according to bodyMode
+    procedure setBody(const b: RawByteString);
+    procedure setBodyU(const b: String);
+    function  getBodyU: String;
+   public
     mode: ThttpReplyMode;
     header: string;            // full raw header (optional)
     contentType: string;       // ContentType header (optional)
@@ -101,14 +107,18 @@ type
       RBM_STRING,       // variable body specifies byte content
       RBM_STREAM        // refer to bodyStream
     );
-    bodyB: RawByteString;    // specifies reply body according to bodyMode
-    bodyStream: Tstream;   // note: the stream is automatically freed 
+    bodyStream: Tstream;   // note: the stream is automatically freed
+    IsGZiped: Boolean; // Is body GZiped
+    isBodyUTF8: Boolean;   // Is body UTF8 string
     firstByte, lastByte: int64;  // body interval for partial replies (206)
     realm: string;   // this will appear in the authentication dialog
     url: string;     // used for redirections
     reason: string;  // customized reason phrase
     resumeForbidden: boolean;
-    end;
+    procedure Clear;
+    property Body: RawByteString read bodyBr write setBody;
+    property BodyU: String read getBodyU write setBodyU;
+   end;
 
   ThttpRequest = record
     full: string;           // the raw request, byte by byte
@@ -124,9 +134,9 @@ type
     length: int64;          // multipart form-data length
     boundary,               // multipart form-data boundary
     header,                 // contextual header
-    data,                   // misc data
     varname,                // post variable name
     filename: string;       // name of posted file
+    data: RawByteString;    // misc data
     mode: (PM_NONE, PM_URLENCODED, PM_MULTIPART);
     end;
 
@@ -169,7 +179,7 @@ type
     lastSpeedTime: int64;
     P_speedOut, P_speedIn: real;
 
-    buffer: string;       // internal buffer for incoming data
+    buffer: RawByteString;       // internal buffer for incoming data
     // event handlers
     procedure disconnected(Sender: TObject; Error: Word);
     procedure dataavailable(Sender: TObject; Error: Word);
@@ -200,13 +210,15 @@ type
     post: ThttpPost;            // it posts
     data: pointer;              // user data
     paused: boolean;            // while (not paused) do senddata()
-    eventData: string;
+    eventData: RawByteString;
     ignoreSpeedLimit: boolean;
     limiters: TobjectList;     // every connection can be bound to a number of TspeedLimiter
     constructor create(server:ThttpSrv);
     destructor Destroy; override;
     procedure disconnect();
     procedure addHeader(s:string; overwrite:boolean=TRUE); // append an additional header line
+    function  setHeaderIfNone(s:string):boolean; // set header if not already existing
+    procedure removeHeader(name:string);
     function  getHeader(h:string):string;  // extract the value associated to the specified header field
     function  getCookie(k:string):string;
     procedure setCookie(k, v:string; pairs:array of string; extra:string='');
@@ -293,11 +305,12 @@ const
     'Moved permanently', 'Not Modified');
 
 // decode/decode url
-function decodeURL(url:string; utf8:boolean=TRUE):string;
-function encodeURL(url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
+function decodeURL(const url:string; utf8:boolean=TRUE):string; OverLoad;
+function decodeURL(const url: RawByteString):string; OverLoad;
+function encodeURL(const url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
   unicode:boolean=FALSE):string;
 // returns true if address is not suitable for the internet
-function isLocalIP(ip:string):boolean;
+function isLocalIP(const ip:string):boolean;
 // an ip address where we are listening
 function getIP():string;
 // ensure a string ends with a specific string
@@ -307,7 +320,7 @@ function charToUnicode(c:char):dword;
 // this version of pos() is able to skip the pattern if inside quotes
 function nonQuotedPos(ss, s:string; ofs:integer=1; quote:string='"'; unquote:string='"'):integer;
 // case insensitive version
-function ipos(ss, s:string; ofs:integer=1):integer; overload;
+//function ipos(ss, s:string; ofs:integer=1):integer; overload;
 
 implementation
 
@@ -316,6 +329,7 @@ uses
 
 const
   CRLF = #13#10;
+  CRLFA = RawByteString(#13#10);
   MAX_REQUEST_LENGTH = 16*1024;
   MAX_INPUT_BUFFER_LENGTH = 256*1024;
   // used as body content when the user did not specify any
@@ -345,7 +359,7 @@ begin if copy(s, length(s)-length(ss)+1, length(ss)) <> ss then s:=s+ss end;
 function charToUnicode(c:char):dword;
 begin stringToWideChar(c,@result,4) end;
 
-function isLocalIP(ip:string):boolean;
+function isLocalIP(const ip:string):boolean;
 var
   r: record d,c,b,a:byte end;
 begin
@@ -362,51 +376,8 @@ begin if a < b then result:=a else result:=b end;
 // this table is to be used by ipos(), to be calculated once
 var
   upcaseTab: array [char] of char;
-function ipos(ss, s: string; ofs:integer=1):integer; overload;
 
-  procedure initTab();
-  var
-    i: char;
-    ia: AnsiChar;
-    tmp: string;
-  begin
-  for ia:=#0 to #255 do
-    begin
-      i := Char(ia);
-      tmp:=ansiUppercase(i);
-      upcaseTab[i]:=tmp[1];
-    end;
-  end;
-
-var
-  rss, rs, rss1, p: pchar;
-  l: integer;
-begin
-  if upcaseTab[#1] = #0 then
-    initTab();
-result:=0;
-l:=length(s);
-if (l < ofs) or (l = 0) or (ss = '') then exit;
-// every strange thing you may notice here is an optimization based on the produced asm
-ss:=uppercase(ss);
-rss1:=@ss[1];
-rs:=@s[ofs];
-for result:=ofs to l do
-  begin
-  rss:=rss1;
-  p:=rs;
-  while (rss^ <> #0) and (rss^ = upcaseTab[p^]) do
-    begin
-    inc(rss);
-    inc(p);
-    end;
-  if rss^ = #0 then exit; // we saw it all, and we saw it was good
-  inc(rs);
-  end;
-result:=0;
-end; // ipos
-
-function nonQuotedPos(ss, s:string; ofs:integer=1; quote:string='"'; unquote:string='"'):integer;
+function nonQuotedPos(ss, s: string; ofs: integer=1; quote: string='"'; unquote: string='"'):integer;
 var
   qpos: integer;
 begin
@@ -425,7 +396,7 @@ begin
   until false;
 end; // nonQuotedPos
 
-function decodeURL(url: string; utf8: boolean=TRUE):string;
+function decodeURL(const url: string; utf8: boolean=TRUE):string;
 var
   i, l: integer;
   c: char;
@@ -473,7 +444,38 @@ while i<=length(url) do
     setLength(result, l);
 end; // decodeURL
 
-function encodeURL(url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
+function decodeURL(const url: RawByteString):string;
+var
+  i, l: integer;
+  resA: RawByteString;
+  c: AnsiChar;
+begin
+  setLength(result, length(url));
+  setLength(resA, length(url));
+  l := 0;
+  i := 1;
+while i<=length(url) do
+  begin
+    if (url[i] = '%') and (i+2 <= length(url)) then
+      try
+        c := AnsiChar(strToInt( '$'+url[i+1]+url[i+2] ));
+        inc(i,2); // three chars for one
+      except
+        c := url[i];
+      end
+    else
+     c := url[i];
+
+    inc(i);
+    inc(l);
+    resA[l] := c;
+  end;
+  setLength(resA, l);
+  Result := UnUTF(resA);
+end; // decodeURL
+
+
+function encodeURL(const url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
   unicode:boolean=FALSE):string;
 var
   i: integer;
@@ -516,16 +518,57 @@ case ips.count of
   end;
 end; // getIP
 
-function replyHeader_IntPositive(name:string; int:int64):string;
+function replyHeader_IntPositive(const name:string; int:int64):string;
 begin
 result:='';
 if int >= 0 then result:=name+': '+intToStr(int)+CRLF;
 end;
 
-function replyHeader_Str(name:string; str:string):string;
+function replyHeader_Str(const name:string; const str:string):string;
 begin
 result:='';
 if str > '' then result:=name+': '+str+CRLF;
+end;
+
+procedure THTTPReply.setBody(const b: RawByteString);
+begin
+  bodyBr := b;
+  isBodyUTF8 := False;
+  IsGZiped := False;
+end;
+
+procedure THTTPReply.setBodyU(const b: String);
+begin
+  bodyBr := UTF8Encode(b);
+  isBodyUTF8 := True;
+  IsGZiped := False;
+end;
+
+function THTTPReply.getBodyU: String;
+begin
+  if not IsGZiped then
+    begin
+      if isBodyUTF8 then
+        Result := UTF8Decode(bodyBr)
+       else
+        Result := UnUTF(bodyBr)
+    end
+   else
+    Result := '' ; // ToDo ZDecompress
+end;
+
+procedure THTTPReply.Clear;
+begin
+  header:='';
+  bodyMode:=RBM_STRING;
+  bodyBr := '';
+  IsGZiped := false;
+  additionalHeaders:='';
+  mode:=HRM_IGNORE;
+//  firstByte:=request.firstByte;
+//  lastByte:=request.lastByte;
+  realm:='Password protected resource';
+  reason:='';
 end;
 
 /////// SERVER
@@ -938,15 +981,11 @@ end; // clearRequest
 
 procedure ThttpConn.clearReply();
 begin
-reply.header:='';
-reply.bodyMode:=RBM_STRING;
-reply.bodyB := '';
-reply.additionalHeaders:='';
-reply.mode:=HRM_IGNORE;
-reply.firstByte:=request.firstByte;
-reply.lastByte:=request.lastByte;
-reply.realm:='Password protected resource';
-reply.reason:='';
+  reply.Clear;
+  reply.mode:=HRM_IGNORE;
+  reply.firstByte:=request.firstByte;
+  reply.lastByte:=request.lastByte;
+  reply.realm:='Password protected resource';
 end; // clearReply
 
 procedure ThttpConn.processInputBuffer();
@@ -1010,24 +1049,25 @@ procedure ThttpConn.processInputBuffer();
     request.pwd:=s;
     end;
 
-  s:=getHeader('Connection');
-  persistent:=srv.persistentConnections and
+  s := getHeader('Connection');
+  persistent := srv.persistentConnections and
     (ansiStartsText('Keep-Alive',s) or (request.ver >= '1.1') and (ipos('close',s)=0));
 
-  s:=getHeader('Content-Type');
+  s := getHeader('Content-Type');
   if ansiStartsText('application/x-www-form-urlencoded', s) then
-    post.mode:=PM_URLENCODED
+    post.mode := PM_URLENCODED
   else if ansiStartsText('multipart/form-data', s) then
     begin
-    post.mode:=PM_MULTIPART;
-    chop('boundary=', s);
-    post.boundary:='--'+s;
+      post.mode := PM_MULTIPART;
+      chop('boundary=', s);
+      post.boundary := '--'+s;
     end;
-  post.length:=StrToInt64Def(getHeader('Content-Length'), 0);
+  post.length := StrToInt64Def(getHeader('Content-Length'), 0);
   // the browser may not support 2GB+ files. This workaround works only for files under 4GB.
-  if post.length < 0 then inc(post.length, int64(2) shl 31);
+  if post.length < 0 then
+    inc(post.length, int64(2) shl 31);
 
-  result:=TRUE;
+  result := TRUE;
   end; // parseHeader
 
   procedure handlePostMultipart();
@@ -1084,17 +1124,17 @@ procedure ThttpConn.processInputBuffer();
     if copy(buffer, i+length(post.boundary), 4) = '--'+CRLF then
       begin
       handleLeftData(i);
-      chop('--'+CRLF, buffer);
+      chop(RawByteString('--'+CRLFA), buffer);
       tryNotify(HE_POST_END);
       state:=HCS_REPLYING;
       break;
       end;
     // we wait for the header to be complete
-    if posEx(CRLF+CRLF, buffer, i+length(post.boundary)) = 0 then break;
+    if posEx(CRLFA+CRLFA, buffer, i+length(post.boundary)) = 0 then break;
     handleLeftData(i);
     post.data:='';
     post.filename:='';
-    post.header:=chop(CRLF+CRLF, buffer);
+    post.header:=chop(CRLFA+CRLFA, buffer);
     chopLine(post.header);
     // parse the header part
     s:=post.header;
@@ -1259,24 +1299,27 @@ end; // processInputBuffer
 
 procedure ThttpConn.dataavailable(Sender: TObject; Error: Word);
 var
-  s: string;
+  s: RawByteString;
 begin
-if error <> 0 then exit;
-s:=sock.ReceiveStr();
-inc(brecvd, length(s));
-inc(srv.brecvd, length(s));
-if (s = '') or dontFulFil then exit;
-if state = HCS_POSTING then inc(postDataReceived, length(s));
-buffer:=buffer+s;
-if length(buffer) > MAX_INPUT_BUFFER_LENGTH then
+  if error <> 0 then
+    exit;
+  s := sock.ReceiveStrA();
+  inc(brecvd, length(s));
+  inc(srv.brecvd, length(s));
+  if (s = '') or dontFulFil then
+    exit;
+  if state = HCS_POSTING then
+    inc(postDataReceived, length(s));
+  buffer := buffer+s;
+  if length(buffer) > MAX_INPUT_BUFFER_LENGTH then
   begin
-  disconnect();
-  try sock.Abort() except end; // please, brutally
-  exit;
+    disconnect();
+    try sock.Abort() except end; // please, brutally
+    exit;
   end;
-eventData:=s;
-notify(HE_GOT);
-processInputBuffer();
+  eventData := s;
+  notify(HE_GOT);
+  processInputBuffer();
 end; // dataavailable
 
 procedure ThttpConn.senddata(sender: Tobject; bytes: integer);
@@ -1319,9 +1362,9 @@ if (state = HCS_REPLYING_HEADER) and (reply.mode <> HRM_REPLY_HEADER) then
   if ((stream = NIL) or (stream.size = 0)) and (reply.mode <> HRM_REPLY) then
     begin
     reply.bodyMode:=RBM_STRING;
-    reply.bodyB := HRM2BODY[reply.mode];
+    reply.setBody(HRM2BODY[reply.mode]);
     if reply.mode in [HRM_REDIRECT, HRM_MOVED] then
-      reply.bodyB := stringReplace(reply.bodyB, '%url%', reply.url, [rfReplaceAll]);
+      reply.body := stringReplace(reply.body, '%url%', reply.url, [rfReplaceAll]);
     initInputStream();
     end;
   end;
@@ -1390,10 +1433,10 @@ result:=FALSE;
 FreeAndNil(stream);
 try
   case reply.bodyMode of
-    RBM_STRING: stream := TAnsiStringStream.create(reply.bodyB);
+    RBM_STRING: stream := TAnsiStringStream.create(reply.body);
     RBM_FILE:
       begin
-        s := UnUTF(reply.bodyB);
+        s := reply.bodyU;
         i := fileopen(s, fmOpenRead+fmShareDenyNone);
         if i = -1 then
           exit;
@@ -1512,32 +1555,60 @@ end;
 function ThttpConn.replyHeader_mode(mode:ThttpReplyMode):string;
 begin result:=replyHeader_code(HRM2CODE[mode]) end;
 
-procedure ThttpConn.addHeader(s:string; overwrite:boolean=TRUE);
-var
-    i, j, from: integer;
-    name, was: string;
+function getNameOf(s:string):string; // colon included
+begin result:=copy(s, 1, pos(':', s)) end;
+
+// return 0 if not found
+function namePos(name:string; headers:string; from:integer=1):integer;
 begin
-was:=reply.additionalHeaders; // handy shortcut
+result:=from;
+  repeat
+  result:=ipos(name, headers, result);
+  until (result<=1) // both not found and found at the start of the string
+    or (headers[result-1] = #10) // or start of the line
+end; // namePos
+
+// return true if the operation succeded
+function ThttpConn.setHeaderIfNone(s:string):boolean;
+var
+  name: string;
+begin
+name:=getNameOf(s);
+if name = '' then
+  raise Exception.Create('Missing colon');
+result:=namePos(name, reply.additionalHeaders) = 0; // empty text will also be considered as existing
+if result then
+  addHeader(s, FALSE); // with FALSE it's faster
+end; // setHeaderIfNone
+
+procedure ThttpConn.removeHeader(name:string);
+var
+    i, eol: integer;
+    s: string;
+begin
+s:=reply.additionalHeaders;
+includeTrailingString(name,':');
+// see if it already exists
+i:=1;
+  repeat
+  i:=namePos(name, s, i);
+  if i = 0 then break;
+  // yes it does
+  eol:=posEx(#10, s, i);
+  if eol = 0 then // this never happens, unless the string is corrupted. Just to be sounder.
+    eol:=length(s);
+  delete(s, i, eol-i+1); // remove it
+  until false;
+reply.additionalHeaders:=s;
+end; // removeHeader
+
+procedure ThttpConn.addHeader(s:string; overwrite:boolean=TRUE);
+begin
 if overwrite then
-    begin
-    // calculate the matching text
-    i:=pos(':', s);
-    if i = 0 then
-        i:=length(s);
-    name:=copy(s, 1, i);
-    // see if it already exists
-    from:=1;
-      repeat
-      i:=ipos(name, was, from);
-      if (i=0) or (i>1) and (was[i-1] <> #10) then break;
-      // yes it does
-        j:=posEx(#10, was, i)+1;
-      delete(was, i, j-i); // remove it
-      from:=i;
-      until false;
-    end;
-reply.additionalHeaders:=was+s+CRLF;
-end;
+  removeHeader(getNameOf(s));
+//appendStr(reply.additionalHeaders, s+CRLF);
+reply.additionalHeaders := reply.additionalHeaders + s + CRLF;
+end; // addHeader
 
 function ThttpConn.getDontFree():boolean;
 begin result:=lockCount > 0 end;

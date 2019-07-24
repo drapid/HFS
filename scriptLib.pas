@@ -187,7 +187,7 @@ var
   procedure unsatisfied(b:boolean=TRUE);
   begin if b then macroError('cannot be used here') end;
 
-  function parEx(idx:integer; const name:string=''; doTrim:boolean=TRUE):string; overload;
+  function parEx(idx: integer; const name: string=''; doTrim: boolean=TRUE): string; overload;
   var
     i: integer;
   begin
@@ -208,29 +208,66 @@ var
     or (name > '') and (pars.names[idx] > '') and not anycharIn(' '#13#10, pars.names[idx]) // this numerical index was already taken by a valid mnemonic name
     then
       raise Exception.create('invalid parameter index');
-    result:=pars[idx];
+    result := pars[idx];
     if doTrim then
-      result:=trim(result);
+      result := trim(result);
   end; // parEx
 
   function parEx(name:string; doTrim:boolean=TRUE):string; overload;
-  begin result:=parEx(-1, name, doTrim) end;
+  begin result := parEx(-1, name, doTrim) end;
+
+  function parExNE(idx: integer; const name: string=''; doTrim: boolean=TRUE): string; overload;
+  var
+    i: integer;
+  begin
+    result:='';
+    if name > '' then
+      begin
+      i := pars.IndexOfName(name);
+      if i >= 0 then
+        begin
+        result := pars.valueFromIndex[i];
+        if doTrim then
+          result:=trim(result);
+        exit;
+        end;
+      end;
+    if (idx < 0) // no numeric index accept
+    or (idx >= pars.count) // invalid index
+    or (name > '') and (pars.names[idx] > '') and not anycharIn(' '#13#10, pars.names[idx]) // this numerical index was already taken by a valid mnemonic name
+    then
+      Exit('');
+    result := pars[idx];
+    if doTrim then
+      result := trim(result);
+  end; // parExNE
+
+  function parExNE(name: string; doTrim: boolean=TRUE):string; overload; // No Exception
+  begin
+    result := parExNE(-1, name, doTrim)
+  end;
 
   function par(idx:integer; name:string=''; doTrim:boolean=TRUE):string; overload;
   begin
     if ((idx < 0) or (idx >= pars.count)) and (name = '') then
       Exit('');
     try
-      result:=parEx(idx, name, doTrim)
+      result := parExNE(idx, name, doTrim)
      except
-      result:=''
+      result := ''
     end
   end;
 
   function par(name:string=''; doTrim:boolean=TRUE; defval:string=''):string; overload;
   begin
-  try result:=parEx(-1, name, doTrim)
-  except result:=defval end
+    try
+      if defval = '' then
+        Result := parExNE(-1, name, doTrim)
+       else
+        Result := parEx(-1, name, doTrim)
+     except
+      result := defval
+    end
   end;
 
   function parI(idx:integer):int64; overload;
@@ -256,11 +293,11 @@ var
   var
     i: integer;
   begin
-  result:=FALSE;
-  for i:=0 to length(names)-1 do
-    if pars.indexOfName(names[i]) < 0 then
-      exit;
-  result:=TRUE;
+    result := FALSE;
+    for i:=0 to length(names)-1 do
+      if pars.indexOfName(names[i]) < 0 then
+        exit;
+    result := TRUE;
   end; // parExist
 
   procedure trueIf(condition:boolean);
@@ -340,7 +377,7 @@ var
     if caseSensitive then
       result:=posEx(ss,s,ofs)
      else
-      result:= HSLib.ipos(ss,s, ofs)
+      result:= ipos(ss,s, ofs)
   end; // pos_
 
   procedure allLogic(isAnd:boolean); // when not "isAnd", then it isOr ;-)
@@ -584,20 +621,17 @@ var
     r1,r2: double;
     c: integer;
   begin
-  try
-    r1:=StrToFloat(p1);
-    r2:=StrToFloat(p2);
-    c:=compare_(r1,r2)
-  except
-    c:=ansiCompareText(p1,p2);
-    end;
-  if op = '=' then result:= c=0
-  else if op = '>' then result:= c>0
-  else if op = '<' then result:= c<0
-  else if op = '>=' then result:= c>=0
-  else if op = '<=' then result:= c<=0
-  else if (op = '<>') or (op = '!=') then result:= c<>0
-  else result:=FALSE;
+    if TryStrToFloat(p1, r1) and TryStrToFloat(p2, r2) then
+      c := compare_(r1,r2)
+     else
+      c := ansiCompareText(p1,p2);
+    if op = '=' then result:= c=0
+    else if op = '>' then result:= c>0
+    else if op = '<' then result:= c<0
+    else if op = '>=' then result:= c>=0
+    else if op = '<=' then result:= c<=0
+    else if (op = '<>') or (op = '!=') then result:= c<>0
+    else result:=FALSE;
   end; // compare
 
   procedure infixOperators(ops:array of string);
@@ -1135,20 +1169,22 @@ var
     i: integer;
     v: string;
   begin
-  try
-    v:=parEx('var');
-    result:=getVar(v);
-  except result:=pars[pars.count-1] end;
-
-  i:=0;
-  while i < pars.count-2 do
-    begin
-    result:=xtpl(result, [pars[i], pars[i+1]]);
-    inc(i, 2);
+    try
+      v := parEx('var');
+      result:=getVar(v);
+     except
+      result := pars[pars.count-1]
     end;
-  if v = '' then exit;
-  setVar(v, result);
-  result:='';
+
+    i:=0;
+    while i < pars.count-2 do
+      begin
+      result:=xtpl(result, [pars[i], pars[i+1]]);
+      inc(i, 2);
+      end;
+    if v = '' then exit;
+    setVar(v, result);
+    result:='';
   end; // replace
 
   procedure dialog();
@@ -1213,7 +1249,7 @@ var
       a.user:=s;
   except end;
 
-  try a.redir:=parEx('redirect') except end;
+  try a.redir := parEx('redirect') except end;
   try a.noLimits:=isTrue(parEx('no limits')) except end;
   try a.enabled:=isTrue(parEx('enabled')) except end;
   try a.group:=isTrue(parEx('is group')) except end;
@@ -1425,15 +1461,27 @@ var
     local := FALSE;
     result := '';
     try
-      s := parEx('path');
-      f := mainfrm.findFileByURL(s, md.folder);
-      if f = NIL then
-        exit;
-      local:=TRUE;
-    except
-      if action = FA_ACCESS then f:=md.f
-      else f:=md.folder;
-      end;
+      s := parExNE('path');
+      if s = '' then
+        begin
+          if action = FA_ACCESS then
+            f := md.f
+           else
+            f := md.folder;
+        end
+       else
+        begin
+          f := mainfrm.findFileByURL(s, md.folder);
+          if f = NIL then
+            exit;
+          local:=TRUE;
+        end;
+     except
+        if action = FA_ACCESS then
+          f := md.f
+         else
+          f := md.folder;
+    end;
     trueIf(accountAllowed(action, md.cd, f));
     if local then
       freeIfTemp(f);
@@ -1750,19 +1798,7 @@ var
     result:=macroQuote(result);
   end; // handleSymbol
 
-{ Commented by Rapid D
-  function stringTotrayMessageType(s:string):TtrayMessageType;
-  begin
-  if compareText(s,'warning') = 0 then
-    result:=TM_WARNING
-  else if compareText(s,'error') = 0 then
-    result:=TM_ERROR
-  else if compareText(s,'info') = 0 then
-    result:=TM_INFO
-  else
-    result:=TM_NONE
-  end; // stringTotrayMessageType
-}
+
   function stringTotrayMessageType(s:string): TBalloonIconType;
   begin
   if compareText(s,'warning') = 0 then
@@ -1884,9 +1920,11 @@ try
     name:=ansiLowercase(name);
 
     if name = 'count' then
-      if satisfied(md.cd) then
-        result:=intToStr(md.cd.tplCounters.incInt(p)-1); // it can work even with no parameters
-
+      begin
+        if satisfied(md.cd) then
+          result:=intToStr(md.cd.tplCounters.incInt(p)-1); // it can work even with no parameters
+      end
+     else
     if name = 'time' then
       begin
         s:=par(0,'format');
@@ -1895,68 +1933,71 @@ try
           result:=floatToStr(r)
          else
           datetimeToString(result, first(s,'c'), r );
-      end;
-
+      end
+     else
     if name = 'disconnect' then
-      disconnect();
-
+      disconnect()
+     else
     if name = 'stop server' then
-      stopServer();
+      stopServer()
+     else
     if name = 'start server' then
-      startServer();
-
-
+      startServer()
+     else
     if name = 'focus' then
       begin
       application.restore();
       application.bringToFront();
       result:='';
-      end;
-
+      end
+     else
     if name = 'current downloads' then
-      result:=intToStr( countDownloads( par('ip'), par('user'), if_(sameText(par('file'), 'this'), md.f) as Tfile) );
-
+      result:=intToStr( countDownloads( par('ip'), par('user'), if_(sameText(par('file'), 'this'), md.f) as Tfile) )
+     else
     if name = 'disconnection reason' then
       begin
-      try
-        if isFalse(parEx('if')) then
-          begin
-          result:='';
-          exit;
-          end;
-      except end;
-      result:=md.cd.disconnectReason; // return the previous state
-      if pars.count > 0 then md.cd.disconnectReason:=p;
-      end;
-
+        try
+          if isFalse(parEx('if')) then
+            begin
+            result:='';
+            exit;
+            end;
+        except end;
+        result:=md.cd.disconnectReason; // return the previous state
+        if pars.count > 0 then md.cd.disconnectReason:=p;
+      end
+     else
     if name = 'clipboard' then
-      if p = '' then
-        result:=clipboard.asText
-      else
-        begin
-        try setClip(getVar(parEx('var')))
-        except setClip(p) end;
-        result:='';
-        end;
-
+      begin
+        if p = '' then
+          result:=clipboard.asText
+         else
+          begin
+            try setClip(getVar(parEx('var')))
+             except setClip(p)
+            end;
+            result:='';
+          end;
+      end
+     else
     if name = 'save vfs' then
       begin
       mainfrm.saveVFS(first(p,lastFileOpen));
       result:='';
-      end;
-
+      end
+     else
     if name = 'save cfg' then
       begin
-      if p = 'file' then savemode:=SM_FILE
-      else if p = 'registry' then savemode:=SM_USER
-      else if p = 'global registry' then savemode:=SM_SYSTEM;
-      mainFrm.saveCFG();
-      result:='';
-      end;
-
+        if p = 'file' then savemode:=SM_FILE
+        else if p = 'registry' then savemode:=SM_USER
+        else if p = 'global registry' then savemode:=SM_SYSTEM;
+        mainFrm.saveCFG();
+        result:='';
+      end
+     else
     if name = 'js encode' then
-      result:=jsEncode(p, first(par(1),'''"'));
-
+      result:=jsEncode(p, first(par(1),'''"'))
+     else
     if name = 'vfs select' then
       if pars.count = 0 then
         try result:=selectedFile.url()
@@ -1979,14 +2020,14 @@ try
 
     if name = 'break' then
       begin
-      result:='';
-      try
-        if isFalse(parEx('if')) then
-          exit;
-      except end;
-      try result:=parEx('result') except end;
-      md.breaking:=TRUE;
-      exit;
+        result:='';
+        try
+          if isFalse(parEx('if')) then
+            exit;
+        except end;
+        try result:=parEx('result') except end;
+        md.breaking:=TRUE;
+        exit;
       end;
 
     if pars.Count < 1 then exit; // from here, only macros with parameters
@@ -2078,18 +2119,18 @@ try
       end;
 
     if name = 'not' then
-      trueIf(isFalse(p));
-
+      trueIf(isFalse(p))
+     else
     if name = 'length' then
       begin // don't trim
-      try s:=getVar(parEx('var', FALSE))
-      except s:=pars[0] end;
-      result:=intToStr(length(s));
-      end;
-
+        try s:=getVar(parEx('var', FALSE))
+        except s:=pars[0] end;
+        result:=intToStr(length(s));
+      end
+     else
     if name = 'load' then
-      load(p, par(1,'var'));
-
+      load(p, par(1,'var'))
+     else
     if name = 'load tpl' then
       if satisfied(md.cd) then
         begin
@@ -2129,20 +2170,20 @@ try
       result:=p;
 
     if name = 'lower' then
-      result:=ansiLowercase(p);
-
+      result:=ansiLowercase(p)
+     else
     if name = 'upper' then
-      result:=ansiUppercase(p);
-
+      result:=ansiUppercase(p)
+     else
     if name = 'abs' then
-      result:=floatToStr(abs(parF(0)));
-
+      result:=floatToStr(abs(parF(0)))
+     else
     if name = 'upload failed' then
       begin
-      md.cd.uploadFailed:=p;
-      result:='';
-      end;
-
+        md.cd.uploadFailed:=p;
+        result:='';
+      end
+     else
     if name = 'is file protected' then
       result:=if_(filematch(PROTECTED_FILES_MASK, parVar('var',0)), '1');
 
@@ -2172,189 +2213,204 @@ try
             stringExists(par(1),['','groups'])
           ))
         ;
-      except unsatisfied() end;
-
+      except unsatisfied() end
+     else
     if name = 'call' then
-      try call(getVar(p), 1) except end;
-
+      try call(getVar(p), 1) except end
+     else
     if name = 'inc' then
       inc_();
     if name = 'dec' then
-      inc_(-1);
-
+      inc_(-1)
+     else
     if name = 'chr' then
       begin
-      result:='';
-      for i:=0 to pars.count-1 do
-        try result:=result+chr(strToInt(replaceStr(pars[i],'x','$')))
-        except end;
-      end;
-
+        result:='';
+        for i:=0 to pars.count-1 do
+          try result:=result+chr(strToInt(replaceStr(pars[i],'x','$')))
+          except end;
+      end
+     else
     if name = 'dequote' then
-      result:=macroDequote(p);
-
+      result:=macroDequote(p)
+     else
     if name ='quote' then
       begin
-      p:=macroDequote(p);
-      applyMacrosAndSymbols(p, cbMacros, cbData);
-      result:=macroQuote(p);
-      end;
-
+        p:=macroDequote(p);
+        applyMacrosAndSymbols(p, cbMacros, cbData);
+        result:=macroQuote(p);
+      end
+     else
     if name = 'encode html' then
-      result:=htmlEncode(p);
-
+      result:=htmlEncode(p)
+     else
     if name = 'play' then
       begin
-      result:='';
-      playSound(Pchar(p), 0, SND_ALIAS or SND_ASYNC or SND_NOWAIT);
-      end;
-
+        result:='';
+        playSound(Pchar(p), 0, SND_ALIAS or SND_ASYNC or SND_NOWAIT);
+      end
+     else
     if name = 'delete' then
       begin
-      s:=uri2diskMaybe(p,NIL,FALSE);
-      if isTrue(par('bin',TRUE,'1')) then
-        spaceIf(moveToBin(s, isTrue(par('forced'))))
-      else
-        spaceIf(deltree(s));
-      end;
-
+        s:=uri2diskMaybe(p,NIL,FALSE);
+        if isTrue(par('bin',TRUE,'1')) then
+          spaceIf(moveToBin(s, isTrue(par('forced'))))
+         else
+          spaceIf(deltree(s));
+      end
+     else
     if name = 'disk free' then
-      result:=intToStr(diskSpaceAt(uri2diskMaybe(p)));
-
+      result:=intToStr(diskSpaceAt(uri2diskMaybe(p)))
+     else
     if name = 'vfs to disk' then
-      if isAbsolutePath(p) then
-        result:=p
-      else if dirCrossing(p) and not ansiStartsStr('/', p) then
-        result:=expandFileName(includeTrailingPathDelimiter(md.folder.resource)+p)
-      else
-        result:=uri2disk(p, md.folder);
-
+      begin
+        if isAbsolutePath(p) then
+          result:=p
+         else if dirCrossing(p) and not ansiStartsStr('/', p) then
+          result:=expandFileName(includeTrailingPathDelimiter(md.folder.resource)+p)
+         else
+          result:=uri2disk(p, md.folder);
+      end
+     else
     if name = 'exists' then
       if ansiContainsStr(p, '/') then
         trueIf(fileExistsByURL(p))
       else
-        trueIf(fileOrDirExists(p));
-
+        trueIf(fileOrDirExists(p))
+     else
     if name = 'is file' then
-      trueIf(fileExists(p));
-
+      trueIf(fileExists(p))
+     else
     if name = 'mime' then
       begin
-      result:='';
-      if satisfied(md.cd) then md.cd.conn.reply.contentType:=p;
-      end;
-
+        result:='';
+        if satisfied(md.cd) then md.cd.conn.reply.contentType:=p;
+      end
+     else
     if name = 'calc' then
-      result:=floatToStr(evalFormula(p));
-
+      result:=floatToStr(evalFormula(p))
+     else
     if name = 'smart size' then
-      result:=smartsize(strToInt64(p));
-
+      result:=smartsize(strToInt64(p))
+     else
     if name = 'round' then
-      result:=floatToStr(roundTo(parF(0), -parI(1, 0)));
-
+      result:=floatToStr(roundTo(parF(0), -parI(1, 0)))
+     else
     if name = 'md5 file' then
-      result:=createFingerprint(p);
-
+      result:=createFingerprint(p)
+     else
     if name = 'exec' then
-      exec_();
-
+      exec_()
+     else
     if name = 'set speed limit for address' then
       begin
-      if pars.count = 1 then
-        setSpeedLimitIP(parF(0))
-      else
-        with objByIp(p) do
-          begin
-          limiter.maxSpeed:=round(parF(1)*1000);
-          customizedLimiter:=TRUE;
-          end;
-      result:='';
-      end;
-
-    if name = 'set speed limit for connection' then
-      if satisfied(md.cd) then
-        try
-          if assigned(md.cd.limiter) then
-            begin
-            md.cd.limiter.maxSpeed:=round(parF(0)*1000);
-            exit;
-            end;
-          md.cd.limiter:=TspeedLimiter.create(round(parF(0)*1000));
-          md.cd.conn.limiters.add(md.cd.limiter);
-          srv.limiters.add(md.cd.limiter);
-          result:='';
-        except
-          md.cd.conn.limiters.remove(md.cd.limiter);
-          srv.limiters.remove(md.cd.limiter);
-          freeAndNIL(md.cd.limiter);
-          result:='';
-          end;
-
-    if name = 'member of' then
-      memberOf();
-
-    if name = 'add header' then
-      if satisfied(md.cd) then
-        begin
-        result:='';
-        // macro 'mime' should be used for content-type, but this test will save precious time to those who will be fooled by the presence this macro
-        if ansiStartsText('Content-Type:', p) then
-          md.cd.conn.reply.contentType:=trim(substr(p, ':'))
-        else if ansiStartsText('Location:', p) then
-          with md.cd.conn.reply do
-            begin
-            mode:=HRM_REDIRECT;
-            url:=trim(substr(p, ':'))
-            end
+        if pars.count = 1 then
+          setSpeedLimitIP(parF(0))
         else
-          md.cd.conn.addHeader(p);
-        end;
-
+          with objByIp(p) do
+            begin
+            limiter.maxSpeed:=round(parF(1)*1000);
+            customizedLimiter:=TRUE;
+            end;
+        result:='';
+      end
+     else
+    if name = 'set speed limit for connection' then
+      begin
+        if satisfied(md.cd) then
+          try
+            if assigned(md.cd.limiter) then
+              begin
+              md.cd.limiter.maxSpeed:=round(parF(0)*1000);
+              exit;
+              end;
+            md.cd.limiter:=TspeedLimiter.create(round(parF(0)*1000));
+            md.cd.conn.limiters.add(md.cd.limiter);
+            srv.limiters.add(md.cd.limiter);
+            result:='';
+           except
+            md.cd.conn.limiters.remove(md.cd.limiter);
+            srv.limiters.remove(md.cd.limiter);
+            freeAndNIL(md.cd.limiter);
+            result:='';
+          end;
+      end
+     else
+    if name = 'member of' then
+      memberOf()
+     else
+    if name = 'add header' then
+      begin
+        if satisfied(md.cd) then
+         begin
+          result:='';
+          // macro 'mime' should be used for content-type, but this test will save precious time to those who will be fooled by the presence this macro
+          if ansiStartsText('Content-Type:', p) then
+            md.cd.conn.reply.contentType:=trim(substr(p, ':'))
+          else if ansiStartsText('Location:', p) then
+            with md.cd.conn.reply do
+              begin
+              mode:=HRM_REDIRECT;
+              url:=trim(substr(p, ':'))
+              end
+          else
+            md.cd.conn.addHeader(p, isTrue(par('overwrite',true,'1')));
+         end;
+      end
+     else
+    if name = 'remove header' then
+      begin
+        if satisfied(md.cd) then
+          begin
+          result:='';
+          md.cd.conn.removeHeader(p);
+          end;
+      end
+     else
     if name = 'get ini' then
-      result:=getKeyFromString(mainFrm.getCfg(), p);
-
+      result:=getKeyFromString(mainFrm.getCfg(), p)
+     else
     if name = 'set ini' then
       begin
       result:='';
       mainfrm.setCfg(p);
-      end;
-
+      end
+     else
     if name = 'set' then
       begin
-      try s:=getVar(parEx('var'));
-      except
-        if pars.count < 2 then s:=''
-        else s:=macroDequote(pars[1]);
+        try s:=getVar(parEx('var'));
+         except
+          if pars.count < 2 then s:=''
+          else s:=macroDequote(pars[1]);
         end;
-      if par('mode') = 'append' then
-        s:=getVar(p)+s
-      else if par('mode') = 'prepend' then
-        s:=s+getVar(p);
-      spaceIf(setVar(p, s));
-      end;
-
+        if par('mode') = 'append' then
+          s:=getVar(p)+s
+        else if par('mode') = 'prepend' then
+          s:=s+getVar(p);
+        spaceIf(setVar(p, s));
+      end
+     else
     if name = 'notify' then
       begin
       tray.balloon(p, parF('timeout',3), stringTotrayMessageType(par('type')), par('title'));
       result:='';
-      end;
-
+      end
+     else
     if name = 'cookie' then
-      cookie();
-
+      cookie()
+     else
     if name = 'new account' then
-      newAccount();
-
+      newAccount()
+     else
     if name = 'delete account' then
       begin
       deleteAccount(p);
       result:='';
-      end;
-
+      end
+     else
     if name = 'delete item' then
       deleteItem();
-      
+
     if pars.count < 2 then exit; // from here, only macros with at least 2 parameters
 
     if name = 'set item' then

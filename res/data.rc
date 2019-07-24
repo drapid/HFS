@@ -9,4 +9,5 @@ uploadHowTo TEXT upload_how.txt
 alias TEXT alias.txt
 shell GIF shell.gif
 IPservices TEXT ipservices.txt
-jquery TEXT jquery.min.js
+// jquery TEXT jquery.min.js
+jquery ZTEXT jquery.min.js.gz

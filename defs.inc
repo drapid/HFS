@@ -9,3 +9,5 @@
 {$WARN UNIT_PLATFORM off }
 {$I-}
 {$INLINE AUTO}
+
+{ $DEFINE HAS_FASTMM}
