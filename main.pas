@@ -193,10 +193,10 @@ type
     procedure setDLcount(i:integer);
     function  getDLcountRecursive():integer;
   public
+    fNode: Ttreenode;
     name, comment, user, pwd, lnk: string;
     resource: string;  // link to physical file/folder; URL for links
     flags: TfileAttributes;
-    node: Ttreenode;
     size: int64; // -1 is NULL
     atime,            // when was this file added to the VFS ?
     mtime: Tdatetime; // modified time, read from disk
@@ -204,10 +204,10 @@ type
     accounts: array [TfileAction] of TStringDynArray;
     filesFilter, foldersFilter, realm, diffTpl,
     defaultFileMask, dontCountAsDownloadMask, uploadFilterMask: string;
-    constructor create(fullpath:string);
-    constructor createTemp(fullpath:string);
+    constructor create(fullpath: String);
+    constructor createTemp(const fullpath: String; pNode: TTreeNode = NIL);
     constructor createVirtualFolder(name:string);
-    constructor createLink(name:string);
+    constructor createLink(const name: String);
     property  parent:Tfile read getParent;
     property  DLcount:integer read getDLcount write setDLcount;
     function  toggle(att:TfileAttribute):boolean;
@@ -254,6 +254,7 @@ type
     procedure lock();
     procedure unlock();
     function  isLocked():boolean;
+    property node: Ttreenode read fNode;
     end; // Tfile
 
   Paccount = ^Taccount;
@@ -1065,10 +1066,10 @@ implementation
 
 uses
   AnsiStrings, MMsystem, UITypes,
-  OverbyteIcsZLibHigh,
+  OverbyteIcsZLibHigh, OverbyteIcsUtils,
   Base64, gifImg,
   RDFileUtil, RDUtils,
-  RnQzip, RnQCrypt, RnQNet.Uploads, RnQGraphics32,
+  RnQzip, RnQCrypt, RnQNet.Uploads, RnQGraphics32, RnQLangs,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib;
 
@@ -1667,8 +1668,7 @@ this would let us have "=" inside the names, but names cannot be assigned
         // if it's a folder, though it was filtered, we need to recur
         if filteredOut and (not recursive or (sr.Attr and faDirectory = 0)) then continue;
 
-        f:=Tfile.createTemp( folder.resource+'\'+sr.name );
-        f.node:=folder.node; // temporary nodes are bound to the parent's node
+        f:=Tfile.createTemp( folder.resource+'\'+sr.name, folder.node ); // temporary nodes are bound to the parent's node
         if (FA_SOLVED_LNK in f.flags) and f.isFolder() then
           // sorry, but we currently don't support lnk to folders in real-folders
           begin
@@ -2330,7 +2330,7 @@ begin
 fullpath:=ExcludeTrailingPathDelimiter(fullpath);
 icon:=-1;
 size:=-1;
-node := NIL;
+  fNode := NIL;
 atime:=now();
 mtime:=atime;
 flags:=[];
@@ -2339,16 +2339,17 @@ if (resource > '') and sysutils.directoryExists(resource) then
   flags:=flags+[FA_FOLDER, FA_BROWSABLE];
 end; // create
 
-constructor Tfile.createTemp(fullpath:string);
+constructor Tfile.createTemp(const fullpath: String; pNode: TTreeNode = NIL);
 begin
 create(fullpath);
 include(flags, FA_TEMP);
+  fNode := pNode;
 end; // createTemp
 
 constructor Tfile.createVirtualFolder(name:string);
 begin
 icon:=-1;
-node := NIL;
+fNode := NIL;
 setResource('');
 flags:=[FA_FOLDER, FA_VIRTUAL, FA_BROWSABLE];
 self.name:=name;
@@ -2356,10 +2357,10 @@ atime:=now();
 mtime:=atime;
 end; // createVirtualFolder
 
-constructor Tfile.createLink(name:string);
+constructor Tfile.createLink(const name: String);
 begin
 icon:=-1;
-node := NIL;
+fNode := NIL;
 setName(name);
 atime:=now();
 mtime:=atime;
@@ -2552,15 +2553,21 @@ except end;
 end; // setDynamicComment
 
 function Tfile.getParent():Tfile;
+var
+  p: TTreeNode;
 begin
-  if node = NIL then result:=NIL
-   else if isTemp() then result:=nodeToFile(node)
-    else
+  if node = NIL then
+    result := NIL
+   else
+    if isTemp() then
+      result := nodeToFile(node)
+     else
       try
-        if node.parent = NIL then
-          result:=NIL
+        p := node.parent;
+        if p = NIL then
+          result := NIL
          else
-          result := node.parent.data
+          result := p.data
        except
 //         add2log()
          Result := NIL;
@@ -2644,12 +2651,19 @@ else
       result:=ICON_FILE;
 end; // getIconForTreeview
 
-function encodeURL(s:string; fullEncode:boolean=FALSE):string;
+function encodeURL(s:string; fullEncode:boolean=FALSE):RawByteString;
+var
+  r: RawByteString;
 begin
-if fullEncode or mainFrm.encodenonasciiChk.checked then
-  s:=ansiToUTF8(s);
-result:=HSlib.encodeURL(s, mainFrm.encodeNonasciiChk.checked,
-  fullEncode or mainFrm.encodeSpacesChk.checked)
+  if fullEncode or mainFrm.encodenonasciiChk.checked then
+    begin
+      r := ansiToUTF8(s);
+      result := HSlib.encodeURL(r, mainFrm.encodeNonasciiChk.checked,
+        fullEncode or mainFrm.encodeSpacesChk.checked)
+    end
+   else
+    result:=HSlib.encodeURL(s, mainFrm.encodeNonasciiChk.checked,
+        fullEncode or mainFrm.encodeSpacesChk.checked)
 end; // encodeURL
 
 function protoColon():string;
@@ -2855,8 +2869,7 @@ while mask > '' do
   if findFirst(resource+'\'+s, faAnyFile-faDirectory, sr) <> 0 then continue;
   try
     // encapsulate for returning
-    result:=Tfile.createTemp(resource+'\'+sr.name);
-    result.node:=node; // temporary nodes are bound to the parent's node
+    result := Tfile.createTemp(resource+'\'+sr.name, node); // temporary nodes are bound to the parent's node
   finally findClose(sr) end;
   exit;
   end;
@@ -3174,12 +3187,10 @@ function Tmainfrm.findFilebyURL(url:string; parent:Tfile=NIL; allowTemp:boolean=
     else s:=UTF8ToAnsi(s); // these may actually be two distinct files, but it's very unlikely to be, and pratically we workaround big problem
   if not fileOrDirExists(s) or not hasRightAttributes(s) then exit;
   // found on disk, we need to build a temporary Tfile to return it
-  result:=Tfile.createTemp(s);
+  result:=Tfile.createTemp(s, f.node); // temp nodes are bound to parent's node
   // the temp file inherits flags from the real folder
   if FA_DONT_LOG in f.flags then include(result.flags, FA_DONT_LOG);
   if not (FA_BROWSABLE in f.flags) then exclude(result.flags, FA_BROWSABLE);
-  // temp nodes are bound to parent's node
-  result.node:=f.node;
   end; // workTheRestByReal
 
 var
@@ -3547,7 +3558,7 @@ begin
   folder.lock();
 try
   buildTime := now();
-  cd.conn.addHeader('Cache-Control: no-cache, no-store, must-revalidate, max-age=-1');
+  cd.conn.addHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=-1');
   recur := shouldRecur(cd);
   baseurl := protoColon()+getSafeHost(cd)+folder.url(TRUE);
 
@@ -3812,7 +3823,7 @@ if assigned(data.tpl) then
 
 try
   data.conn.reply.mode:=HRM_REPLY;
-  data.conn.reply.bodyMode:=RBM_STRING;
+  data.conn.reply.bodyMode := RBM_RAW;
   data.conn.reply.body := '';
 except end;
 
@@ -3884,9 +3895,9 @@ if result then
   conn.reply.mode:=HRM_NOT_MODIFIED;
   exit;
   end;
-conn.addHeader('ETag: '+etag);
+conn.addHeader('ETag', etag);
 if ts > '' then
-  conn.addHeader('Last-Modified: '+ts);
+  conn.addHeader('Last-Modified', ts);
 end; // notModified
 
 function notModified(conn:ThttpConn; f:string):boolean; overload;
@@ -3936,7 +3947,7 @@ if notModified(cd.conn, s, '') then
 }
 cd.conn.reply.mode:=HRM_REPLY;
 cd.conn.reply.contentType:='image/gif';
-cd.conn.reply.bodyMode:=RBM_STRING;
+cd.conn.reply.bodyMode := RBM_RAW;
 cd.downloadingWhat:=DW_ICON;
 cd.lastFN:=copy(url,2,1000);
 end; // sendPic
@@ -3997,7 +4008,8 @@ procedure setupDownloadIcon(data:TconnData);
   bmp.free;
   data.tray.setIcon(data.tray_ico);
   data.tray.setTip(
-    if_( data.conn.reply.bodyMode=RBM_STRING, decodeURL(data.conn.request.url), data.lastFN )
+    if_( (data.conn.reply.bodyMode=RBM_RAW)or(data.conn.reply.bodyMode=RBM_TEXT),
+         decodeURL(data.conn.request.url), data.lastFN )
     +trayNL+format('%.1f KB/s', [data.averageSpeed/1000])
     +trayNL+dotted(data.conn.bytesSentLastItem)+' bytes sent'
     +trayNL+data.address
@@ -4484,13 +4496,16 @@ var
     if isReceivingFile(data) then
       begin
       // we must encapsulate it in a Tfile to expose file properties to the script. we don't need to cache the object because we need it only once.
-      md.f:=Tfile.createTemp(data.uploadDest);
-      md.f.size:=sizeOfFile(data.uploadDest);
-      pleaseFree:=TRUE;
 
       md.folder:=data.lastFile;
       if assigned(md.folder) then
-        md.f.node:=md.folder.node;
+        md.f:=Tfile.createTemp(data.uploadDest, md.folder.node)
+       else
+        md.f:=Tfile.createTemp(data.uploadDest)
+        ;
+      md.f.size:=sizeOfFile(data.uploadDest);
+      pleaseFree:=TRUE;
+
       end
     else if assigned(f) then
       md.f:=f
@@ -4922,7 +4937,7 @@ var
       '%archive-size%', intToStr(tar.size)
     ]), data.lastFN);
     if not noContentdispositionChk.checked then
-      conn.addHeader('Content-Disposition: attachment; filename="'+data.lastFN+'";');
+      conn.addHeader('Content-Disposition', RawByteString('attachment; filename="')+encodeURL(data.lastFN)+'";');
   except tar.free end;
   end; // serveTar
 
@@ -5003,12 +5018,12 @@ var
       conn.reply.contentType:=if_(trim(getTill('<', s))='', 'text/html', 'text/plain');
     a := conn.getHeader('Accept-Charset');
     if (a <> '') and ( (ipos('utf-8', a) = 0) and (pos('*', a) = 0)) then
-      conn.reply.body := s
+      conn.reply.body := UnicodeToAnsi(s, 28591) // ISO 8859-1 Latin 1; Western European (ISO)
      else
       conn.reply.bodyU := s;
 
     conn.reply.mode:=HRM_REPLY;
-    conn.reply.bodyMode:=RBM_STRING;
+    conn.reply.bodyMode := RBM_TEXT;
     compressReply(data);
     end; // replyWithString
 
@@ -5023,7 +5038,7 @@ var
     if conn.reply.contentType = '' then
       conn.reply.contentType:=if_(trim(getTill(RawByteString('<'), s))='', 'text/html', 'text/plain');
     conn.reply.mode:=HRM_REPLY;
-    conn.reply.bodyMode:=RBM_STRING;
+    conn.reply.bodyMode := RBM_RAW;
     conn.reply.body := s;
     compressReply(data);
     end; // replyWithStringB
@@ -5048,7 +5063,7 @@ var
       if conn.reply.contentType = '' then
         conn.reply.contentType:=if_(trim(getTill(RawByteString('<'), s))='', 'text/html', 'text/plain');
       conn.reply.mode:=HRM_REPLY;
-      conn.reply.bodyMode:=RBM_STRING;
+      conn.reply.bodyMode := RBM_RAW;
       conn.reply.body := s;
       conn.reply.IsGZiped := isGZ;
       compressReply(data);
@@ -5157,9 +5172,9 @@ var
       conn.limiters.add(limiter);
     end;
 
-  conn.addHeader('Accept-Ranges: bytes');
+  conn.addHeader('Accept-Ranges', 'bytes');
   if sendHFSidentifierChk.checked then
-    conn.addHeader('Server: HFS '+VERSION);
+    conn.addHeader('Server', 'HFS '+VERSION);
 
   case data.preReply of
     PR_OVERLOAD:
@@ -5515,7 +5530,7 @@ OutputDebugString(PChar('Prepared reply for folder by ' + floattostr(TimingSecon
   if (data.agent = 'MSIE') and (conn.getHeader('Accept') = '*/*') then
     s:=xtpl(s, [' ','%20']);
   if not noContentdispositionChk.checked or not b then
-    conn.addHeader( 'Content-Disposition: '+if_(not b, 'attachment; ')+'filename="'+s+'";' );
+    conn.addHeader( 'Content-Disposition', if_(not b, 'attachment; ')+'filename="'+encodeURL(s)+'";' );
   end; // handleRequest
 
   procedure lastByte();
@@ -5662,7 +5677,7 @@ case event of
     runEventScript('stream ready');
     if (i=0) and (data.disconnectReason > '') then // only if it was not already disconnecting
       begin
-      conn.reply.additionalHeaders:=''; // content-disposition would prevent the browser
+      conn.reply.ClearAdditionalHeaders; // content-disposition would prevent the browser
       getPage('deny', data);
       conn.initInputStream();
       end;
@@ -5983,7 +5998,7 @@ if stopAddingItems then exit;
 n:=filesBox.Items.AddChild(parent, f.name);
 // stateIndex assignments are a workaround to a delphi bug
 n.stateIndex:=0;
-f.node:=n;
+f.fNode:=n;
 n.stateIndex:=-1;
 n.Data:=f;
 f.setupImage();
@@ -9257,7 +9272,7 @@ begin
   ZeroMemory(@after, sizeof(after));
 node.DeleteChildren();
 f:=Tfile(node.data);
-f.node:=node;
+f.fNode := node;
 tlv:=Ttlv.create;
 tlv.parse(vfs);
 while not tlv.isOver() do
@@ -9571,9 +9586,9 @@ drawGraphOn(bmp.canvas, colors);
 result:=bmp2str(bmp);
 bmp.free;
 if cd = NIL then exit;
-cd.conn.addHeader('Cache-Control: no-cache');
+cd.conn.addHeader('Cache-Control', 'no-cache');
 if refresh > '' then
-  cd.conn.addHeader('Refresh: '+refresh);
+  cd.conn.addHeader('Refresh', refresh);
 end; // getGraphPic
 
 procedure resendShortcut(mi:Tmenuitem; sc:Tshortcut);
@@ -10811,7 +10826,7 @@ if (cd.workaroundForIEutf8  = toDetect) and (cd.agent > '') then
     lToGZip := false;
   if lToGZip then
     begin
-      cd.conn.addHeader('Content-Encoding: gzip');
+      cd.conn.addHeader('Content-Encoding', 'gzip');
       cd.conn.reply.body := s;
     end
    else
@@ -11827,6 +11842,7 @@ if quitASAP then
   exit;
   end;
 
+  LoadSomeLanguage;
 show();
 strToConnColumns(serializedConnColumns);
 if startminimizedChk.checked then application.Minimize();
@@ -12353,7 +12369,7 @@ if dll <> HINSTANCE_ERROR then
 toDelete:=Tlist.create();
 usersInVFS:=TusersInVFS.create();
 
-openInBrowser:='*.htm;*.html;*.jpg;*.jpeg;*.gif;*.png;*.txt;*.swf;*.svg';
+openInBrowser:='*.htm;*.html;*.jpg;*.jpeg;*.gif;*.png;*.txt;*.swf;*.svg;*.webp';
 MIMEtypes:=toSA([
 	'*.htm;*.html', 'text/html',
   '*.jpg;*.jpeg;*.jpe', 'image/jpeg',
@@ -12365,7 +12381,8 @@ MIMEtypes:=toSA([
   '*.avi', 'video/x-msvideo',
   '*.txt', 'text/plain',
   '*.css', 'text/css',
-  '*.js',  'text/javascript'
+  '*.js',  'text/javascript',
+  '*.webp', 'image/webp'
 ]);
 
 systemimages:=getSystemimages();

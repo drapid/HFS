@@ -150,7 +150,7 @@ type
     stack: array of integer;
     stackTop: integer;
   public
-    procedure parse(data: RawByteString);
+    procedure parse(const data: RawByteString);
 //    function pop(var value:string): integer; OverLoad
     function pop(var value: RawByteString): integer;
     function down():boolean;
@@ -746,7 +746,7 @@ begin result:=self end;
 
 
 
-procedure Ttlv.parse(data: RawByteString);
+procedure Ttlv.parse(const data: RawByteString);
 begin
   whole:=data;
   cur:=1;

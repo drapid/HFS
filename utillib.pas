@@ -103,7 +103,8 @@ function compare_(i1,i2:double):integer; overload;
 function compare_(i1,i2:int64):integer; overload;
 function compare_(i1,i2:integer):integer; overload;
 function msgDlg(msg:string; code:integer=0; title:string=''):integer;
-function if_(v:boolean; v1:string; v2:string=''):string; overload; inline;
+function if_(v:boolean; const v1:string; const v2:string=''):string; overload; inline;
+function if_(v: Boolean; const v1: RawByteString; const v2: RawByteString = ''): RawByteString;overload; inline;
 function if_(v:boolean; v1:int64; v2:int64=0):int64; overload; inline;
 function if_(v:boolean; v1:integer; v2:integer=0):integer; overload; inline;
 function if_(v:boolean; v1:Tobject; v2:Tobject=NIL):Tobject; overload; inline;
@@ -427,7 +428,7 @@ try
   if list = '' then exit;
 
   try
-    fillChar(fo, sizeOf(fo), 0);
+    ZeroMemory(@fo, sizeOf(fo));
     fo.wFunc:=FO_DELETE;
     fo.pFrom:=pchar(list);
     fo.fFlags:=FOF_ALLOWUNDO or FOF_NOCONFIRMATION or FOF_NOERRORUI or FOF_SILENT;
@@ -448,14 +449,14 @@ function moveFile(src, dst:string; op:UINT=FO_MOVE):boolean;
 var
   fo: TSHFileOpStruct;
 begin
-try
-  fillChar(fo, sizeOf(fo), 0);
-  fo.wFunc:=op;
-  fo.pFrom:=pchar(src+#0);
-  fo.pTo:=pchar(dst+#0);
-  fo.fFlags:=FOF_ALLOWUNDO + FOF_NOCONFIRMATION + FOF_NOERRORUI + FOF_SILENT + FOF_NOCONFIRMMKDIR;
-  result:=SHFileOperation(fo) = 0;
-except result:=FALSE end;
+  try
+    ZeroMemory(@fo, sizeOf(fo));
+    fo.wFunc:=op;
+    fo.pFrom:=pchar(src+#0);
+    fo.pTo:=pchar(dst+#0);
+    fo.fFlags:=FOF_ALLOWUNDO + FOF_NOCONFIRMATION + FOF_NOERRORUI + FOF_SILENT + FOF_NOCONFIRMMKDIR;
+    result:=SHFileOperation(fo) = 0;
+  except result:=FALSE end;
 end; // movefile
 
 function copyFile(src, dst:string):boolean;
@@ -1281,10 +1282,10 @@ var
   si: TStartupInfo;
   pi: TProcessInformation;
 begin
-fillchar(si, sizeOf(si), 0);
-fillchar(pi, sizeOf(pi), 0);
-si.cb:=sizeOf(si);
-result:=createProcess(NIL,pchar(cmd),NIL,NIL,FALSE,0,NIL,NIL,si,pi)
+  ZeroMemory(@si, sizeOf(si));
+  ZeroMemory(@pi, sizeOf(pi));
+  si.cb:=sizeOf(si);
+  result:=createProcess(NIL,pchar(cmd),NIL,NIL,FALSE,0,NIL,NIL,si,pi)
 end; // execNew
 
 function addArray(var dst:TstringDynArray; src:array of string; where:integer=-1; srcOfs:integer=0; srcLn:integer=-1):integer;
@@ -1349,8 +1350,16 @@ end; // addUniqueArray
 function if_(v:boolean; v1:boolean; v2:boolean=FALSE):boolean;
 begin if v then result:=v1 else result:=v2 end;
 
-function if_(v:boolean; v1, v2:string):string;
+function if_(v:boolean; const v1, v2:string):string;
 begin if v then result:=v1 else result:=v2 end;
+
+function if_(v: Boolean; const v1, v2: RawByteString): RawByteString;
+begin
+  if v then
+    result := v1
+   else
+    result := v2
+end;
 
 function if_(v:boolean; v1,v2:int64):int64;
 begin if v then result:=v1 else result:=v2 end;
@@ -2277,7 +2286,8 @@ var
   ReadPipe,WritePipe  : THandle;
   start               : TStartUpInfo;
   ProcessInfo         : TProcessInformation;
-  Buffer              : Pchar;
+  Buffer              : PAnsiChar;
+  buf2                : PWideChar;
   TotalBytesRead,
   BytesRead           : DWORD;
   Apprunning,
@@ -2292,9 +2302,9 @@ sa.lpsecuritydescriptor:=NIL;
 
 if not createPipe(ReadPipe, WritePipe, @sa, 0) then exit;
 // Redirect In- and Output through STARTUPINFO structure
-Buffer:=AllocMem(ReadBuffer + 1);
-FillChar(Start,Sizeof(Start),#0);
-start.cb:= SizeOf(start);
+  Buffer := AllocMem(ReadBuffer + 1);
+  ZeroMemory(@start, Sizeof(Start));
+  start.cb:= SizeOf(start);
 start.hStdOutput:= WritePipe;
 start.hStdInput:= ReadPipe;
 start.dwFlags:= STARTF_USESTDHANDLES + STARTF_USESHOWWINDOW;
@@ -2324,8 +2334,9 @@ try
     inc(TotalBytesRead, BytesRead);
     until (Apprunning <> WAIT_TIMEOUT) or (now() >= timeout);
   Buffer[TotalBytesRead]:= #0;
-  OemToChar(PansiChar(Buffer),Buffer);
-  output:=strPas(Buffer);
+  buf2 := StrAlloc(ReadBuffer + 1);
+  OemToChar(PansiChar(Buffer), buf2);
+  output := strPas(buf2);
 finally
   GetExitCodeProcess(ProcessInfo.hProcess, exitcode);
   TerminateProcess(ProcessInfo.hProcess, 0);
@@ -2785,9 +2796,9 @@ var
   acc: Taccount;
   i: integer;
 begin
-result:=NIL;
-fillChar(acc, sizeof(acc), 0);
-acc.enabled:=TRUE;
+  result:=NIL;
+  ZeroMemory(@acc, sizeOf(acc));
+  acc.enabled:=TRUE;
   repeat
   if not newuserpassFrm.prompt(acc.user, acc.pwd)
   or (acc.user = '') then exit;

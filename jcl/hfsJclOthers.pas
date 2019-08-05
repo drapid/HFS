@@ -605,7 +605,7 @@ begin
   if Size > 0 then
   begin
     Byte(P) := 0;
-    FillChar(P, Size, 0);
+    ZeroMemory(@p, Size);
   end;
 end;
 

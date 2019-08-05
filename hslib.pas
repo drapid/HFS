@@ -94,17 +94,21 @@ type
   ThttpReply = record
    private
     bodyBr: RawByteString;    // specifies reply body according to bodyMode
+    fHeader: RawByteString;            // full raw header (optional)
+    fAdditionalHeaders: RawByteString; // these are appended to predefined headers (opt)
     procedure setBody(const b: RawByteString);
     procedure setBodyU(const b: String);
     function  getBodyU: String;
+    procedure setHeaderU(const h: String);
+    function  getHeaderU: String;
    public
     mode: ThttpReplyMode;
-    header: string;            // full raw header (optional)
     contentType: string;       // ContentType header (optional)
-    additionalHeaders: string; // these are appended to predefined headers (opt)
     bodyMode :(
       RBM_FILE,         // variable body specifies a file
-      RBM_STRING,       // variable body specifies byte content
+//      RBM_STRING,       // variable body specifies byte content
+      RBM_RAW,        // variable body specifies byte content
+      RBM_TEXT,       // variable body specifies byte content
       RBM_STREAM        // refer to bodyStream
     );
     bodyStream: Tstream;   // note: the stream is automatically freed
@@ -115,9 +119,14 @@ type
     url: string;     // used for redirections
     reason: string;  // customized reason phrase
     resumeForbidden: boolean;
+    procedure headerAdd(const h: String); OverLoad;
+    procedure headerAdd(const h: RawByteString); OverLoad;
     procedure Clear;
+    procedure ClearAdditionalHeaders;
     property Body: RawByteString read bodyBr write setBody;
     property BodyU: String read getBodyU write setBodyU;
+    property header: RawByteString read fHeader;
+    property headerU: String read getHeaderU write setHeaderU;
    end;
 
   ThttpRequest = record
@@ -216,9 +225,11 @@ type
     constructor create(server:ThttpSrv);
     destructor Destroy; override;
     procedure disconnect();
-    procedure addHeader(s:string; overwrite:boolean=TRUE); // append an additional header line
+//    procedure addHeader(s:string; overwrite:boolean=TRUE); OverLoad; // append an additional header line
+    procedure addHeader(const s:RawByteString; overwrite:boolean=TRUE); OverLoad; // append an additional header line
+    procedure addHeader(const h, v:RawByteString; overwrite:boolean=TRUE); OverLoad; // append an additional header line
     function  setHeaderIfNone(s:string):boolean; // set header if not already existing
-    procedure removeHeader(name:string);
+    procedure removeHeader(name: RawByteString);
     function  getHeader(h:string):string;  // extract the value associated to the specified header field
     function  getCookie(k:string):string;
     procedure setCookie(k, v:string; pairs:array of string; extra:string='');
@@ -308,19 +319,26 @@ const
 function decodeURL(const url:string; utf8:boolean=TRUE):string; OverLoad;
 function decodeURL(const url: RawByteString):string; OverLoad;
 function encodeURL(const url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
-  unicode:boolean=FALSE):string;
+  unicode:boolean=FALSE):string; OverLoad;
+function encodeURL(const url: RawByteString; nonascii:boolean=TRUE; spaces:boolean=TRUE;
+  unicode: boolean=FALSE): RawByteString; OverLoad;
 // returns true if address is not suitable for the internet
 function isLocalIP(const ip:string):boolean;
 // an ip address where we are listening
 function getIP():string;
 // ensure a string ends with a specific string
-procedure includeTrailingString(var s:string; ss:string);
+procedure includeTrailingString(var s:string; const ss:string); OverLoad;
+procedure includeTrailingString(var s: RawByteString; const ss: RawByteString); OverLoad;
 // gets unicode code for specified character
 function charToUnicode(c:char):dword;
 // this version of pos() is able to skip the pattern if inside quotes
 function nonQuotedPos(ss, s:string; ofs:integer=1; quote:string='"'; unquote:string='"'):integer;
 // case insensitive version
 //function ipos(ss, s:string; ofs:integer=1):integer; overload;
+function getNameOf(const s: String): String; OverLoad; // colon included
+function getNameOf(const s: RawByteString): RawByteString; OverLoad; // colon included
+function namePos(const name: string; const headers:string; from:integer=1):integer; OverLoad;
+function namePos(const name: RawByteString; const headers: RawByteString; from: integer=1):integer; OverLoad;
 
 implementation
 
@@ -353,8 +371,14 @@ const
 var
   freq: int64;
 
-procedure includeTrailingString(var s:string; ss:string);
+procedure includeTrailingString(var s:string; const ss:string);
 begin if copy(s, length(s)-length(ss)+1, length(ss)) <> ss then s:=s+ss end;
+
+procedure includeTrailingString(var s: RawByteString; const ss: RawByteString);
+begin
+  if copy(s, length(s)-length(ss)+1, length(ss)) <> ss then
+    s:=s+ss
+end;
 
 function charToUnicode(c:char):dword;
 begin stringToWideChar(c,@result,4) end;
@@ -501,6 +525,34 @@ for i:=1 to length(url) do
     result:=result+url[i];
 end; // encodeURL
 
+function encodeURL(const url: RawByteString; nonascii:boolean=TRUE; spaces:boolean=TRUE;
+  unicode:boolean=FALSE): RawByteString;
+var
+  i: integer;
+  encodePerc, encodeUni: set of AnsiChar;
+begin
+  result := '';
+  encodeUni := [];
+  if nonascii then
+    encodeUni:=[#128..#255];
+  encodePerc := [#0..#31,'#','%','?','"','''','&','<','>',':'];
+  // actually ':' needs encoding only in relative url
+  if spaces then
+    include(encodePerc,' ');
+  if not unicode then
+   begin
+    encodePerc:=encodePerc+encodeUni;
+    encodeUni:=[];
+   end;
+  for i:=1 to length(url) do
+	  if url[i] in encodePerc then
+      result := result+'%'+IntToHexA(ord(url[i]),2)
+     else if url[i] in encodeUni then
+      result := result+'&#'+IntToStrA(Byte(url[i]))+';'
+  else
+    result := result+url[i];
+end; // encodeURL
+
 function getIP():string;
 var
   i: integer;
@@ -549,7 +601,7 @@ begin
   if not IsGZiped then
     begin
       if isBodyUTF8 then
-        Result := UTF8Decode(bodyBr)
+        Result := UTF8ToString(bodyBr)
        else
         Result := UnUTF(bodyBr)
     end
@@ -557,18 +609,58 @@ begin
     Result := '' ; // ToDo ZDecompress
 end;
 
+procedure THTTPReply.setHeaderU(const h: String);
+begin
+  fHeader := UTF8Encode(h);
+  includeTrailingString(fHeader, CRLFA);
+end;
+
+procedure THTTPReply.headerAdd(const h: String);
+var
+  r: RawByteString;
+begin
+  if h > '' then
+    begin
+      r := UTF8Encode(h);
+      includeTrailingString(r, CRLFA);
+      fHeader := fHeader + r;
+    end;
+end;
+
+procedure THTTPReply.headerAdd(const h: RawByteString);
+var
+  r: RawByteString;
+begin
+  if h > '' then
+    begin
+      r := h;
+      includeTrailingString(r, CRLFA);
+      fHeader := fHeader + r;
+    end;
+end;
+
+function THTTPReply.getHeaderU: String;
+begin
+  Result := UnUTF(fHeader);
+end;
+
 procedure THTTPReply.Clear;
 begin
-  header:='';
-  bodyMode:=RBM_STRING;
+  fHeader:='';
+  bodyMode := RBM_RAW;
   bodyBr := '';
   IsGZiped := false;
-  additionalHeaders:='';
+  fAdditionalHeaders := '';
   mode:=HRM_IGNORE;
 //  firstByte:=request.firstByte;
 //  lastByte:=request.lastByte;
   realm:='Password protected resource';
   reason:='';
+end;
+
+procedure THTTPReply.ClearAdditionalHeaders;
+begin
+  fAdditionalHeaders := '';
 end;
 
 /////// SERVER
@@ -1361,8 +1453,8 @@ if (state = HCS_REPLYING_HEADER) and (reply.mode <> HRM_REPLY_HEADER) then
   // set up a default body for errors with no body set
   if ((stream = NIL) or (stream.size = 0)) and (reply.mode <> HRM_REPLY) then
     begin
-    reply.bodyMode:=RBM_STRING;
-    reply.setBody(HRM2BODY[reply.mode]);
+    reply.bodyMode := RBM_TEXT;
+    reply.Body := HRM2BODY[reply.mode];
     if reply.mode in [HRM_REDIRECT, HRM_MOVED] then
       reply.body := stringReplace(reply.body, '%url%', reply.url, [rfReplaceAll]);
     initInputStream();
@@ -1433,7 +1525,8 @@ result:=FALSE;
 FreeAndNil(stream);
 try
   case reply.bodyMode of
-    RBM_STRING: stream := TAnsiStringStream.create(reply.body);
+    RBM_RAW: stream := TAnsiStringStream.create(reply.body);
+    RBM_TEXT: stream := TAnsiStringStream.create(reply.body);
     RBM_FILE:
       begin
         s := reply.bodyU;
@@ -1515,18 +1608,20 @@ begin srv.notify(ev, self) end;
 procedure ThttpConn.tryNotify(ev:ThttpEvent);
 begin try srv.notify(ev, self) except end end;
 
-procedure ThttpConn.sendheader(h:string='');
+procedure ThttpConn.sendheader(h: string='');
 begin
-state:=HCS_REPLYING_HEADER;
-if reply.header = '' then reply.header:=h;
-includeTrailingString(reply.header, CRLF);
-reply.header:=reply.header+reply.additionalHeaders;
-includeTrailingString(reply.header, CRLF);
-try sock.sendStr(reply.header+CRLF);
-except end;
+  state:=HCS_REPLYING_HEADER;
+  if reply.header = '' then
+    reply.headerU := h;
+  reply.headerAdd(reply.fAdditionalHeaders);
+
+  try
+     sock.sendStr(reply.header+CRLFA);
+   except
+  end;
 end; // sendHeader
 
-function replycode2reason(code:integer):string;
+function replycode2reason(code:integer): RawByteString;
 begin
 case code of
   200: result:='OK';
@@ -1555,11 +1650,14 @@ end;
 function ThttpConn.replyHeader_mode(mode:ThttpReplyMode):string;
 begin result:=replyHeader_code(HRM2CODE[mode]) end;
 
-function getNameOf(s:string):string; // colon included
+function getNameOf(const s:string):string; // colon included
+begin result:=copy(s, 1, pos(':', s)) end;
+
+function getNameOf(const s: RawByteString): RawByteString; // colon included
 begin result:=copy(s, 1, pos(':', s)) end;
 
 // return 0 if not found
-function namePos(name:string; headers:string; from:integer=1):integer;
+function namePos(const name:string; const headers:string; from:integer=1):integer;
 begin
 result:=from;
   repeat
@@ -1568,30 +1666,41 @@ result:=from;
     or (headers[result-1] = #10) // or start of the line
 end; // namePos
 
+function namePos(const name: RawByteString; const headers: RawByteString; from: integer=1):integer; OverLoad;
+begin
+ result := from;
+  repeat
+    result := ipos(name, headers, result);
+  until (result<=1) // both not found and found at the start of the string
+    or (headers[result-1] = #10) // or start of the line
+end; // namePos
+
 // return true if the operation succeded
 function ThttpConn.setHeaderIfNone(s:string):boolean;
 var
-  name: string;
+  name: RawByteString;
 begin
-name:=getNameOf(s);
+  name := getNameOf(s);
 if name = '' then
   raise Exception.Create('Missing colon');
-result:=namePos(name, reply.additionalHeaders) = 0; // empty text will also be considered as existing
+result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
 if result then
   addHeader(s, FALSE); // with FALSE it's faster
 end; // setHeaderIfNone
 
-procedure ThttpConn.removeHeader(name:string);
+procedure ThttpConn.removeHeader(name: RawByteString);
 var
     i, eol: integer;
-    s: string;
+    s: RawByteString;
 begin
-s:=reply.additionalHeaders;
-includeTrailingString(name,':');
+  s := reply.fAdditionalHeaders;
+  if s = '' then
+    Exit;
+  includeTrailingString(name, ':');
 // see if it already exists
-i:=1;
+  i:=1;
   repeat
-  i:=namePos(name, s, i);
+    i := namePos(name, s, i);
   if i = 0 then break;
   // yes it does
   eol:=posEx(#10, s, i);
@@ -1599,15 +1708,22 @@ i:=1;
     eol:=length(s);
   delete(s, i, eol-i+1); // remove it
   until false;
-reply.additionalHeaders:=s;
+reply.fAdditionalHeaders:=s;
 end; // removeHeader
 
-procedure ThttpConn.addHeader(s:string; overwrite:boolean=TRUE);
+procedure ThttpConn.addHeader(const s: RawByteString; overwrite:boolean=TRUE);
 begin
 if overwrite then
   removeHeader(getNameOf(s));
 //appendStr(reply.additionalHeaders, s+CRLF);
-reply.additionalHeaders := reply.additionalHeaders + s + CRLF;
+reply.fAdditionalHeaders := reply.fAdditionalHeaders + s + CRLF;
+end; // addHeader
+
+procedure ThttpConn.addHeader(const h, v:RawByteString; overwrite:boolean=TRUE);
+begin
+  if overwrite then
+    removeHeader(h);
+  reply.fAdditionalHeaders := reply.fAdditionalHeaders + h + ': ' + v + CRLF;
 end; // addHeader
 
 function ThttpConn.getDontFree():boolean;
