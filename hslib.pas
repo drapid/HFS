@@ -29,7 +29,9 @@ unit HSlib;
 interface
 
 uses
-  OverbyteIcsWSocket, classes, messages, winprocs, forms, extctrls, sysutils, contnrs, strUtils, winsock, inifiles, types;
+  classes, messages, winprocs, forms, extctrls, sysutils,
+  contnrs, strUtils, winsock, OverbyteIcsWSocket, inifiles, types,
+  hfsGlobal;
 
 const
   VERSION = '2.10.0';
@@ -301,7 +303,7 @@ type
     procedure stop();
     procedure disconnectAll(wait:boolean=FALSE);
     procedure freeConnList(l:TobjectList);
-    end;
+   end;
 
 const
   TIMER_HZ = 100;

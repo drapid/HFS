@@ -119,10 +119,6 @@ object optionsFrm: ToptionsFrm
     object accountsPage: TTabSheet
       Caption = 'Accounts'
       ImageIndex = 29
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         797
         385)
@@ -157,7 +153,6 @@ object optionsFrm: ToptionsFrm
         Anchors = [akLeft, akTop, akRight, akBottom]
         Caption = 'Account properties'
         TabOrder = 7
-        ExplicitHeight = 318
         DesignSize = (
           619
           317)
@@ -203,7 +198,6 @@ object optionsFrm: ToptionsFrm
           TabOrder = 7
           OnContextPopup = accountAccessBoxContextPopup
           OnDblClick = accountAccessBoxDblClick
-          ExplicitHeight = 117
         end
         object ignoreLimitsChk: TCheckBox
           Left = 226
@@ -276,7 +270,6 @@ object optionsFrm: ToptionsFrm
           ScrollBars = ssVertical
           ShowHint = False
           TabOrder = 8
-          ExplicitHeight = 270
         end
         object notesWrapChk: TCheckBox
           Left = 502
@@ -307,7 +300,6 @@ object optionsFrm: ToptionsFrm
         ParentFont = False
         TabOrder = 2
         OnClick = deleteaccountBtnClick
-        ExplicitTop = 352
       end
       object renaccountBtn: TButton
         Left = 53
@@ -325,7 +317,6 @@ object optionsFrm: ToptionsFrm
         ParentFont = False
         TabOrder = 3
         OnClick = renaccountBtnClick
-        ExplicitTop = 329
       end
       object addaccountBtn: TButton
         Left = 3
@@ -342,7 +333,6 @@ object optionsFrm: ToptionsFrm
         ParentFont = False
         TabOrder = 1
         OnClick = addaccountBtnClick
-        ExplicitTop = 329
       end
       object upBtn: TButton
         Left = 107
@@ -360,7 +350,6 @@ object optionsFrm: ToptionsFrm
         TabOrder = 5
         OnClick = upBtnClick
         OnMouseUp = upBtnMouseUp
-        ExplicitTop = 329
       end
       object downBtn: TButton
         Left = 107
@@ -378,7 +367,6 @@ object optionsFrm: ToptionsFrm
         TabOrder = 6
         OnClick = upBtnClick
         OnMouseUp = upBtnMouseUp
-        ExplicitTop = 352
       end
       object sortBtn: TButton
         Left = 53
@@ -396,7 +384,6 @@ object optionsFrm: ToptionsFrm
         TabOrder = 4
         OnClick = sortBtnClick
         OnMouseUp = upBtnMouseUp
-        ExplicitTop = 352
       end
       object accountsBox: TListView
         Left = 3
@@ -424,7 +411,6 @@ object optionsFrm: ToptionsFrm
         OnDragOver = accountsBoxDragOver
         OnKeyDown = accountsBoxKeyDown
         OnKeyPress = accountsBoxKeyPress
-        ExplicitHeight = 288
       end
     end
     object mimePage: TTabSheet
@@ -640,7 +626,6 @@ object optionsFrm: ToptionsFrm
         Width = 76
         Height = 22
         Style = csOwnerDrawFixed
-        ItemHeight = 16
         TabOrder = 1
         OnChange = iconsBoxChange
         OnDrawItem = iconsBoxDrawItem

@@ -27,272 +27,29 @@ interface
 uses
   // delphi libs
   Windows, Messages, SysUtils, Forms, Menus, Graphics, Controls, ComCtrls, Dialogs, math,
-  registry, ExtCtrls, shellapi, ImgList, ToolWin, StdCtrls, strutils, AppEvnts, types,
-  winsock, clipbrd, shlobj, activex, Buttons, FileCtrl, dateutils, iniFiles, Classes,
-  System.ImageList,
+  Buttons, ImgList, StdCtrls, ExtCtrls, ToolWin, ImageList, strutils, AppEvnts, types,
+  iniFiles, Classes,
   // 3rd part libs. ensure you have all of these, the same version reported in dev-notes.txt
-  OverbyteIcsWSocket, OverbyteIcsHttpProt, //OverbyteicsMD5,// GIFimage, zlibex,
+  OverbyteIcsWSocket, OverbyteIcsHttpProt,
    //RegularExpressions,
   regexpr,
   rnqTraylib,
   // rejetto libs
+  fileLib, hfsGlobal,
   HSlib, monoLib, progFrmLib, classesLib;
 
-const
-  VERSION = '2.3m RD';
-  VERSION_BUILD = '300';
-  VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
-  CURRENT_VFS_FORMAT :integer = 1;
-  CRLF = #13#10;
-  TAB = #9;
-  BAK_EXT = '.bak';
-  CORRUPTED_EXT = '.corrupted';
-  COMMENT_FILE_EXT = '.comment';
-  VFS_FILE_IDENTIFIER = 'HFS.VFS';
-  CFG_KEY = 'Software\rejetto\HFS';
-  CFG_FILE = 'hfs.ini';
-  TPL_FILE = 'hfs.tpl';
-  IPS_FILE = 'hfs.ips.txt';
-  VFS_TEMP_FILE = '~temp.vfs';
-  HFS_HTTP_AGENT = 'HFS/'+VERSION;
-  COMMENTS_FILE = 'hfs.comments.txt';
-  DIFF_TPL_FILE = 'hfs.diff.tpl';
-  FILELIST_TPL_FILE = 'hfs.filelist.tpl';
-  EVENTSCRIPTS_FILE = 'hfs.events';
-  MACROS_LOG_FILE = 'macros-log.html';
-  PREVIOUS_VERSION = 'hfs.old.exe';
-  SESSION_COOKIE = 'HFS_SID_';
-  PROTECTED_FILES_MASK = 'hfs.*;*.htm*;descript.ion;*.comment;*.md5;*.corrupted;*.lnk';
-  G_VAR_PREFIX = '#';
-  HOURS = 24;
-  MINUTES = HOURS*60;
-  SECONDS = MINUTES*60; // Tdatetime * SECONDS = time in seconds
-  ETA_FRAME = 5; // time frame for ETA (in seconds)
-  DOWNLOAD_MIN_REFRESH_TIME :Tdatetime = 1/(5*SECONDS); // 5 Hz
-  BYTES_GROUPING_THRESHOLD :Tdatetime = 1/SECONDS; // group bytes in log
-  IPS_THRESHOLD = 50;  // used to avoid an external file for few IPs (ipsEverConnected list)
-  STATUSBAR_REFRESH = 10; // tenth of second
-  MAX_RECENT_FILES = 5;
-  MANY_ITEMS_THRESHOLD = 1000;
-  KILO = 1024;
-  MEGA = KILO*KILO;
-  COMPRESSION_THRESHOLD = 10*KILO; // if more than X bytes, VFS files are compressed
-  STARTING_SNDBUF = 32000;
-  YESNO :array [boolean] of string=('no','yes');
-  DEFAULT_MIME = 'application/octet-stream';
-  IP_SERVICES_URL = 'http://hfsservice.rejetto.com/ipservices.php';
-  SELF_TEST_URL = 'http://hfstest.rejetto.com/';
-
-  USER_ANONYMOUS = '@anonymous';
-  USER_ANYONE = '@anyone';
-  USER_ANY_ACCOUNT = '@any account';
-
-  ALWAYS_ON_WEB_SERVER = 'google.com';
-  ADDRESS_COLOR = clGreen;
-  BG_ERROR = $BBBBFF;
-  ENCODED_TABLE_HEADER = 'this is an encoded table'+CRLF;
-
-  DEFAULT_MIME_TYPES: array [0..23] of string = (
-    '*.htm;*.html', 'text/html',
-    '*.jpg;*.jpeg;*.jpe', 'image/jpeg',
-    '*.gif', 'image/gif',
-    '*.png', 'image/png',
-    '*.bmp', 'image/bmp',
-    '*.ico', 'image/x-icon',
-    '*.mpeg;*.mpg;*.mpe', 'video/mpeg',
-    '*.avi', 'video/x-msvideo',
-    '*.txt', 'text/plain',
-    '*.css', 'text/css',
-    '*.js',  'text/javascript',
-    '*.webp', 'image/webp'
-  );
-
-  ICONMENU_NEW = 1;
-
-  ICON_UNIT = 31;
-  ICON_ROOT = 1;
-  ICON_LINK = 4;
-  ICON_FILE = 37;
-  ICON_FOLDER = 6;
-  ICON_REAL_FOLDER = 19;
-  ICON_LOCK = 12;
-  ICON_EASY = 29;
-  ICON_EXPERT = 35;
-
-  USER_ICON_MASKS_OFS = 10000;
-  // messages
-  MSG_UNPROTECTED_LINKS = 'Links are NOT actually protected.'
-    +#13'The feature is there to be used with the "list protected items only..." option.'
-    +#13'Continue?';
-  MSG_SAME_NAME ='An item with the same name is already present in this folder.'
-    +#13'Continue?';
-  MSG_OPTIONS_SAVED = 'Options saved';
-  MSG_SOME_LOCKED = 'Some items were not affected because locked';
-  MSG_ITEM_LOCKED = 'The item is locked';
-  MSG_INVALID_VALUE = 'Invalid value';
-  MSG_EMPTY_NO_LIMIT = 'Leave blank to get no limits.';
-  MSG_ADDRESSES_EXCEED = 'The following addresses exceed the limit:'#13'%s';
-  MSG_NO_TEMP = 'Cannot save temporary file';
-  MSG_ERROR_REGISTRY = 'Can''t write to registry.'
-    +#13'You may lack necessary rights.';
-  MSG_MANY_ITEMS = 'You are putting many files.'
-    +#13'Try using real folders instead of virtual folders.'
-    +#13'Read documentation or ask on the forum for help.';
-  MSG_ADD_TO_HFS = '"Add to HFS" has been added to your Window''s Explorer right-click menu.';
-  MSG_SINGLE_INSTANCE = 'Sorry, this feature only works with the "Only 1 instance" option enabled.'
-    +#13#13'You can find this option under Menu -> Start/Exit'
-    +#13'(only in expert mode)';
-  MSG_ENABLED =   'Option enabled';
-  MSG_DISABLED = 'Option disabled';
-  MSG_COMM_ERROR = 'Network error. Request failed.';
 
 type
-  Pboolean = ^boolean;
-
-  TfileAttribute = (
-    FA_FOLDER,       // folder kind
-    FA_VIRTUAL,      // does not exist on disc
-    FA_ROOT,         // only the root item has this attribute
-    FA_BROWSABLE,    // permit listing of this folder (not recursive, only dir)
-    FA_HIDDEN,       // hidden iterms won't be shown to browsers (not recursive)
-    { no more used attributes have to stay for backward compatibility with
-    { VFS files }
-    FA_NO_MORE_USED1,
-  	FA_NO_MORE_USED2,
-    FA_TEMP,            // this is a temporary item and is not part of the VFS
-    FA_HIDDENTREE,      // recursive hidden
-    FA_LINK,            // redirection
-    FA_UNIT,            // logical unit (drive)
-    FA_VIS_ONLY_ANON,   // visible only to anonymous users [no more used]
-    FA_DL_FORBIDDEN,    // forbid download (not recursive)
-    FA_HIDE_EMPTY_FOLDERS,  // (recursive)
-    FA_DONT_COUNT_AS_DL,    // (not recursive)
-    FA_SOLVED_LNK,
-    FA_HIDE_EXT,       // (recursive)
-    FA_DONT_LOG,       // (recursive)
-    FA_ARCHIVABLE      // (recursive)
-  );
-  TfileAttributes = set of TfileAttribute;
-
-  Tfile = class;
-  TconnData = class;
-
-  TfileCallbackReturn = set of (FCB_NO_DEEPER, FCB_DELETE, FCB_RECALL_AFTER_CHILDREN); // use FCB_* flags
-
-  // returning FALSE stops recursion
-  TfileCallback = function(f:Tfile; childrenDone:boolean; par, par2:integer):TfileCallbackReturn;
-
-  TfileAction = (FA_ACCESS, FA_DELETE, FA_UPLOAD);
-
-  Tfile = class (Tobject)
-  private
-    locked: boolean;
-    FDLcount: integer;
-    function  getParent():Tfile;
-    function  getDLcount():integer;
-    procedure setDLcount(i:integer);
-    function  getDLcountRecursive():integer;
-  public
-    fNode: Ttreenode;
-    name, comment, user, pwd, lnk: string;
-    resource: string;  // link to physical file/folder; URL for links
-    flags: TfileAttributes;
-    size: int64; // -1 is NULL
-    atime,            // when was this file added to the VFS ?
-    mtime: Tdatetime; // modified time, read from disk
-    icon: integer;
-    accounts: array [TfileAction] of TStringDynArray;
-    filesFilter, foldersFilter, realm, diffTpl,
-    defaultFileMask, dontCountAsDownloadMask, uploadFilterMask: string;
-    constructor create(fullpath: String);
-    constructor createTemp(const fullpath: String; pNode: TTreeNode = NIL);
-    constructor createVirtualFolder(name:string);
-    constructor createLink(const name: String);
-    property  parent:Tfile read getParent;
-    property  DLcount:integer read getDLcount write setDLcount;
-    function  toggle(att:TfileAttribute):boolean;
-    function  isFolder():boolean; inline;
-    function  isFile():boolean; inline;
-    function  isFileOrFolder():boolean; inline;
-    function  isRealFolder():boolean; inline;
-    function  isVirtualFolder():boolean; inline;
-    function  isEmptyFolder(cd:TconnData=NIL):boolean;
-    function  isRoot():boolean; inline;
-    function  isLink():boolean; inline;
-    function  isTemp():boolean; inline;
-    function  isNew():boolean;
-    function  isDLforbidden():boolean;
-    function  url(fullEncode:boolean=FALSE):string;
-    function  relativeURL(fullEncode:boolean=FALSE):string;
-    function  pathTill(root:Tfile=NIL; delim:char='\'):string;
-    function  parentURL():string;
-		function  fullURL(userpwd:string=''; ip:string=''):string;
-    procedure setupImage(newIcon:integer); overload;
-    procedure setupImage(); overload;
-    function  getAccountsFor(action:TfileAction; specialUsernames:boolean=FALSE; outInherited:Pboolean=NIL):TstringDynArray;
-    function  accessFor(username, password:string):boolean; overload;
-    function  accessFor(cd:TconnData):boolean; overload;
-    function  hasRecursive(attributes: TfileAttributes; orInsteadOfAnd:boolean=FALSE; outInherited:Pboolean=NIL):boolean; overload;
-    function  hasRecursive(attribute: TfileAttribute; outInherited:Pboolean=NIL):boolean; overload;
-    function  getSystemIcon():integer;
-    function  getIconForTreeview():integer;
-    function  getShownRealm():string;
-    function  getFolder():string;
-    function  getRecursiveFileMask():string;
-    function  shouldCountAsDownload():boolean;
-    function  getDefaultFile():Tfile;
-    procedure recursiveApply(callback:TfileCallback; par:integer=0; par2:integer=0);
-    procedure getFiltersRecursively(var files,folders:string);
-    function  diskfree():int64;
-    function  same(f:Tfile):boolean;
-    procedure setName(name:string);
-    procedure setResource(res:string);
-    function  getDynamicComment(skipParent:boolean=FALSE):string;
-    procedure setDynamicComment(cmt:string);
-    function  getRecursiveDiffTplAsStr(outInherited:Pboolean=NIL; outFromDisk:Pboolean=NIL):string;
-    // locking prevents modification of all its ancestors and descendants
-    procedure lock();
-    procedure unlock();
-    function  isLocked():boolean;
-    property node: Ttreenode read fNode;
-    end; // Tfile
-
-  Paccount = ^Taccount;
-	Taccount = record   // user/pass profile
-    user, pwd, redir, notes: string;
-    wasUser: string; // used in user renaming panel
-    enabled, noLimits, group: boolean;
-    link: TStringDynArray;
-    end;
-  Taccounts = array of Taccount;
-
-  TfilterMethod = function(self:Tobject):boolean;
-
-  Thelp = ( HLP_NONE, HLP_TPL );
-
-  TdownloadingWhat = ( DW_UNK, DW_FILE, DW_FOLDERPAGE, DW_ICON, DW_ERROR, DW_ARCHIVE );
-
-  TpreReply =  (PR_NONE, PR_BAN, PR_OVERLOAD);
-
-  TuploadResult = record
-    fn, reason:string;
-    speed:integer;
-    size: int64;
-    end;
-
   TmyTrayicon = TTrayicon;
 
-  TconnData = class  // data associated to a client connection
+  TconnData = class(TconnDataMain)  // data associated to a client connection
   private
     FlastFile: Tfile;
     procedure setLastFile(f:Tfile);
   public
-    address: string;   // this is address shown in the log, and it is not necessarily the same as the socket address
     averageSpeed: real;   { calculated on disconnection as bytesSent/totalTime. it is calculated also while
                             sending and it is different from conn.speed because conn.speed is average speed
                             in the last second, while averageSpeed is calculated on ETA_FRAME seconds }
-    time: Tdatetime;  // connection start time
-    requestTime: Tdatetime; // last request start time
     tray: TmyTrayicon;
     tray_ico: Ticon;
     lastFN: string;
@@ -300,29 +57,19 @@ type
     { cache User-Agent because often retrieved by connBox.
     { this value is filled after the http request is complete (HE_REQUESTED),
     { or before, during the request as we get a file (HE_POST_FILE). }
-    agent: string;
-    conn: ThttpConn;
-    account: Paccount;
-    usr, pwd: string;
-    acceptedCredentials: boolean;
-    limiter: TspeedLimiter;
-    tpl: Ttpl;
     deleting: boolean;      // don't use, this item is about to be discarded
     nextDloadScreenUpdate: Tdatetime; // avoid too fast updating during download
-    disconnectReason: string;
     error: string;         // error details
     eta: record
       idx: integer;   // estimation time (seconds)
       data: array [0..ETA_FRAME-1] of real;  // accumulates speed data
       result: Tdatetime;
       end;
-    downloadingWhat: TdownloadingWhat;
     preReply: TpreReply;
     banReason: string;
     lastBytesSent, lastBytesGot: int64; // used for print to log only the recent amount of bytes  
-    lastActivityTime, fileXferStart: Tdatetime;
+    fileXferStart: Tdatetime;
     uploadSrc, uploadDest: string;
-    uploadFailed: string; // reason (empty on success)
     uploadResults: array of TuploadResult;
     disconnectAfterReply, logLaterInApache, dontLog, fullDLlogged: boolean;
     bytesGotGrouping, bytesSentGrouping: record
@@ -330,12 +77,6 @@ type
       since: Tdatetime;
       end;
     sessionID: string;
-    session,
-    vars, // defined by {.set.}
-    urlvars,  // as $_GET in php
-    postVars  // as $_POST in php
-      : THashedStringList;
-    tplCounters: TstringToIntHash;
     workaroundForIEutf8: (toDetect, yes, no);
     { here we put just a pointer because the file type would triplicate
     { the size of this record, while it is NIL for most connections }
@@ -347,6 +88,7 @@ type
     function sessionGet(const k: string): string;
     procedure sessionSet(const k, v: string);
     procedure disconnect(const reason: string);
+    function accessFor(f: TFile): Boolean;
     end; // Tconndata
 
   Tautosave = record
@@ -923,7 +665,8 @@ type
     procedure trayEvent(sender:Tobject; ev: TtrayEvent);
     procedure downloadtrayEvent(sender:Tobject; ev:TtrayEvent);
     procedure httpEvent(event:ThttpEvent; conn:ThttpConn);
-    function  addFileRecur(f:Tfile; parent:Ttreenode=NIL):Tfile;
+    function  addFileRecur(f:Tfile; parent:TTreeNode=NIL):Tfile; OverLoad;
+    function  addFileRecur(f:Tfile; parent:TTreeNode; var newNode: TTreeNode): Tfile; OverLoad;
     function  pointedFile(strict:boolean=TRUE):Tfile;
     function  pointedConnection():TconnData;
     procedure updateSbar();
@@ -963,13 +706,16 @@ type
     function  fileAttributeInSelection(fa:TfileAttribute):boolean;
     procedure progFrmHttpGetUpdate(sender:TObject; buffer:pointer; Len:integer);
     procedure recalculateGraph();
+    procedure remove(node:Ttreenode=NIL); OverLoad;
  public
-    procedure remove(node:Ttreenode=NIL);
+    function  getLP: TLoadPrefs;
+    procedure remove(f: TFile=NIL); OverLoad;
     function  setCfg(cfg:string; alreadyStarted:boolean=TRUE):boolean;
-    function  getCfg(exclude:string=''):string;
+    function  getCfg(exclude:string=''): string;
     function  saveCFG():boolean;
-    function  addFile(f:Tfile; parent:Ttreenode=NIL; skipComment:boolean=FALSE):Tfile;
-    procedure add2log(lines:string; cd:TconnData=NIL; clr:Tcolor= Graphics.clDefault);
+    function  addFile(f:Tfile; parent:Ttreenode=NIL; skipComment:boolean=FALSE):Tfile; OverLoad;
+    function  addFile(f:Tfile; parent: TTreeNode; skipComment: boolean; var newNode: TTreeNode): Tfile; OverLoad;
+    procedure add2log(lines:string; cd:TconnDataMain=NIL; clr:Tcolor= Graphics.clDefault);
     function  findFilebyURL(url:string; parent:Tfile=NIL; allowTemp:boolean=TRUE):Tfile;
     function  ipPointedInLog():string;
     procedure saveVFS(fn:string='');
@@ -978,6 +724,8 @@ type
     procedure setStatusBarText(s:string; lastFor:integer=5);
     procedure minimizeToTray();
     procedure autoCheckUpdates();
+    function  SetSelectedFile(f: TFile): Boolean; OverLoad;
+    function  SetSelectedFile(f: TFile; node: TTreeNode): Boolean; OverLoad;
     function  copySelection():TtreeNodeDynArray;
     procedure setLogToolbar(v:boolean);
     function  getTrayTipMsg(tpl:string=''):string;
@@ -985,22 +733,24 @@ type
     procedure menuMeasure(sender:Tobject; cnv: Tcanvas; var w:integer; var h:integer);
   end; // Tmainfrm
 
-const
-  FILEACTION2STR: array [TfileAction] of string = ('Access', 'Delete', 'Upload');
-
+  TFileHlp = class helper for Tfile
+     function pathTill(root:Tfile=NIL; delim:char='\'):string;
+     function url(fullEncode:boolean=FALSE):string;
+     function fullURL(userpwd:string=''; ip:string=''):string;
+     function getShownRealm():string;
+     function getSystemIcon(): integer;
+     function parentURL():string;
+  end;
 var
   mainFrm: TmainFrm;
-  srv: ThttpSrv;
   tpl: Ttpl; // template for generated pages
   customIPs: TStringDynArray;   // user customized IP addresses
   iconMasks: TstringIntPairs;
   ipsEverConnected: THashedStringList;
   easyMode: boolean = TRUE;
-  defaultIP: string;    // the IP address to use forming URLs
   rootNode: TtreeNode;
   rootFile: Tfile;
   noReplyBan: boolean;
-  exePath: string;
   externalIP: string;
   banlist: array of record ip,comment:string; end;
   trayMsg: string; // template for the tray hint
@@ -1040,18 +790,15 @@ function loadCfg(var ini,tpl:string):boolean;
 function idx_img2ico(i:integer):integer;
 function idx_ico2img(i:integer):integer;
 function idx_label(i:integer):string;
-function findEnabledLinkedAccount(account:Paccount; over:TStringDynArray; isSorted:boolean=FALSE):Paccount;
-function getImageIndexForFile(fn:string):integer;
 function conn2data(i:integer):TconnData; inline; overload;
 function uptimestr():string;
 function countIPs(onlyDownloading:boolean=FALSE; usersInsteadOfIps:boolean=FALSE):integer;
-function getSafeHost(cd:TconnData):string;
+function getSafeHost(cd:TconnDataMain):string;
 function localDNSget(ip:string):string;
 function countDownloads(ip:string=''; user:string=''; f:Tfile=NIL):integer;
-function accountAllowed(action:TfileAction; cd:TconnData; f:Tfile):boolean;
 function getAccountList(users:boolean=TRUE; groups:boolean=TRUE):TstringDynArray;
 function fileExistsByURL(url:string):boolean;
-function createFingerprint(fn:string):string;
+function createFingerprint(const fn:string):string;
 function objByIP(ip:string):TperIp;
 function protoColon():string;
 procedure setSpeedLimitIP(v:real);
@@ -1066,136 +813,22 @@ implementation
 
 uses
   AnsiStrings, MMsystem, UITypes,
+  clipbrd, dateutils, shlobj, shellapi, winsock,
+//  registry, activex, FileCtrl,
   OverbyteIcsZLibHigh, OverbyteIcsUtils,
   Base64, gifImg,
   RDFileUtil, RDUtils,
   RnQzip, RnQCrypt, RnQNet.Uploads, RnQGraphics32, RnQLangs,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib,
-  purgeDlg, filepropDlg, runscriptDlg, scriptLib;
+  purgeDlg, filepropDlg, runscriptDlg, scriptLib, hfsVars;
 
 // global variables
 var
-  globalLimiter: TspeedLimiter;
-  ip2obj: THashedStringList;
-  sessions: THashedStringList;
-  addToFolder: string; // default folder where to add items from the command line
-  lastDialogFolder: string;  // stores last for open dialog, to make it persistent
-  clock: integer;       // program ticks (tenths of second)
-  // workaround for splitters' bad behaviour
-  lastGoodLogWidth, lastGoodConnHeight: integer;
-  etags: THashedStringList; 
-  tray_ico: Ticon;             // the actual icon shown in tray
-  usingFreePort: boolean=TRUE; // the actual server port set was 0
-  upTime: Tdatetime;           // the server is up since...
-  trayed: boolean;             // true if the window has been minimized to tray
-  trayShows: string;           // describes the content of the tray icon
-  flashOn: string;             // describes when to flash the taskbar
-  addFolderDefault: string;    // how to default adding a folder (real/virtual)
-  defSorting: string;          // default sorting, browsing
-  toDelete: Tlist;             // connections pending for deletion
-  systemimages: Timagelist;    // system icons
-  speedLimitIP: real;
-  maxConnections: integer;     // max number of connections (total)
-  maxConnectionsIP: integer;   // ...from a single address
-  maxContempDLs: integer;      // max number of contemporaneous downloads
-  maxContempDLsIP: integer;    // ...from a single address
-  maxContempDLsUser: integer;  // ...from a single user
-  maxIPs: integer;             // max number of different addresses connected
-  maxIPsDLing: integer;        // max number of different addresses downloading
-  autoFingerprint: integer;    // create fingerprint on file addition
-  renamePartialUploads: string;
-  allowedReferer: string;      // check over the Refer header field
-  altPressedForMenu: boolean;  // used to enable the menu on ALT key
-  noDownloadTimeout: integer;  // autoclose the application after (minutes)
-  connectionsInactivityTimeout: integer; // autokick connection after (seconds)
-  startingImagesCount: integer;
-  lastUpdateCheck, lastFilelistTpl: Tdatetime;
-  lastUpdateCheckFN: string;   // eventual temp file for saving lastUpdateCheck
-  lastActivityTime: Tdatetime;  // used for the "no download timeout"
-  recentFiles: TStringDynArray; // recently loaded files
-  addingItemsCounter: integer = -1; // -1 is disabled
-  stopAddingItems, queryingClose: boolean;
-  port: string;
-  defaultTpl: string;
-  tpl_help: string;
-  lastWindowRect: Trect;
-  dmBrowserTpl, filelistTpl: Ttpl;
-  tplEditor: string;
-  tplLast: Tdatetime;
-  tplImport: boolean;
-  eventScriptsLast, runScriptLast: Tdatetime;
-  autoupdatedFiles: TstringToIntHash;   // download counter for temp Tfile.s
-  iconsCache: TiconsCache;
-  usersInVFS: TusersInVFS;    // keeps track of user/pwd in the VFS
   progFrm: TprogressForm;
-  graphInEasyMode: boolean;
-  cfgPath, tmpPath: string;
-  logMaxLines: integer;     // number of lines
-  windowsShuttingDown: boolean = FALSE;
-  dontLogAddressMask: string;
-  openInBrowser: string; // to not send the "attachment" suggestion in header
-  quitASAP: boolean;  // deferred quit
-  quitting: boolean; // ladies, we're quitting
-  scrollFilesBox: integer = -1;
-  defaultCfg: string;
-  selfTesting: boolean;
-  tplIsCustomized: boolean;
-  fakingMinimize: boolean; // user clicked the [X] but we simulate the [_]
-  sysidx2index: array of record sysidx, idx:integer; end; // maps system imagelist icons to internal imagelist
-  loginRealm: string;
-  serializedConnColumns: string;
-  VFScounterMod: boolean; // if any counter has changed
-  imagescache: array of string;
-  logFontName: string;
-  logFontSize: integer;
-  forwardedMask: string;
-  applicationFullyInitialized: boolean;
-  lockTimerevent: boolean;
-  filesStayFlaggedForMinutes: integer;
   autosaveVFS: Tautosave;
-  logRightClick: Tpoint;
-  warnManyItems: boolean = TRUE;
-  runningOnRemovable: boolean;
-  startupFilename: string;
-  trustedFiles, filesToAddQ: TstringDynArray;
-  setThreadExecutionState: function(d:dword):dword; stdcall; // as variable, because not available on Win95
-  listenOn: string;  // interfaces HFS should listen on
-  backuppedCfg: string;
-  updateASAP: string;
-  refusedUpdate: string;
-  updateWaiting: string;
-  filesBoxRatio: real;
-  fromTray: boolean; // used to notify about an eventy happening from a tray action
-  userInteraction: record
-    disabled: boolean;
-    bakVisible: boolean;  // backup value for mainFrm.visible
-    end;
-  logFile: record
-    filename: string;
-    apacheFormat: string;
-    apacheZoneString: string;
-    end;
-  loadingVFS: record
-    resetLetBrowse, unkFK, disableAutosave, visOnlyAnon, bakAvailable, useBackup, macrosFound: boolean;
-    build: string;
-    end;
   lastDiffTpl: record
     f: Tfile;
     ofs: integer;
-    end;
-  userIcsBuffer, userSocketBuffer: integer;
-  searchLogTime, searchLogWhiteTime, timeTookToSearchLog: TdateTime;
-  sbarTextTimeout: Tdatetime;
-  sbarIdxs: record  // indexes within the statusbar
-    totalIn, totalOut, banStatus, customTpl, oos, out, notSaved: integer;
-    end;
-  graph: record
-  	rate: integer;    // update speed
-    lastOut, lastIn: int64; // save bytesSent and bytesReceived last values
-    maxV: integer;    // max value in scale
-    size: integer;    // height of the box
-    samplesIn, samplesOut: array [0..3000] of integer; // 1 sample, 1 pixel
-    beforeRecalcMax: integer;  // countdown
     end;
 
 function deleteAccount(name:string):boolean;
@@ -1221,604 +854,14 @@ for i:=0 to n-1 do
 result:=FALSE;
 end; // deleteAccount
 
-function isCommentFile(fn:string):boolean;
-begin
-result:=(fn=COMMENTS_FILE)
-  or mainfrm.loadSingleCommentsChk.checked and isExtension(fn, COMMENT_FILE_EXT)
-  or mainfrm.supportDescriptionChk.checked and sameText('descript.ion',fn)
-end; // isCommentFile
-
-function isFingerprintFile(fn:string):boolean;
-begin
-result:=mainfrm.fingerprintsChk.checked and isExtension(fn, '.md5')
-end; // isFingerprintFile
-
-type
-  TaccountRecursionStopCase = (ARSC_REDIR, ARSC_NOLIMITS, ARSC_IN_SET);
-
-// this function follows account linking until it finds and returns the account matching the stopCase
-function accountRecursion(account:Paccount; stopCase:TaccountRecursionStopCase; data:pointer=NIL; data2:pointer=NIL):Paccount;
-
-  function shouldStop():boolean;
-  begin
-  case stopCase of
-    ARSC_REDIR: result:=account.redir > '';
-    ARSC_NOLIMITS: result:=account.noLimits;
-    ARSC_IN_SET: result:=stringExists(account.user, TstringDynArray(data), boolean(data2));
-    else result:=FALSE;
-    end;
-  end;
-
-var
-  tocheck: TStringDynArray;
-  i: integer;
-begin
-result:=NIL;
-if (account = NIL) or not account.enabled then exit;
-if shouldStop() then
-  begin
-  result:=account;
-  exit;
-  end;
-i:=0;
-toCheck:=account.link;
-while i < length(toCheck) do
-  begin
-  account:=getAccount(toCheck[i], TRUE);
-  inc(i);
-  if (account = NIL) or not account.enabled then continue;
-  if shouldStop() then
-    begin
-    result:=account;
-    exit;
-    end;
-  addUniqueArray(toCheck, account.link);
-  end;
-end; // accountRecursion
-
-function findEnabledLinkedAccount(account:Paccount; over:TStringDynArray; isSorted:boolean=FALSE):Paccount;
-begin result:=accountRecursion(account, ARSC_IN_SET, over, boolToPtr(isSorted)) end;
-
 function noLimitsFor(account:Paccount):boolean;
 begin
 account:=accountRecursion(account, ARSC_NOLIMITS);
 result:=assigned(account) and account.noLimits;
 end; // noLimitsFor
 
-function accountAllowed(action:TfileAction; cd:TconnData; f:Tfile):boolean;
-var
-  a: TStringDynArray;
-begin
-result:=FALSE;
-if f = NIL then exit;
-if action = FA_ACCESS then
-  begin
-  result:=f.accessFor(cd);
-  exit;
-  end;
-if f.isTemp() then
-  f:=f.parent;
-if (action = FA_UPLOAD) and not f.isRealFolder() then exit;
-
-  repeat
-  a:=f.accounts[action];
-  if assigned(a)
-  and not ((action = FA_UPLOAD) and not f.isRealFolder()) then break;
-  f:=f.parent;
-  if f = NIL then exit;
-  until false;
-
-result:=TRUE;
-if stringExists(USER_ANYONE, a, TRUE) then exit;
-result:=(cd.usr = '') and stringExists(USER_ANONYMOUS, a, TRUE)
-  or assigned(cd.account) and stringExists(USER_ANY_ACCOUNT, a, TRUE)
-  or (NIL <> findEnabledLinkedAccount(cd.account, a, TRUE));
-end; // accountAllowed
-
-function hasRightAttributes(attr:integer):boolean; overload;
-begin
-result:=(mainfrm.listfileswithhiddenattributeChk.checked or (attr and faHidden = 0))
-  and (mainfrm.listfileswithsystemattributeChk.checked or (attr and faSysFile = 0));
-end; // hasRightAttributes
-
-function hasRightAttributes(fn:string):boolean; overload;
-begin result:=hasRightAttributes(GetFileAttributesA(pAnsiChar(ansiString(fn)))) end;
-
 function isAnyMacroIn(s:RawByteString):boolean; inline;
 begin result := pos(MARKER_OPEN, s) > 0 end;
-
-function loadDescriptionFile(fn:string):string;
-begin
-result:=loadFile(fn);
-if result = '' then
-  result:=loadFile(fn+'\descript.ion');
-if (result > '') and mainfrm.oemForIonChk.checked then
-  OEMToCharBuff(@result[1], @result[1], length(result));
-end; // loadDescriptionFile
-
-function escapeIon(s:string):string;
-begin
-// this escaping method (and also the 2-bytes marker) was reverse-engineered from Total Commander
-result:=escapeNL(s);
-if result <> s then
-  result:=result+#4#$C2;
-end; // escapeIon
-
-function unescapeIon(s:string):string;
-begin
-if ansiEndsStr(#4#$C2, s) then
-  begin
-  setLength(s, length(s)-2);
-  s:=unescapeNL(s);
-  end;
-result:=s;
-end; // unescapeIon
-
-function findNameInDescriptionFile(txt, name:string):integer;
-begin result:=reMatch(txt, '^'+quoteRegExprMetaChars(quoteIfAnyChar(' ',name)), 'mi') end;
-
-type
-  TfileListing = class
-  public
-    dir: array of Tfile;
-    ignoreConnFilter: boolean;
-    constructor create();
-    destructor Destroy; override;
-    function fromFolder(folder:Tfile; cd:TconnData; recursive:boolean=FALSE;
-      limit:integer=-1; toSkip:integer=-1; doClear:boolean=TRUE):integer;
-    procedure sort(cd:TconnData; def:string='');
-    end;
-
-constructor TfileListing.create();
-begin
-dir:=NIL;
-end; // create
-
-destructor TfileListing.destroy;
-var
-  i: integer;
-begin
-for i:=0 to length(dir)-1 do
-  freeIfTemp(dir[i]);
-inherited destroy;
-end; // destroy
-
-procedure TfileListing.sort(cd:TconnData; def:string='');
-var
-  foldersBefore, linksBefore, rev: boolean;
-  sortBy: ( SB_NAME, SB_EXT, SB_SIZE, SB_TIME, SB_DL, SB_COMMENT );
-
-  function compareExt(f1,f2:string):integer;
-  begin result:=ansiCompareText(extractFileExt(f1), extractFileExt(f2)) end;
-
-  function compareFiles(item1,item2:pointer):integer;
-  var
-    f1, f2:Tfile;
-  begin
-  f1:=item1;
-  f2:=item2;
-  if linksBefore and (f1.isLink() <> f2.isLink()) then
-    begin
-    if f1.isLink() then result:=-1
-    else result:=+1;
-    exit;
-    end;
-  if foldersBefore and (f1.isFolder() <> f2.isFolder()) then
-    begin
-    if f1.isFolder() then result:=-1
-    else result:=+1;
-    exit;
-    end;
-  result:=0;
-  case sortby of
-    SB_SIZE: result:=compare_(f1.size, f2.size);
-    SB_TIME: result:=compare_(f1.mtime, f2.mtime);
-    SB_DL: result:=compare_(f1.DLcount, f2.DLcount);
-    SB_EXT:
-      if not f1.isFolder() and not f2.isFolder() then
-        result:=compareExt(f1.name, f2.name);
-    SB_COMMENT: result:=ansiCompareText(f1.comment, f2.comment);
-    end;
-  if result = 0 then // this happen both for SB_NAME and when other comparisons result in no difference
-    result:=ansiCompareText(f1.name,f2.name);
-  if rev then result:=-result;
-  end; // compareFiles
-
-  procedure qsort(left, right:integer);
-  var
-    split, t: Tfile;
-    i, j: integer;
-  begin
-  if left >= right then exit;
-  application.ProcessMessages();
-  if cd.conn.state = HCS_DISCONNECTED then exit;
-
-  i:=left;
-  j:=right;
-  split:=dir[(i+j) div 2];
-    repeat
-    while compareFiles(dir[i], split) < 0 do inc(i);
-    while compareFiles(split, dir[j]) < 0 do dec(j);
-    if i <= j then
-      begin
-      t:=dir[i];
-      dir[i]:=dir[j];
-      dir[j]:=t;
-
-      inc(i);
-      dec(j);
-      end
-    until i > j;
-  if left < j then qsort(left, j);
-  if i < right then qsort(i, right);
-  end; // qsort
-
-  procedure check1(var flag:boolean; val:string);
-  begin if val > '' then flag:=val='1' end;
-
-var
-  v: string;
-begin
-// caching
-foldersBefore:=mainfrm.foldersBeforeChk.checked;
-linksBefore:=mainfrm.linksBeforeChk.checked;
-
-v:=first([def, defSorting, 'name']);
-rev:=FALSE;
-if assigned(cd) then
-  with cd.urlvars do
-    begin
-    v:=first(values['sort'], v);
-    rev:=values['rev'] = '1';
-
-    check1(foldersBefore, values['foldersbefore']);
-    check1(linksBefore, values['linksbefore']);
-    end;
-if ansiStartsStr('!', v) then
-  begin
-  delete(v, 1,1);
-  rev:=not rev;
-  end;
-if v = '' then exit;
-case v[1] of
-  'n': sortBy:=SB_NAME;
-  'e': sortBy:=SB_EXT;
-  's': sortBy:=SB_SIZE;
-  't': sortBy:=SB_TIME;
-  'd': sortBy:=SB_DL;
-  'c': sortBy:=SB_COMMENT;
-  else exit; // unsupported value
-  end;
-qsort( 0, length(dir)-1 );
-end; // sort
-
-procedure loadIon(path:string; comments:TstringList);
-var
-  s, l, fn: string;
-begin
-if not mainfrm.supportDescriptionChk.checked then exit;
-s:=loadDescriptionFile(path);
-while s > '' do
-  begin
-  l:=chopLine(s);
-  if l = '' then continue;
-  fn:=chop(nonQuotedPos(' ', l), l);
-  comments.add(dequote(fn)+'='+trim(unescapeIon(l)));
-  end;
-end; // loadIon
-
-// returns number of skipped files
-function TfileListing.fromFolder(folder:Tfile; cd:TconnData;
-  recursive:boolean=FALSE; limit:integer=-1; toSkip:integer=-1; doClear:boolean=TRUE):integer;
-var
-  actualCount: integer;
-  seeProtected, noEmptyFolders, forArchive: boolean;
-  filesFilter, foldersFilter, urlFilesFilter, urlFoldersFilter: string;
-
-  procedure recurOn(f:Tfile);
-  begin
-  if not f.isFolder() then exit;
-  setLength(dir, actualCount);
-  toSkip:=fromFolder(f, cd, TRUE, limit, toSkip, FALSE);
-  actualCount:=length(dir);
-  end; // recurOn
-
-  procedure addToListing(f:Tfile);
-  begin
-  if noEmptyFolders and f.isEmptyFolder(cd)
-  and not accountAllowed(FA_UPLOAD, cd, f) then exit; // upload folders should be listed anyway
-  application.ProcessMessages();
-  if cd.conn.state = HCS_DISCONNECTED then exit;
-
-  if toSkip > 0 then dec(toSkip)
-  else
-    begin
-    if actualCount >= length(dir) then
-      setLength(dir, actualCount+100);
-    dir[actualCount]:=f;
-    inc(actualCount);
-    end;
-
-  if recursive and f.isFolder() then
-    recurOn(f);
-  end; // addToListing
-
-  function allowedTo(f:Tfile):boolean;
-  begin
-  if cd = NIL then result:=FALSE
-  else result:=(not (FA_VIS_ONLY_ANON in f.flags) or (cd.usr = ''))
-    and (seeProtected or f.accessFor(cd))
-    and not (forArchive and f.isDLforbidden())
-  end; // allowedTo
-
-  procedure includeFilesFromDisk();
-  var
-    comments: THashedStringList;
-    commentMasks: TStringDynArray;
-
-    // moves to "commentMasks" comments with a filemask as filename
-    procedure extractCommentsWithWildcards();
-    var
-      i: integer;
-      s: string;
-    begin
-    i:=0;
-    while i < comments.count do
-      begin
-      s:=comments.names[i];
-      if ansiContainsStr(s, '?')
-      or ansiContainsStr(s, '*') then
-        begin
-        addString(comments[i], commentMasks);
-        comments.Delete(i);
-        end
-      else
-        inc(i);
-      end;
-    end; // extractCommentsWithWildcards
-
-    // extract comment for "fn" from "commentMasks"
-    function getCommentByMaskFor(fn:string):string;
-    var
-      i: integer;
-      s, mask: string;
-    begin
-    for i:=0 to length(commentMasks)-1 do
-      begin
-      s:=commentMasks[i];
-      mask:=chop('=', s);
-      if fileMatch(mask, fn) then
-        begin
-        result:=s;
-        exit;
-        end;
-      end;
-    result:='';
-    end; // getCommentByMaskFor
-
-    procedure setBit(var i:integer; bits:integer; flag:boolean); inline;
-    begin
-    if flag then i:=i or bits
-    else i:=i and not bits;
-    end; // setBit
-
-{**
-
-this would let us have "=" inside the names, but names cannot be assigned
-
-    procedure fixQuotedStringList(sl:Tstrings);
-    var
-      i: integer;
-      s: string;
-    begin
-    for i:=0 to sl.count-1 do
-      begin
-      s:=sl.names[i];
-      if (s = '') or (s[1] <> '"') then continue;
-      s:=s+'='+sl.ValueFromIndex[i]; // reconstruct the line
-      sl.names[i]:=chop(nonQuotedPos('=', s), s);
-      sl.ValueFromIndex[i]:=s;
-      end;
-    end;
-}
-  var
-    f: Tfile;
-    sr: TSearchRec;
-    namesInVFS: TStringDynArray;
-    n: TtreeNode;
-    filteredOut: boolean;
-    i: integer;
-  begin
-  if (limit >= 0) and (actualCount >= limit) then exit;
-
-  // collect names in the VFS at this level. supposed to be faster than existsNodeWithName().
-  namesInVFS:=NIL;
-  n:=folder.node.getFirstChild();
-  while assigned(n) do
-    begin
-    addString(n.text, namesInVFS);
-    n:=n.getNextSibling();
-    end;
-
-  comments:=THashedStringList.create();
-  try
-    comments.caseSensitive:=FALSE;
-    try comments.loadFromFile(folder.resource+'\'+COMMENTS_FILE);
-    except end;
-    loadIon(folder.resource, comments);
-    i:=if_((filesFilter='\') or (urlFilesFilter='\'), faDirectory, faAnyFile);
-    setBit(i, faSysFile, mainFrm.listfileswithsystemattributeChk.checked);
-    setBit(i, faHidden, mainFrm.listfileswithHiddenAttributeChk.checked);
-    if findfirst(folder.resource+'\*', i, sr) <> 0 then exit;
-
-    try
-      extractCommentsWithWildcards();
-        repeat
-        application.ProcessMessages();
-        cd.lastActivityTime:=now();
-        // we don't list these entries
-        if (sr.name = '.') or (sr.name = '..')
-        or isCommentFile(sr.name) or isFingerprintFile(sr.name) or sameText(sr.name, DIFF_TPL_FILE)
-        or not hasRightAttributes(sr.attr)
-        or stringExists(sr.name, namesInVFS)
-        then continue;
-
-        filteredOut:=not fileMatch( if_(sr.Attr and faDirectory > 0, foldersFilter, filesFilter), sr.name)
-          or not fileMatch( if_(sr.Attr and faDirectory > 0, urlFoldersFilter, urlFilesFilter), sr.name);
-        // if it's a folder, though it was filtered, we need to recur
-        if filteredOut and (not recursive or (sr.Attr and faDirectory = 0)) then continue;
-
-        f:=Tfile.createTemp( folder.resource+'\'+sr.name, folder.node ); // temporary nodes are bound to the parent's node
-        if (FA_SOLVED_LNK in f.flags) and f.isFolder() then
-          // sorry, but we currently don't support lnk to folders in real-folders
-          begin
-          f.free;
-          continue;
-          end;
-        if filteredOut then
-          begin
-          recurOn(f);
-          // possible children added during recursion are linked back through the node field, so we can safely free the Tfile
-          f.free;
-          continue;
-          end;
-
-        f.comment:=comments.values[sr.name];
-        if f.comment = '' then
-          f.comment:=getCommentByMaskFor(sr.name);
-        f.comment:=macroQuote(unescapeNL(f.comment));
-
-        f.size:=0;
-        if f.isFile() then
-          if FA_SOLVED_LNK in f.flags then
-            f.size:=sizeOfFile(f.resource)
-          else
-            f.size:=sr.FindData.nFileSizeLow
-              +int64(sr.FindData.nFileSizeHigh) shl 32;
-        f.mtime:=filetimeToDatetime(sr.FindData.ftLastWriteTime);
-        addToListing(f);
-        until (findNext(sr) <> 0) or (cd.conn.state = HCS_DISCONNECTED) or (limit >= 0) and (actualCount >= limit);
-    finally findClose(sr) end;
-  finally comments.free  end
-  end; // includeFilesFromDisk
-
-  procedure includeItemsFromVFS();
-  var
-    f: Tfile;
-    sr: TSearchRec;
-    n: Ttreenode;
-  begin
-  { this folder has been dinamically generated, thus the node is not actually
-  { its own... skip }
-  if folder.isTemp() then exit;
-
-  // include (valid) items from the VFS branch
-  n:=folder.node.getFirstChild();
-  while assigned(n) and (cd.conn.state <> HCS_DISCONNECTED)
-  and ((limit < 0) or (actualCount < limit)) do
-    begin
-    cd.lastActivityTime:=now();
-
-    f:=n.data;
-    n:=n.getNextSibling();
-
-    // watching not allowed, to anyone
-    if (FA_HIDDEN in f.flags) or (FA_HIDDENTREE in f.flags) then continue;
-
-    // filtered out
-    if not fileMatch( if_(f.isFolder(), foldersfilter, filesfilter), f.name)
-    or not fileMatch( if_(f.isFolder(), urlFoldersfilter, urlFilesfilter), f.name)
-    // in this case we must continue recurring: other virtual items may be contained in this real folder, and this flag doesn't apply to them.
-    or (forArchive and f.isRealFolder() and (FA_DL_FORBIDDEN in f.flags)) then
-      begin
-      if recursive then recurOn(f);
-      continue;
-      end;
-
-    if not allowedTo(f) then continue;
-
-    if FA_VIRTUAL in f.flags then // links and virtual folders are virtual
-      begin
-      addToListing(f);
-      continue;
-      end;
-    if FA_UNIT in f.flags then
-      begin
-      if sysutils.directoryExists(f.resource+'\') then
-        addToListing(f);
-      continue;
-      end;
-
-    // try to get more info about this item
-    if findFirst(f.resource, faAnyFile, sr) = 0 then
-      begin
-      try
-        // update size and time
-        with sr.FindData do f.size:=nFileSizeLow+int64(nFileSizeHigh) shl 32;
-        try f.mtime:=filetimeToDatetime(sr.FindData.ftLastWriteTime);
-        except f.mtime:=0 end;
-      finally findClose(sr) end;
-      if not hasRightAttributes(sr.attr) then continue;
-      end
-    else // why findFirst() failed? is it a shared folder?
-      if not sysutils.directoryExists(f.resource) then continue;
-    addToListing(f);
-    end;
-  end; // includeItemsFromVFS
-
-  function beginsOrEndsBy(ss:string; s:string):boolean;
-  begin result:=ansiStartsText(ss,s) or ansiEndsText(ss,s) end;
-
-  function par(k:string):string;
-  begin if cd = NIL then result:='' else result:=cd.urlvars.values[k] end;
-
-begin
-result:=toSkip;
-if doClear then dir:=NIL;
-
-if not folder.isFolder()
-or not folder.accessFor(cd)
-or folder.hasRecursive(FA_HIDDENTREE)
-or not (FA_BROWSABLE in folder.flags)
-then exit;
-
-if assigned(cd) then
-  begin
-  if limit < 0 then
-    limit:=StrToIntDef(par('limit'), -1);
-  if toSkip < 0 then
-    toSkip:=StrToIntDef(par('offset'), -1);
-  if toSkip < 0 then
-    toSkip:=max(0, pred(strToIntDef(par('page'), 1))*limit);
-  end;
-
-actualCount:=length(dir);
-folder.getFiltersRecursively(filesFilter, foldersFilter);
-if assigned(cd) and not ignoreConnFilter then
-  begin
-  urlFilesFilter:=par('files-filter');
-  if urlFilesFilter = '' then urlFilesFilter:=par('filter');
-  urlFoldersFilter:=par('folders-filter');
-  if urlFoldersFilter = '' then urlFoldersFilter:=par('filter');
-  if (urlFilesFilter+urlFoldersFilter = '') and (par('search') > '') then
-    begin
-    urlFilesFilter:=reduceSpaces(par('search'), '*');
-    if not beginsOrEndsBy('*', urlFilesFilter) then
-      urlFilesFilter:='*'+urlFilesFilter+'*';
-    urlFoldersFilter:=urlFilesFilter;
-    end;
-  end;
-// cache user options
-forArchive:=assigned(cd) and (cd.downloadingWhat = DW_ARCHIVE);
-seeProtected:=not mainfrm.hideProtectedItemsChk.Checked and not forArchive;
-noEmptyFolders:=(urlFilesFilter = '') and folder.hasRecursive(FA_HIDE_EMPTY_FOLDERS);
-try
-  if folder.isRealFolder() and not (FA_HIDDENTREE in folder.flags) and allowedTo(folder) then
-    includeFilesFromDisk();
-  includeItemsFromVFS();
-finally setLength(dir, actualCount) end;
-result:=toSkip;
-end; // fromFolder
 
 function isDownloading(data:TconnData):boolean;
 begin
@@ -1927,135 +970,6 @@ end;
 
 function idx_label(i:integer):string;
 begin result:=intToStr(idx_img2ico(i)) end;
-
-function bmp2str(bmp:Tbitmap): RawByteString;
-var
-//  stream: Tstringstream;
-  str: TMemorystream;
-	gif: TGIFImage;
-begin
-{ the gif component has a GDI object leak while reducing colors of
-{ transparent images. this seems to be not a big problem since the
-{ icon cache system was introduced, but a real fix would be nice. }
-//stream:=Tstringstream.create('');
-  str := TMemorystream.Create;
-  gif := TGIFImage.Create();
-
-  gif.ColorReduction := rmQuantize;
-  //gif.Compression := gcLZW;
-  gif.Assign(bmp);
-  gif.SaveToStream(str);
-  gif.free;
-  SetLength(Result, str.Size);
-  str.Position := 0;
-  CopyMemory(@result[1], str.Memory, Length(Result));
-//result:=stream.DataString;
-
-  str.free;
-end; // bmp2str
-
-function pic2str(idx:integer): RawByteString;
-var
-  pic, pic2: Tbitmap;
-begin
-result:='';
-if idx < 0 then exit;
-idx:=idx_ico2img(idx);
-if length(imagescache) < idx+1 then setlength(imagescache, idx+1);
-result:=imagescache[idx];
-if result > '' then exit;
-pic:=Tbitmap.create();
-mainfrm.images.getBitmap(idx,pic);
-// pic2 is the transparent version of pic
-pic2:=Tbitmap.create();
-pic2.Width:=mainfrm.images.Width;
-pic2.height:=mainfrm.images.height;
-pic2.TransparentMode:=tmFixed;
-
-pic2.TransparentColor:=$2FFFFFF;
-pic2.Transparent:=TRUE;
-BitBlt(pic2.Canvas.Handle, 0,0,16,16, pic.Canvas.Handle, 0,0, SRCAND);
-BitBlt(pic2.Canvas.Handle, 0,0,16,16, pic.Canvas.Handle, 0,0, SRCPAINT);
-
-result:=bmp2str(pic2);
-pic2.free;
-pic.free;
-imagescache[idx]:=result;
-end; // pic2str
-
-function str2pic(s: RawByteString):integer;
-var
-	gif: TGIFImage;
-begin
-  for result:=0 to mainfrm.images.count-1 do
-    if pic2str(result) = s then
-      exit;
-// in case the pic was not found, it automatically adds it to the pool
-  gif := stringToGif(s);
-  try
-    result := mainfrm.images.addMasked(gif.bitmap, gif.Bitmap.TransparentColor);
-    etags.values['icon.'+intToStr(result)] := MD5PassHS(s);
-   finally
-    gif.free
-  end;
-end; // str2pic
-
-function getImageIndexForFile(fn:string):integer;
-var
-  i, n: integer;
-  ico: Ticon;
-  shfi: TShFileInfo;
-  s: string;
-begin
-  ZeroMemory(@shfi, SizeOf(TShFileInfo));
-// documentation reports shGetFileInfo() to be working with relative paths too,
-// but it does not actually work without the expandFileName()
-shGetFileInfo( pchar(expandFileName(fn)), 0, shfi, SizeOf(shfi), SHGFI_SYSICONINDEX);
-if shfi.iIcon = 0 then
-  begin
-  result:=ICON_FILE;
-  exit;
-  end;
-// as reported by official docs
-if shfi.hIcon <> 0 then
-  destroyIcon(shfi.hIcon);
-
-// have we already met this sysidx before?
-for i:=0 to length(sysidx2index)-1 do
-  if sysidx2index[i].sysidx = shfi.iIcon then
-  	begin
-    result:=sysidx2index[i].idx;
-    exit;
-    end;
-// found not, let's check deeper: byte comparison.
-// we first add the ico to the list, so we can use pic2str()
-ico:=Ticon.create();
-try
-  systemimages.getIcon(shfi.iIcon, ico);
-  i:=mainfrm.images.addIcon(ico);
-  s:=pic2str(i);
-  etags.values['icon.'+intToStr(i)] := MD5PassHS(s);
-finally ico.free end;
-// now we can search if the icon was already there, by byte comparison
-n:=0;
-while n < length(sysidx2index) do
-  begin
-  if pic2str(sysidx2index[n].idx) = s then
-    begin // found, delete the duplicate
-    mainfrm.images.delete(i);
-    setlength(imagescache, i);
-    i:=sysidx2index[n].idx;
-    break;
-    end;
-  inc(n);
-  end;
-
-n:=length(sysidx2index);
-setlength(sysidx2index, n+1);
-sysidx2index[n].sysidx:=shfi.iIcon;
-sysidx2index[n].idx:=i;
-result:=i;
-end; // getImageIndexForFile
 
 function getBaseTrayIcon(perc:real=0):Tbitmap;
 var
@@ -2325,331 +1239,12 @@ freeIfTemp(FlastFile);
 FlastFile:=f;
 end;
 
-constructor Tfile.create(fullpath: string);
+function TconnData.accessFor(f: TFile): Boolean;
 begin
-fullpath:=ExcludeTrailingPathDelimiter(fullpath);
-icon:=-1;
-size:=-1;
-  fNode := NIL;
-atime:=now();
-mtime:=atime;
-flags:=[];
-setResource(fullpath);
-if (resource > '') and sysutils.directoryExists(resource) then
-  flags:=flags+[FA_FOLDER, FA_BROWSABLE];
-end; // create
-
-constructor Tfile.createTemp(const fullpath: String; pNode: TTreeNode = NIL);
-begin
-create(fullpath);
-include(flags, FA_TEMP);
-  fNode := pNode;
-end; // createTemp
-
-constructor Tfile.createVirtualFolder(name:string);
-begin
-icon:=-1;
-fNode := NIL;
-setResource('');
-flags:=[FA_FOLDER, FA_VIRTUAL, FA_BROWSABLE];
-self.name:=name;
-atime:=now();
-mtime:=atime;
-end; // createVirtualFolder
-
-constructor Tfile.createLink(const name: String);
-begin
-icon:=-1;
-fNode := NIL;
-setName(name);
-atime:=now();
-mtime:=atime;
-flags:=[FA_LINK, FA_VIRTUAL];
-end; // createLink
-
-procedure Tfile.setResource(res:string);
-
-  function sameDrive(f1,f2:string):boolean;
-  begin
-  result:=(length(f1) >= 2) and (length(f2) >= 2) and (f1[2] = ':')
-    and (f2[2] = ':') and (upcase(f1[1]) = upcase(f2[1]));
-  end; // sameDrive
-
-var
-  s: string;
-begin
-if isExtension(res, '.lnk') or fileExists(res+'\target.lnk') then
-  begin
-  s:=extractFileName(res);
-  if isExtension(s, '.lnk') then
-    setLength(s, length(s)-4);
-  setName(s);
-  lnk:=res;
-  res:=resolveLnk(res);
-  include(flags, FA_SOLVED_LNK);
-  end
-else
-  exclude(flags, FA_SOLVED_LNK);
-res:=ExcludeTrailingPathDelimiter(res);
-
-// in this case, drive letter may change. useful with pendrives.
-if runningOnRemovable and sameDrive(exePath, res) then
-  delete(res, 1,2);
-
-resource:=res;
-if (length(res) = 2) and (res[2] = ':') then // logical unit
-  begin
-  include(flags, FA_UNIT);
-  if not isRoot() and not (FA_SOLVED_LNK in flags) then
-    setName(res);
-  end
-else
-  begin
-  exclude(flags, FA_UNIT);
-  if not isRoot() and not (FA_SOLVED_LNK in flags) then
-    setName(extractFileName(res));
-  end;
-size:=-1;
-end; // setResource
-
-procedure Tfile.setName(name:string);
-begin
-self.name:=name;
-if node = NIL then exit;
-node.Text:=name;
-end; // setName
-
-function Tfile.same(f:Tfile):boolean;
-begin result:=(self = f) or (resource = f.resource) end;
-
-function Tfile.toggle(att:TfileAttribute):boolean;
-begin
-if att in flags then exclude(flags, att)
-else include(flags, att);
-result:=att in flags
+  Result := Self <> NIL;
+  if Result then
+    Result := f.accessFor(usr, pwd);
 end;
-
-function Tfile.isRoot():boolean;
-begin result:=FA_ROOT in flags end;
-
-function Tfile.isFolder():boolean;
-begin result:=FA_FOLDER in flags end;
-
-function Tfile.isLink():boolean;
-begin result:=FA_LINK in flags end;
-
-function Tfile.isTemp():boolean;
-begin result:=FA_TEMP in flags end;
-
-function Tfile.isFile():boolean;
-begin result:=not ((FA_FOLDER in flags) or (FA_LINK in flags)) end;
-
-function Tfile.isFileOrFolder():boolean;
-begin result:=not (FA_LINK in flags) end;
-
-function Tfile.isRealFolder():boolean;
-begin result:=(FA_FOLDER in flags) and not (FA_VIRTUAL in flags) end;
-
-function Tfile.isVirtualFolder():boolean;
-begin result:=(FA_FOLDER in flags) and (FA_VIRTUAL in flags) end;
-
-function Tfile.isEmptyFolder(cd:TconnData=NIL):boolean;
-var
-  listing: TfileListing;
-begin
-result:=FALSE;
-if not isFolder() then exit;
-listing:=TfileListing.create();
-//** i fear it is not ok to use fromFolder() to know if the folder is empty, because it gives empty also for unallowed folders. 
-listing.fromFolder( self, cd, FALSE, 1 );
-result:= length(listing.dir) = 0;
-listing.free;
-end; // isEmptyFolder
-
-// uses comments file
-function Tfile.getDynamicComment(skipParent:boolean=FALSE):string;
-var
-  comments: THashedStringList;
-begin
-try
-  result:=comment;
-  if result > '' then exit;
-  if mainfrm.loadSingleCommentsChk.checked then
-    result:=loadFile(resource+COMMENT_FILE_EXT);
-  if (result > '') or skipParent then exit;
-  comments:=THashedStringList.create();
-  try
-    try
-      comments.CaseSensitive:=FALSE;
-      comments.LoadFromFile(resource+'\..\'+COMMENTS_FILE);
-      result:=comments.values[name];
-    except end
-  finally
-    if result = '' then
-      begin
-      loadIon(resource+'\..', comments);
-      result:=comments.values[name];
-      end;
-    if result > '' then
-      result:=unescapeNL(result);
-    comments.free
-  end;
-finally result:=macroQuote(result) end;
-end; // getDynamicComment
-
-procedure Tfile.setDynamicComment(cmt:string);
-var
-  s, path, name: string;
-  i: integer;
-begin
-if not isTemp() then
-  begin
-  comment:=cmt; // quite easy
-  exit;
-  end;
-path:=resource+COMMENT_FILE_EXT;
-if fileExists(path) then
-  begin
-  if cmt='' then
-    deleteFile(path)
-  else
-    saveFile2(path, cmt);
-  exit;
-  end;
-name:=extractFileName(resource);
-
-// we prefer descript.ion, but if its support was disabled,
-// or it doesn't exist while hfs.comments.txt does, then we'll use the latter
-path:=extractFilePath(resource)+COMMENTS_FILE;
-if not mainfrm.supportDescriptionChk.checked
-or fileExists(path) and not fileExists(extractFilePath(resource)+'descript.ion') then
-  saveTextFile(path, setKeyInString(loadfile(path), name, escapeNL(cmt)));
-
-if not mainfrm.supportDescriptionChk.checked then exit;
-
-path:=extractFilePath(resource)+'descript.ion';
-try
-  s:=loadDescriptionFile(path);
-  cmt:=escapeIon(cmt); // that's how multilines are handled in this file
-  i:=findNameInDescriptionFile(s, name);
-  if i = 0 then // not found
-    if cmt='' then // no comment, we are good
-      exit
-    else
-      s:=s+quoteIfAnyChar(' ', name)+' '+cmt+CRLF // append
-  else // found, then replace
-    if cmt='' then
-      replace(s, '', i, findEOL(s, i)) // remove the whole line
-    else
-      begin
-      i:=nonQuotedPos(' ', s, i); // replace just the comment
-      replace(s, cmt, i+1, findEOL(s, i, FALSE));
-      end;
-  if s='' then
-    deleteFile(path)
-  else
-    saveTextFile(path, s);
-except end;
-end; // setDynamicComment
-
-function Tfile.getParent():Tfile;
-var
-  p: TTreeNode;
-begin
-  if node = NIL then
-    result := NIL
-   else
-    if isTemp() then
-      result := nodeToFile(node)
-     else
-      try
-        p := node.parent;
-        if p = NIL then
-          result := NIL
-         else
-          result := p.data
-       except
-//         add2log()
-         Result := NIL;
-      end;
-end; // getParent
-
-function Tfile.getDLcount():integer;
-begin
-if isFolder() then result:=getDLcountRecursive()
-else if isTemp() then result:=autoupdatedFiles.getInt(resource)
-else result:=FDLcount;
-end; // getDLcount
-
-procedure Tfile.setDLcount(i:integer);
-begin
-if isTemp() then autoupdatedFiles.setInt(resource, i)
-else FDLcount:=i;
-end; // setDLcount
-
-function Tfile.getDLcountRecursive():integer;
-var
-  n: Ttreenode;
-  i: integer;
-  f: Tfile;
-begin
-if not isFolder() then
-  begin
-  result:=DLcount;
-  exit;
-  end;
-result:=0;
-if node = NIL then exit;
-n:=node.getFirstChild();
-if not isTemp() then
-  while assigned(n) do
-    begin
-    f:=nodeToFile(n);
-    if assigned(f) then
-      if f.isFolder() then inc(result, f.getDLcountRecursive())
-      else inc(result, f.FDLcount);
-    n:=n.getNextSibling();
-    end;
-if isRealFolder() then
-  for i:=0 to autoupdatedFiles.count-1 do
-    if ansiStartsText(resource, autoupdatedFiles[i]) then
-      inc(result, autoupdatedFiles.getIntByIdx(i));
-end; // getDLcountRecursive
-
-function Tfile.diskfree():int64;
-begin
-if FA_VIRTUAL in flags then result:=0
-else result:=diskSpaceAt(resource);
-end; // diskfree
-
-procedure Tfile.setupImage(newIcon:integer);
-begin
-icon:=newIcon;
-setupImage();
-end; // setupImage
-
-procedure Tfile.setupImage();
-begin
-if icon >= 0 then node.Imageindex:=icon
-else node.ImageIndex:=getIconForTreeview();
-node.SelectedIndex:=node.imageindex;
-end; // setupImage
-
-function Tfile.getIconForTreeview():integer;
-begin
-if FA_UNIT in flags then result:=ICON_UNIT
-else if FA_ROOT in flags then result:=ICON_ROOT
-else if FA_LINK in flags then result:=ICON_LINK
-else
-  if FA_FOLDER in flags then
-    if FA_VIRTUAL in flags then result:=ICON_FOLDER
-    else result:=ICON_REAL_FOLDER
-  else
-    if mainfrm.useSystemIconsChk.checked and (resource > '') then
-      result:=getImageIndexForFile(resource) // skip iconsCache
-    else
-      result:=ICON_FILE;
-end; // getIconForTreeview
 
 function encodeURL(s:string; fullEncode:boolean=FALSE):RawByteString;
 var
@@ -2682,449 +1277,6 @@ for i:=1 to length(s) do
   result:=result+'%'+intToHex(ord(s[i]),2)
 end; // totallyEncoded
 
-function Tfile.relativeURL(fullEncode:boolean=FALSE):string;
-begin
-if isLink() then result:=xtpl(resource, ['%ip%', defaultIP])
-else if isRoot() then result:=''
-else result:=encodeURL(name, fullEncode)+if_(isFolder(),'/')
-end;
-
-function Tfile.pathTill(root:Tfile=NIL; delim:char='\'):string;
-var
-  f: Tfile;
-begin
-result:='';
-if self = root then exit;
-result:=name;
-f:=parent;
-if isTemp() then
-  begin
-  if FA_SOLVED_LNK in flags then
-    result:=extractFilePath(copy(lnk,length(f.resource)+2, MAXINT))+name // the path is the one of the lnk, but we have to replace the file name as the lnk can make it
-  else
-    result:=copy(resource, length(f.resource)+2, MAXINT);
-  if delim <> '\' then result:=xtpl(result, ['\', delim]);
-  end;
-while assigned(f) and (f <> root) and (f <> rootFile) do
-  begin
-  result:=f.name+delim+result;
-  f:=f.parent;
-  end;
-end; // pathTill
-
-function Tfile.url(fullEncode:boolean=FALSE):string;
-begin
-assert(node<>NIL, 'node can''t be NIL');
-if isLink() then result:=relativeURL(fullEncode)
-else result:='/'+encodeURL(pathTill(rootFile,'/'), fullEncode)
-  +if_(isFolder() and not isRoot(), '/');
-end; // url
-
-function Tfile.getFolder():string;
-var
-  f: Tfile;
-  s: string;
-begin
-result:='/';
-f:=parent;
-while assigned(f) and assigned(f.parent) do
-  begin
-  result:='/'+f.name+result;
-  f:=f.parent;
-  end;
-if not isTemp() then exit;
-f:=parent; // f now points to the non-temporary ancestor item
-s:=extractFilePath(resource);
-s:=copy( s, length(f.resource)+2, length(s) );
-result:=result+xtpl(s, ['\','/']);
-end; // getFolder
-
-function Tfile.fullURL(userpwd:string=''; ip:string=''):string;
-begin
-result:=url();
-if isLink() then exit;
-if assigned(srv) and srv.active and (srv.port <> '80') and (pos(':',ip) = 0)
-and not mainfrm.noPortInUrlChk.checked then
-  result:=':'+srv.port+result;
-if ip = '' then ip:=defaultIP;
-result:=protoColon()+nonEmptyConcat('',userpwd,'@')+ip+result
-end; // fullURL
-
-function Tfile.isDLforbidden():boolean;
-var
-  f: Tfile;
-begin
-// the flag can be in this node
-result:=FA_DL_FORBIDDEN in flags;
-if result or not isTemp() then exit;
-f:=nodeToFile(node);
-result:=assigned(f) and (FA_DL_FORBIDDEN in f.flags);
-end; // isDLforbidden
-
-function Tfile.isNew():boolean;
-var
-  t: Tdatetime;
-begin
-if FA_TEMP in flags then t:=mtime
-else t:=atime;
-result:=(filesStayFlaggedForMinutes > 0)
-  and (trunc(abs(now()-t)*24*60) <= filesStayFlaggedForMinutes)
-end; // isNew
-
-function Tfile.getRecursiveDiffTplAsStr(outInherited:Pboolean=NIL; outFromDisk:Pboolean=NIL):string;
-var
-  basePath, runPath, s, fn, diff: string;
-  f: Tfile;
-  first: boolean;
-
-  function add2diff(s:string):boolean;
-  begin
-  result:=FALSE;
-  if s = '' then exit;
-  diff:=s
-    + ifThen((diff > '') and not ansiEndsStr(CRLF,s), CRLF)
-    + ifThen((diff > '') and not isSectionAt(@diff[1]), '[]'+CRLF)
-    + diff;
-  result:=TRUE;
-  end; // add2diff
-
-begin
-result:='';
-diff:='';
-runPath:='';
-f:=self;
-if assigned(outInherited) then outInherited^:=FALSE;     
-if assigned(outFromDisk) then outFromDisk^:=FALSE;
-first:=TRUE;
-while assigned(f) do
-  begin
-  if f.isRealFolder() then
-    if f.isTemp() then
-      begin
-      basePath:=excludeTrailingPathDelimiter( extractFilePath(f.parent.resource) );
-      runPath:=copy(f.resource, length(basePath)+2, length(f.resource));
-      f:=f.parent;
-      end
-    else
-      begin
-      basePath:=excludeTrailingPathDelimiter(extractFilePath(f.resource));
-      runPath:=extractFileName(f.resource);
-      end;
-  // temp realFolder will cycle more than once, while non-temp only once
-  while runPath > '' do
-    begin
-    if add2diff(loadFile(basePath+'\'+runPath+'\'+DIFF_TPL_FILE)) and assigned(outFromDisk) then
-      outFromDisk^:=TRUE;
-    runPath:=excludeTrailingPathDelimiter(ExtractFilePath(runPath));
-    end;
-  // consider the diffTpl in node
-  s:=f.diffTpl;
-  if (s > '') and singleLine(s) then
-    begin
-    // maybe it refers to a file
-    fn:=trim(s);
-    if fileExists(fn) then doNothing()
-    else if fileExists(exePath+fn) then fn:=exePath+fn
-    else if fileExists(f.resource+'\'+fn) then fn:=f.resource+'\'+fn;
-    if fileExists(fn) then s:=loadFile(fn);
-    end;
-  if add2diff(s) and not first and assigned(outInherited) then
-    outInherited^:=TRUE;
-  f:=f.parent;
-  first:=FALSE;
-  end;
-result:=diff;
-end; // getRecursiveDiffTplAsStr
-
-function Tfile.getDefaultFile():Tfile;
-var
-  f: Tfile;
-  mask, s: string;
-  sr: TsearchRec;
-  n: Ttreenode;
-begin
-result:=NIL;
-mask:=getRecursiveFileMask();
-if mask = '' then exit;
-
-n:=node.getFirstChild();
-{ if this folder has been dinamically generated, the treenode is not actually
-{ its own, and we won't care about subitems }
-if not isTemp() then
-  while assigned(n) do
-    begin
-    f:=n.data;
-    n:=n.getNextSibling();
-    if (FA_LINK in f.flags) or f.isFolder()
-    or not fileMatch(mask, f.name) or not fileExists(f.resource) then continue;
-    result:=f;
-    exit;
-    end;
-
-if not isRealFolder() or not sysutils.directoryExists(resource) then exit;
-
-while mask > '' do
-  begin
-  s:=chop(';', mask);
-  if findFirst(resource+'\'+s, faAnyFile-faDirectory, sr) <> 0 then continue;
-  try
-    // encapsulate for returning
-    result := Tfile.createTemp(resource+'\'+sr.name, node); // temporary nodes are bound to the parent's node
-  finally findClose(sr) end;
-  exit;
-  end;
-end; // getDefaultFile
-
-function Tfile.shouldCountAsDownload():boolean;
-var
-  f: Tfile;
-  mask: string;
-begin
-result:=not (FA_DONT_COUNT_AS_DL in flags);
-if not result then exit;
-f:=self;
-  repeat
-  mask:=f.dontCountAsDownloadMask;
-  f:=f.parent;
-  until (f = NIL) or (mask > '');
-if mask > '' then result:=not fileMatch(mask, name)
-end; // shouldCountAsDownload
-
-function Tfile.getShownRealm():string;
-var
-  f: Tfile;
-begin
-f:=self;
-  repeat
-  result:=f.realm;
-  if result > '' then exit;
-  f:=f.parent;
-  until f = NIL;
-if mainfrm.useCommentAsRealmChk.checked then
-  result:=getDynamicComment();
-end; // getShownRealm
-
-function Tfile.parentURL():string;
-var
-  i: integer;
-begin
-result:=url(TRUE);
-i:=length(result)-1;
-while (i > 1) and (result[i] <> '/') do dec(i);
-setlength(result,i);
-end; // parentURL
-
-function Tfile.getSystemIcon(): integer;
-var
-  ic: PcachedIcon;
-  i: integer;
-begin
-  result := icon;
-  if result >= 0 then exit;
-  if isFile() then
-    for i:=0 to length(iconMasks)-1 do
-      if fileMatch(iconMasks[i].str, name) then
-        begin
-        result:=iconMasks[i].int;
-        exit;
-        end;
-  ic:=iconsCache.get(resource);
-  if ic = NIL then
-    begin
-    result:=getImageIndexForFile(resource);
-    iconsCache.put(resource, result, mtime);
-    exit;
-    end;
-  if mtime <= ic.time then result:=ic.idx
-  else
-    begin
-    result:=getImageIndexForFile(resource);
-    ic.time:=mtime;
-    ic.idx:=result;
-    end;
-end; // getSystemIcon
-
-procedure Tfile.lock();
-begin locked:=TRUE end;
-
-procedure Tfile.unlock();
-begin locked:=FALSE end;
-
-function Tfile.isLocked():boolean;
-var
-  f: Tfile;
-  n: Ttreenode;
-begin
-// check ancestors (first, because it is always fast)
-f:=self;
-  repeat
-  result:=f.locked;
-  f:=f.parent;
-  until (f = NIL) or result;
-// check descendants
-n:=node.getFirstChild();
-while assigned(n) and not result do
-  begin
-  result:=nodeToFile(n).isLocked();
-  n:=n.getNextSibling();
-  end;
-end; // isLocked
-
-procedure Tfile.recursiveApply(callback:TfileCallback; par:integer=0; par2:integer=0);
-var
-  n, next: Ttreenode;
-  r: TfileCallbackReturn;
-begin
-r:=callback(self, FALSE, par, par2);
-if FCB_DELETE in r then
-  begin
-  node.delete();
-  exit;
-  end;
-if FCB_NO_DEEPER in r then exit;
-n:=node.getFirstChild();
-while assigned(n) do
-  begin
-  next:=n.getNextSibling(); // "next" must be saved this point because the callback may delete the current node
-  if assigned(n.data) then nodeToFile(n).recursiveApply(callback, par, par2);
-  n:=next;
-  end;
-if FCB_RECALL_AFTER_CHILDREN in r then
-  begin
-  r:=callback(self, TRUE, par, par2);
-  if FCB_DELETE in r then node.delete();
-  end;
-end; // recursiveApply
-
-function Tfile.hasRecursive(attributes: TfileAttributes; orInsteadOfAnd:boolean=FALSE; outInherited:Pboolean=NIL):boolean;
-var
-  f: Tfile;
-begin
-result:=FALSE;
-f:=self;
-if assigned(outInherited) then outInherited^:=FALSE;
-while assigned(f) do
-  begin
-  result:=orInsteadOfAnd and (attributes*f.flags <> [])
-    or (attributes*f.flags = attributes);
-  if result then exit;
-  f:=f.parent;
-  if assigned(outInherited) then outInherited^:=TRUE;
-  end;
-if assigned(outInherited) then outInherited^:=FALSE; // grant it is set only if result=TRUE
-end; // hasRecursive
-
-function Tfile.hasRecursive(attribute: TfileAttribute; outInherited:Pboolean=NIL):boolean;
-begin result:=hasRecursive([attribute], FALSE, outInherited) end;
-
-function Tfile.accessFor(cd:TconnData):boolean;
-begin
-if cd = NIL then result:=accessFor('', '')
-else result:=accessFor(cd.usr, cd.pwd)
-end; // accessFor
-
-function Tfile.accessFor(username, password:string):boolean;
-var
-  a: Paccount;
-  f: Tfile;
-  list: TStringDynArray;
-begin
-result:=FALSE;
-if isFile() and isDLforbidden() then exit;
-result:=FALSE;
-f:=self;
-while assigned(f) do
-  begin
-  list:=f.accounts[FA_ACCESS]; // shortcut
-  
-  if (username = '') and stringExists(USER_ANONYMOUS, list, TRUE) then break;
-  // first check in user/pass
-  if (f.user > '') and sameText(f.user, username) and (f.pwd = password) then break;
-  // then in accounts
-  if assigned(list) then
-    begin
-    a:=getAccount(username);
-
-    if stringExists(USER_ANYONE, list, TRUE) then break;
-    // we didn't match the user/pass, but this file is restricted, so we must have an account at least to access it
-    if assigned(a) and (a.pwd = password) and
-      (stringExists(USER_ANY_ACCOUNT, list, TRUE) or (findEnabledLinkedAccount(a, list, TRUE) <> NIL))
-    then break;
-      
-    exit;
-    end;
-  // there's a user/pass restriction, but the password didn't match (if we got this far). We didn't exit before to give accounts a chance.
-  if f.user > '' then exit;
-
-  f:=f.parent;
-  end;
-result:=TRUE;
-
-// in case the file is not protected, we must not accept authentication credentials belonging to disabled accounts
-if (username > '') and (f = NIL) then
-  begin
-  a:=getAccount(username);
-  if a = NIL then exit;
-  result:=a.enabled;
-  end;
-end; // accessFor
-
-function Tfile.getRecursiveFileMask():string;
-var
-  f: Tfile;
-begin
-f:=self;
-  repeat
-  result:=f.defaultFileMask;
-  if result > '' then exit;
-  f:=f.parent;
-  until f = NIL;
-end; // getRecursiveFileMask
-
-function Tfile.getAccountsFor(action:TfileAction; specialUsernames:boolean=FALSE; outInherited:Pboolean=NIL):TstringDynArray;
-var
-  i: integer;
-  f: Tfile;
-  s: string;
-begin
-result:=NIL;
-f:=self;
-if assigned(outInherited) then outInherited^:=FALSE;
-while assigned(f) do
-  begin
-  for i:=0 to length(f.accounts[action])-1 do
-  	begin
-    s:=f.accounts[action][i];
-    if (s = '')
-    or (action = FA_UPLOAD) and not f.isRealFolder() then continue; // we must ignore this setting
-
-    if specialUsernames and (s[1] = '@')
-    or accountExists(s, specialUsernames) then // we admit groups only if specialUsernames are admitted too
-      addString(s, result);
-    end;
-  if (action = FA_ACCESS) and (f.user > '') then addString(f.user, result);
-  if assigned(result) then exit;
-  if assigned(outInherited) then outInherited^:=TRUE;
-  f:=f.parent;
-  end;
-end; // getAccountsFor
-
-procedure Tfile.getFiltersRecursively(var files,folders:string);
-var
-  f: Tfile;
-begin
-files:='';
-folders:='';
-f:=self;
-while assigned(f) do
-  begin
-  if (files = '') and (f.filesfilter > '') then files:=f.filesFilter;
-  if (folders = '') and (f.foldersfilter > '') then folders:=f.foldersFilter;
-  if (files > '') and (folders > '') then break;
-  f:=f.parent;
-  end;
-end; // getFiltersRecursively
-
 procedure kickByIP(ip:string);
 var
   i: integer;
@@ -3140,7 +1292,7 @@ while i < srv.conns.count do
   end;
 end; // kickByIP
 
-function getSafeHost(cd:TconnData):string;
+function getSafeHost(cd:TconnDataMain):string;
 begin
 result:='';
 if cd = NIL then exit;
@@ -3184,10 +1336,11 @@ function Tmainfrm.findFilebyURL(url:string; parent:Tfile=NIL; allowTemp:boolean=
   s:=includeTrailingPathDelimiter(f.resource)+s; // we made the ".." test before, so relative paths are allowed in the VFS
   if not fileOrDirExists(s) then
     if fileOrDirExists(s+'.lnk') then s:=s+'.lnk'
-    else s:=UTF8ToAnsi(s); // these may actually be two distinct files, but it's very unlikely to be, and pratically we workaround big problem
-  if not fileOrDirExists(s) or not hasRightAttributes(s) then exit;
+//    else s:=UTF8ToAnsi(s) // these may actually be two distinct files, but it's very unlikely to be, and pratically we workaround big problem
+    ;
+  if not fileOrDirExists(s) or not hasRightAttributes(getLP, s) then exit;
   // found on disk, we need to build a temporary Tfile to return it
-  result:=Tfile.createTemp(s, f.node); // temp nodes are bound to parent's node
+  result:=Tfile.createTemp(s, f); // temp nodes are bound to parent's node
   // the temp file inherits flags from the real folder
   if FA_DONT_LOG in f.flags then include(result.flags, FA_DONT_LOG);
   if not (FA_BROWSABLE in f.flags) then exclude(result.flags, FA_BROWSABLE);
@@ -3262,7 +1415,8 @@ for i:=0 to length(parts)-1 do
   n:=cur.getFirstChild();
   while assigned(n) do
     begin
-    found:=stringExists(n.text, s) or sameText(n.text, UTF8toAnsi(s));
+//    found:=stringExists(n.text, s) or sameText(n.text, UTF8toAnsi(s));
+        found := stringExists(n.text, s) or sameText(n.text, s);
     if found then break;
     n:=n.getNextSibling();
     end;
@@ -3271,9 +1425,10 @@ for i:=0 to length(parts)-1 do
     f:=cur.data;
     if f.isRealFolder() then // but real folders have not all the stuff loaded and ready. we have another way to walk.
       begin
-      for j:=i+1 to length(parts)-1 do
-        s:=s+'\'+parts[j];
-      workTheRestByReal(s, f);
+        if length(parts) > i+1 then
+          for j:=i+1 to length(parts)-1 do
+            s:=s+'\'+parts[j];
+        workTheRestByReal(s, f);
       end;
     exit;
     end;
@@ -3354,7 +1509,7 @@ begin
    Result := not progFrm.cancelRequested;
 end;
 
-function createFingerprint(fn:string):string;
+function createFingerprint(const fn:string):string;
 var
   b: TBytes;
   i: Integer;
@@ -3387,6 +1542,21 @@ begin
 result:=mainFrm.recursiveListingChk.checked
   and ((data.urlvars.indexOf('recursive') >= 0) or (data.urlvars.values['search'] > ''))
 end; // shouldRecur
+
+function Tmainfrm.getLP: TLoadPrefs;
+begin
+  Result := [];
+  if supportDescriptionChk.checked then
+    Include(Result, lpION);
+  if listfileswithsystemattributeChk.checked then
+    Include(Result, lpSysAttr);
+  if listfileswithHiddenAttributeChk.checked then
+    Include(Result, lpHdnAttr);
+  if loadSingleCommentsChk.checked then
+    Include(Result, lpSnglCmnt);
+  if mainfrm.fingerprintsChk.checked  then
+    Include(Result, lpFingerPrints);
+end;
 
 function Tmainfrm.getFolderPage(folder:Tfile; cd:TconnData; otpl:Tobject):string;
 // we pass the Tpl parameter as Tobject because symbol Ttpl is not defined yet
@@ -3547,6 +1717,7 @@ var
 
 var
   i: integer;
+  lp: TLoadPrefs;
 begin
   result := '';
   if (folder = NIL) or not folder.isFolder() then
@@ -3608,8 +1779,10 @@ try
   if fingerprintsChk.checked then
     hasher.loadFrom(folder.resource);
   try
-    listing.fromFolder( folder, cd, recur );
-    listing.sort(cd, if_(recur or (otpl = filelistTpl), '?', diffTpl['sort by']) ); // '?' is just a way to cause the sort to fail in case the sort key is not defined by the connection
+    if mainfrm.hideProtectedItemsChk.Checked then
+      Include(lp, lpHideProt);
+    listing.fromFolder(lp, folder, cd, recur );
+    listing.sort(mainfrm.foldersBeforeChk.checked, mainfrm.linksBeforeChk.checked, cd, if_(recur or (otpl = filelistTpl), '?', diffTpl['sort by']) ); // '?' is just a way to cause the sort to fail in case the sort key is not defined by the connection
 
     for i:=0 to length(listing.dir)-1 do
       begin
@@ -4044,7 +2217,7 @@ if mainfrm.trayfordownloadChk.checked and isSendingFile(data) then
 else data.tray.hide();
 end; // setupDownloadIcon
 
-function getDynLogFilename(cd:TconnData):string; overload;
+function getDynLogFilename(cd:TconnDataMain):string; overload;
 var
   d, m, y, w: word;
   u: string;
@@ -4070,7 +2243,7 @@ begin
      FormatSettings.ShortDateFormat:=GetLocaleStr(LOCALE_USER_DEFAULT, LOCALE_SSHORTDATE,'');
 end;
 
-procedure Tmainfrm.add2log(lines:string; cd:TconnData=NIL; clr:Tcolor= Graphics.clDefault);
+procedure Tmainfrm.add2log(lines:string; cd:TconnDataMain=NIL; clr:Tcolor= Graphics.clDefault);
 var
   s, ts, first, rest, addr: string;
 begin
@@ -4327,6 +2500,7 @@ var
   var
     i, b: integer;
     s: string;
+    sa: RawByteString;
   begin
   // comments file
   try
@@ -4339,10 +2513,15 @@ var
   // descript.ion
   if not mainfrm.supportDescriptionChk.checked then exit;
   try
-    s:=loadFile(path+'descript.ion');
-    if s = '' then exit;
+    sa:=loadFile(path+'descript.ion');
+    if sa = '' then exit;
     if mainfrm.oemForIonChk.checked then
-      OEMToCharBuff(@s[1], @s[1], length(s));
+      begin
+        SetLength(s, Length(sa));
+        OEMToCharBuff(@sa[1], @s[1], length(s));
+      end
+     else
+      s := UnUTF(sa);
     for i:=trancheStart to trancheEnd do
       begin
       b:=findNameInDescriptionFile(s, files[i]);
@@ -4425,7 +2604,7 @@ begin
 result:=FALSE; // mod by mars
 //patch290();
 // if we'd use optUTF8() here, we couldn't make use of tpl.utf8, because text would not be parsed yet
-tpl.fullText:=text;
+tpl.fullTextS := text;
 tplIsCustomized:= text <> defaultTpl;
 if boolOnce(tplImport) then
   runTplImport();
@@ -4499,7 +2678,7 @@ var
 
       md.folder:=data.lastFile;
       if assigned(md.folder) then
-        md.f:=Tfile.createTemp(data.uploadDest, md.folder.node)
+        md.f:=Tfile.createTemp(data.uploadDest, md.folder)
        else
         md.f:=Tfile.createTemp(data.uploadDest)
         ;
@@ -4513,7 +2692,7 @@ var
       md.f:=data.lastFile;
 
     if assigned(md.f) and (md.folder = NIL) then
-      md.folder:=md.f.getParent();
+      md.folder:=md.f.parent;
 
     tryApplyMacrosAndSymbols(result, md);
 
@@ -4828,12 +3007,13 @@ var
       fi: Tfile;
       fIsTemp: boolean;
       s: string;
+
     begin
     if not f.accessFor(data) then exit;
     listing:=TfileListing.create();
     try
       listing.ignoreConnFilter:=ignoreConnFilters;
-      listing.fromFolder( f, data, shouldRecur(data));
+      listing.fromFolder(getLP, f, data, shouldRecur(data));
       fIsTemp:=f.isTemp();
       ofs:=length(f.resource)-length(f.name)+1;
       for i:=0 to length(listing.dir)-1 do
@@ -5174,7 +3354,7 @@ var
 
   conn.addHeader('Accept-Ranges', 'bytes');
   if sendHFSidentifierChk.checked then
-    conn.addHeader('Server', 'HFS '+VERSION);
+    conn.addHeader('Server', 'HFS '+ hfsGlobal.VERSION);
 
   case data.preReply of
     PR_OVERLOAD:
@@ -5943,16 +4123,27 @@ VFSmodified:=inputqueryLong('Comment', format(MSG, [f.name]), f.comment);
 end; // inputComment
 
 function Tmainfrm.addFile(f:Tfile; parent:Ttreenode=NIL; skipComment:boolean=FALSE):Tfile;
+var
+  n: TTreeNode;
 begin
+  Result := addFile(f, parent, skipComment, n);
+end;
+
+function Tmainfrm.addFile(f:Tfile; parent: TTreeNode; skipComment: boolean; var newNode: TTreeNode): Tfile;
+begin
+  newNode := NIL;
 abortBtn.show();
 stopAddingItems:=FALSE;
-try result:=addFileRecur(f,parent);
-finally abortBtn.hide() end;
+  try
+    result:= addFileRecur(f, parent, newNode);
+   finally
+    abortBtn.hide()
+  end;
 if result = NIL then exit;
 if stopAddingItems then
   msgDlg('File addition was aborted.'#13'The list of files is incomplete.', MB_ICONWARNING);
 if assigned(parent) then parent.expanded:=TRUE;
-filesbox.Selected:=result.node;
+SetSelectedFile(result, newNode);
 
 if skipComment or not autoCommentChk.checked then exit;
 application.restore();
@@ -5960,13 +4151,21 @@ application.bringToFront();
 inputComment(f);
 end; // addFile
 
-function Tmainfrm.addFileRecur(f:Tfile; parent:Ttreenode=NIL):Tfile;
+function Tmainfrm.addFileRecur(f:Tfile; parent:TTreeNode=NIL): Tfile;
 var
-  n: Ttreenode;
+  n: TTreeNode;
+begin
+  Result := addFileRecur(f, parent, n);
+end;
+
+function Tmainfrm.addFileRecur(f:Tfile; parent:TTreeNode; var newNode: TTreeNode): Tfile;
+var
+//  n: Ttreenode;
   sr: TsearchRec;
   newF: Tfile;
   s: string;
 begin
+  newNode := NIL;
 result:=f;
 if stopAddingItems then exit;
 
@@ -5995,15 +4194,13 @@ if existsNodeWithName(f.name, parent) then
 
 if stopAddingItems then exit;
 
-n:=filesBox.Items.AddChild(parent, f.name);
+newNode:=filesBox.Items.AddChildObject(parent, f.name, f);
 // stateIndex assignments are a workaround to a delphi bug
-n.stateIndex:=0;
-f.fNode:=n;
-n.stateIndex:=-1;
-n.Data:=f;
-f.setupImage();
+newNode.stateIndex:=0;
+newNode.stateIndex:=-1;
+f.setupImage(mainfrm.useSystemIconsChk.checked, newNode);
 // autocreate fingerprint
-if f.isFile() and fingerprintsChk.checked and (autoFingerprint > 0) then
+if f.isFile() and fingerprintsChk.checked and (autoFingerprint > 0) and (f.resource > '') then
   try
     f.size:=sizeofFile(f.resource);
     if (autoFingerprint >= f.size div 1024)
@@ -6023,10 +4220,10 @@ try
   repeat
   if stopAddingItems then break;
   if (sr.name[1] = '.')
-  or isFingerprintFile(sr.name) or isCommentFile(sr.name) then continue;
+  or isFingerprintFile(getLP, sr.name) or isCommentFile(getLP, sr.name) then continue;
   newF:=Tfile.create(f.resource+'\'+sr.name);
   if newF.isFolder() then include(newF.flags, FA_VIRTUAL);
-  if addfileRecur(newF, n) = NIL then
+  if addfileRecur(newF, newNode) = NIL then
     freeAndNIL(newF);
   until findnext(sr) <> 0;
 finally FindClose(sr) end;
@@ -6115,6 +4312,15 @@ for i:=father+1 to length(nodes)-1 do
     end;
 end; // setNilChildrenFrom
 
+procedure Tmainfrm.remove(f: TFile=NIL);
+begin
+  if f = NIL then
+    remove(Ttreenode(NIL))
+   else
+    if f.node <> NIL then
+      remove(f.node);
+end;
+
 procedure Tmainfrm.remove(node:Ttreenode=NIL);
 var
   i: integer;
@@ -6159,7 +4365,7 @@ end; // remove
 procedure TmainFrm.Remove1Click(Sender: TObject);
 begin
 // this method is bound to the DEL key also while a renaming is ongoing
-if not filesBox.IsEditing() then remove()
+if not filesBox.IsEditing() then remove(Ttreenode(NIL))
 end;
 
 procedure TmainFrm.startBtnClick(Sender: TObject);
@@ -6356,6 +4562,7 @@ type
 
   begin
   result:='';
+  if Length(accounts) > 0 then
   for i:=0 to length(accounts)-1 do
   	begin
     a:=@accounts[i];
@@ -6418,7 +4625,7 @@ var
 begin
 userIconMasks:='';
 iconMasksStr:=iconMasksToStr();
-result:='HFS '+VERSION+' - Build #'+VERSION_BUILD+CRLF
+result:='HFS '+ hfsGlobal.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'active='+yesno[srv.active]+CRLF
 +'only-1-instance='+yesno[only1instanceChk.checked]+CRLF
 +'window='+rectToStr(lastWindowRect)+CRLF
@@ -7113,6 +5320,7 @@ if a = NIL then exit;
 
 if not (a.group and noGroups) then
   addString(a.user, result);
+if length(accounts)>0 then
 for i:=0 to length(accounts)-1 do
   if not stringExists(accounts[i].user, result)
   and stringExists(a.user, accounts[i].link) then
@@ -7327,7 +5535,7 @@ if saveCFG() then
 end;
 
 procedure TmainFrm.About1Click(Sender: TObject);
-begin msgDlg(format(getRes('copyright'), [VERSION,VERSION_BUILD])) end;
+begin msgDlg(format(getRes('copyright'), [hfsGlobal.VERSION,VERSION_BUILD + ' ' + DateTimeToStr(BuiltTime)])) end;
 
 procedure Tmainfrm.purgeConnections();
 var
@@ -7404,7 +5612,7 @@ while s > '' do
   while (s > '') and (s[1] <> '@') do
     msg:=msg+chopLine(s)+#13;
   // before 2.0 beta14 a bare semicolon-separated string comparison was used
-  if filematch(l, VERSION) or filematch(l, '#'+VERSION_BUILD) then
+  if filematch(l, hfsGlobal.VERSION) or filematch(l, '#'+VERSION_BUILD) then
     msgDlg(msg, MB_ICONWARNING);
   end;
 end; // parseVersionNotice
@@ -7564,7 +5772,7 @@ try
   and (not VERSION_STABLE or testerUpdatesChk.checked) then
     thereSnew('untested');
   // same version? we show build number
-  if ver = VERSION then
+  if ver = hfsGlobal.VERSION then
     ver:=format('Build #%s (current is #%s)', [build, VERSION_BUILD]);
   if logOtherEventsChk.checked then
     add2log('Check update: '+ifThen(updateURL = '', 'no new version', 'new version found: '+ver));
@@ -8052,7 +6260,7 @@ if assigned(selectedFile) then setClip(selectedFile.fullURL());
 updateUrlBox();
 end;
 
-function setBrowsable(f:Tfile; childrenDone:boolean; par, par2:integer):TfileCallbackReturn;
+function setBrowsable(f:Tfile; childrenDone:boolean; par, par2: IntPtr):TfileCallbackReturn;
 begin
 if not f.isFolder() then exit;
 if (FA_BROWSABLE in f.flags) = boolean(par) then VFSmodified:=TRUE
@@ -8474,7 +6682,7 @@ procedure TmainFrm.appEventsShowHint(var HintStr: String; var CanShow: Boolean; 
   if f.isRealFolder() then perm(FA_UPLOAD, 'Upload allowed for');
   perm(FA_DELETE, 'Delete allowed for');
 
-  s:=reduce(f.getDynamicComment());
+  s:=reduce(f.getDynamicComment(mainfrm.getLP));
   if (s > '') and (f.comment = '') then s:=s+EXTERNAL_LABEL;
   if s > '' then result:=result+#13'Comment: '+s;
 
@@ -8937,7 +7145,7 @@ result:=xtpl(first(tpl, trayMsg), [
   '%hits%', intToStr(hitsLogged),
   '%downloads%', intToStr(downloadsLogged),
   '%uploads%', intToStr(uploadsLogged),
-  '%version%', VERSION,
+  '%version%', hfsGlobal.VERSION,
   '%build%', VERSION_BUILD
 ]);
 end; // getTrayTipMsg
@@ -9272,7 +7480,7 @@ begin
   ZeroMemory(@after, sizeof(after));
 node.DeleteChildren();
 f:=Tfile(node.data);
-f.fNode := node;
+f.SyncNode(node);
 tlv:=Ttlv.create;
 tlv.parse(vfs);
 while not tlv.isOver() do
@@ -9357,7 +7565,7 @@ while not tlv.isOver() do
     FK_DIFF_TPL: f.diffTpl := data2;
     FK_DONTCOUNTASDOWNLOADMASK: f.dontCountAsDownloadMask := data2;
     FK_DONTCOUNTASDOWNLOAD: if boolean(data2[1]) then include(f.flags, FA_DONT_COUNT_AS_DL);  // legacy, now moved into flags
-    FK_ICON_GIF: if data2 > '' then f.setupImage(str2pic(data2));
+    FK_ICON_GIF: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2));
     FK_AUTOUPDATED_FILES: parseAutoupdatedFiles(data2);
     FK_HFS_BUILD: loadingVFS.build:= data2;
     FK_HEAD, FK_HFS_VER: ; // recognize these fields, but do nothing
@@ -9387,7 +7595,7 @@ if FA_VIS_ONLY_ANON in f.flags then
 if f.isVirtualFolder() or f.isLink() then f.mtime:=f.atime;
 if assigned(f.accounts[FA_UPLOAD]) and (f.resource > '') then
   addString(f.resource, uploadPaths);
-f.setupImage();
+f.setupImage(mainfrm.useSystemIconsChk.checked, node);
 if after.resetLetBrowse then
   f.recursiveApply(setBrowsable, integer(FA_BROWSABLE in f.flags));
 end; // setVFS
@@ -9400,7 +7608,7 @@ if length(vfsdata) > COMPRESSION_THRESHOLD then
     ZcompressStr(vfsdata, clFastest, zsGZip) );
 result:= TLV(FK_HEAD, VFS_FILE_IDENTIFIER)
   +TLV(FK_FORMAT_VER, str_(CURRENT_VFS_FORMAT))
-  +TLV(FK_HFS_VER, VERSION)
+  +TLV(FK_HFS_VER, hfsGlobal.VERSION)
   +TLV(FK_HFS_BUILD, VERSION_BUILD)
   +TLV(FK_CRC, str_(getCRC(vfsdata)));  // CRC must always be right before data
 result:=result+vfsdata
@@ -9886,6 +8094,8 @@ begin
     exit;
   if not Self.Visible then
     Exit;
+  if not node.isVisible then
+    Exit;
   f := Tfile(node.data);
   if f = NIL then
     exit;
@@ -10251,8 +8461,7 @@ f.flags:=f.flags+[FA_ROOT, FA_ARCHIVABLE];
 f.dontCountAsDownloadMask:='*.htm;*.html;*.css';
 f.defaultFileMask:='index.html;index.htm;default.html;default.htm';
 rootFile:=f;
-addFile(f, NIL, TRUE);
-rootNode:=rootFile.node;
+addFile(f, NIL, TRUE, rootNode);
 VFSmodified:=FALSE;
 lastFileOpen:='';
 end; // initVFS
@@ -10420,7 +8629,11 @@ addUniqueString(fn, trustedFiles);
 end; // saveVFS
 
 procedure TmainFrm.filesBoxAddition(Sender: TObject; Node: TTreeNode);
-begin VFSmodified:=TRUE end;
+begin
+  VFSmodified:=TRUE;
+  if Node.Data <> NIL then
+    TFile(Node.Data).SyncNode(Node);
+end;
 
 procedure TmainFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
@@ -10541,7 +8754,7 @@ try
             setNilChildrenFrom(nodes, i);
             node.Delete();
             addFile(f, under, TRUE);
-            f.setupImage(bakIcon);
+            f.setupImage(mainfrm.useSystemIconsChk.checked, bakIcon);
             f.node.Focused:=TRUE;
             end;
   VFSmodified:=TRUE;
@@ -10868,7 +9081,7 @@ for i:=0 to filesBox.SelectionCount-1 do
 VFSmodified:=TRUE;
 end;
 
-function removeFlagNew(f:Tfile; childrenDone:boolean; par, par2:integer):TfileCallbackReturn;
+function removeFlagNew(f:Tfile; childrenDone:boolean; par, par2: IntPtr):TfileCallbackReturn;
 begin
 result:=[];
 VFSmodified:=TRUE;
@@ -11097,7 +9310,7 @@ function pointToCharPoint(re:TRichEdit; pt:Tpoint):Tpoint;
 const
   EM_EXLINEFROMCHAR = WM_USER+54;
 begin
-result.x:=re.perform(EM_CHARFROMPOS, 0, integer(@pt));
+result.x:=re.perform(EM_CHARFROMPOS, 0, NativeInt(@pt));
 if result.x < 0 then exit;
 result.y:=re.perform(EM_EXLINEFROMCHAR, 0, result.x);
 dec(result.x, re.perform(EM_LINEINDEX, result.y, 0));
@@ -11453,7 +9666,7 @@ else done:=PromptForFileName(res, '', '', CAPTION);
 if done then VFSmodified:=TRUE;
 selectedFile.setResource(res);
 if not nameSync then selectedFile.setName(oldName);
-selectedFile.setupImage();
+selectedFile.setupImage(mainfrm.useSystemIconsChk.checked);
 end;
 
 procedure TmainFrm.enableMacrosChkClick(Sender: TObject);
@@ -11721,8 +9934,8 @@ tray_ico:=Ticon.create();
 tray:=TmyTrayicon.create(self.Handle);
 DragAcceptFiles(handle, true);
 caption:=format('HFS ~ HTTP File Server %s%sBuild %s',
-  [VERSION, stringOfChar(' ',80), VERSION_BUILD]);
-application.Title:=format('HFS %s (%s)', [VERSION, VERSION_BUILD]);
+  [hfsGlobal.VERSION, stringOfChar(' ',80), VERSION_BUILD]);
+application.Title:=format('HFS %s (%s)', [hfsGlobal.VERSION, VERSION_BUILD]);
 setSpeedLimit(-1);
 setSpeedLimitIP(-1);
 setGraphRate(10);
@@ -11883,7 +10096,7 @@ with sender as ThttpCli do
   end;
 end; // progFrmHttpGetUpdate
 
-function purgeFilesCB(f:Tfile; childrenDone:boolean; par, par2:integer):TfileCallbackReturn;
+function purgeFilesCB(f:Tfile; childrenDone:boolean; par, par2: IntPtr):TfileCallbackReturn;
 begin
 result:=[];
 if f.locked or f.isRoot() then exit;
@@ -12044,7 +10257,7 @@ for i:=0 to length(list)-1 do
           begin
           exclude(flags, FA_VIRTUAL);
           setResource(resource);
-          setupImage();
+          setupImage(mainfrm.useSystemIconsChk.checked);
           setNilChildrenFrom(list, i);
           node.DeleteChildren();
           end;
@@ -12083,7 +10296,7 @@ begin
 default:=TStringList.create();
 default.text:=defaultCfg;
 current:=getCfg();
-diff:='# '+VERSION+' (build '+VERSION_BUILD+')'+CRLF;
+diff:='# '+hfsGlobal.VERSION+' (build '+VERSION_BUILD+')'+CRLF;
 
 while current > '' do
   begin
@@ -12265,6 +10478,27 @@ setlength(result, filesBox.SelectionCount);
 for i:=0 to filesBox.SelectionCount-1 do result[i]:=filesbox.selections[i];
 end; // copySelection
 
+function TmainFrm.SetSelectedFile(f: TFile): Boolean;
+var
+  n: TTreeNode;
+begin
+  n := f.node;
+  Result := n <> NIL;
+  filesBox.Selected := n;
+end;
+
+function TmainFrm.SetSelectedFile(f: TFile; node: TTreeNode): Boolean;
+var
+  n: TTreeNode;
+begin
+  n := node;
+  Result := n <> NIL;
+  if not Result then
+    n := f.node;
+  Result := n <> NIL;
+  filesBox.Selected := n;
+end;
+
 procedure TmainFrm.menuMeasure(sender:Tobject; cnv: Tcanvas; var w:integer; var h:integer);
 begin
 with sender as Tmenuitem do
@@ -12320,6 +10554,105 @@ if mi.Checked then
   end;
 end;
 
+
+function TFileHlp.pathTill(root:Tfile=NIL; delim:char='\'):string;
+var
+  f: Tfile;
+begin
+result:='';
+if self = root then exit;
+result:=name;
+f:=parent;
+if isTemp() then
+  begin
+  if FA_SOLVED_LNK in flags then
+    result:=extractFilePath(copy(lnk,length(f.resource)+2, MAXINT))+name // the path is the one of the lnk, but we have to replace the file name as the lnk can make it
+  else
+    result:=copy(resource, length(f.resource)+2, MAXINT);
+  if delim <> '\' then result:=xtpl(result, ['\', delim]);
+  end;
+while assigned(f) and (f <> root) and (f <> rootFile) do
+  begin
+  result:=f.name+delim+result;
+  f:=f.parent;
+  end;
+end; // pathTill
+
+function TFileHlp.url(fullEncode:boolean=FALSE):string;
+begin
+assert(node<>NIL, 'node can''t be NIL');
+if isLink() then result:=relativeURL(fullEncode)
+else result:='/'+encodeURL(pathTill(rootFile,'/'), fullEncode)
+  +if_(isFolder() and not isRoot(), '/');
+end; // url
+
+function TFileHlp.fullURL(userpwd:string=''; ip:string=''):string;
+begin
+result:=url();
+if isLink() then exit;
+if assigned(srv) and srv.active and (srv.port <> '80') and (pos(':',ip) = 0)
+and not mainfrm.noPortInUrlChk.checked then
+  result:=':'+srv.port+result;
+if ip = '' then ip:=defaultIP;
+result:=protoColon()+nonEmptyConcat('',userpwd,'@')+ip+result
+end; // fullURL
+
+function TFileHlp.getShownRealm():string;
+var
+  f: Tfile;
+begin
+f:=self;
+  repeat
+  result:=f.realm;
+  if result > '' then exit;
+  f:=f.parent;
+  until f = NIL;
+if mainfrm.useCommentAsRealmChk.checked then
+  result:= getDynamicComment(mainfrm.getLP);
+end; // getShownRealm
+
+function TFileHlp.getSystemIcon(): integer;
+var
+  ic: PcachedIcon;
+  i: integer;
+begin
+  result := icon;
+  if result >= 0 then exit;
+  if isFile() then
+    for i:=0 to length(iconMasks)-1 do
+      if fileMatch(iconMasks[i].str, name) then
+        begin
+        result:=iconMasks[i].int;
+        exit;
+        end;
+  ic:=iconsCache.get(resource);
+  if ic = NIL then
+    begin
+    result:=getImageIndexForFile(resource);
+    iconsCache.put(resource, result, mtime);
+    exit;
+    end;
+  if mtime <= ic.time then result:=ic.idx
+  else
+    begin
+    result:=getImageIndexForFile(resource);
+    ic.time:=mtime;
+    ic.idx:=result;
+    end;
+end; // getSystemIcon
+
+function TFileHlp.parentURL():string;
+var
+  i: integer;
+begin
+result:=url(TRUE);
+i:=length(result)-1;
+while (i > 1) and (result[i] <> '/') do dec(i);
+setlength(result,i);
+end; // parentURL
+
+
+
 var
   dll: HMODULE;
 
@@ -12338,9 +10671,9 @@ if savefileA(tmpPath+'test.tmp','') then
 lastUpdateCheckFN:=tmpPath+'HFS last update check.tmp';
 setCurrentDir(exePath); // sometimes people mess with the working directory, so we force it to the exe path
 if fileExists('default.tpl') then
-  defaultTpl:= loadfile('default.tpl')
+  defaultTpl:= UnUTF(loadfile('default.tpl'))
 else
-  defaultTpl:=getRes('defaultTpl');
+  defaultTpl:= UnUTF(getRes('defaultTpl'));
 tpl_help := UnUTF(getRes('tplHlp'));
 tpl:=Ttpl.create();
 defSorting:='name';
@@ -12359,7 +10692,7 @@ trayShows:='downloads';
 flashOn:='download';
 forwardedMask:='127.0.0.1';
 runningOnRemovable:=DRIVE_REMOVABLE = GetDriveType(PChar(exePath[1]+':\'));
-etags.values['exe']:= MD5PassHS(dateToHTTP(getMtimeUTC(paramStr(0))));
+etags.values['exe']:= MD5PassHS(dateToHTTPr(getMtimeUTC(paramStr(0))));
 
 
 dll:=GetModuleHandle('kernel32.dll');

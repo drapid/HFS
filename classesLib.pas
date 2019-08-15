@@ -23,7 +23,8 @@ unit classesLib;
 interface
 
 uses
-  iniFiles, types, hslib, strUtils, sysUtils, classes, math;
+  iniFiles, types, strUtils, sysUtils, classes, math,
+  hslib, hfsGlobal;
 
 type
   TfastStringAppend = class
@@ -51,7 +52,7 @@ type
     procedure put(data:string; idx:integer; time:Tdatetime);
     procedure clear();
     procedure purge(olderThan:Tdatetime);
-    function idxOf(data:shortstring):integer;
+    function idxOf(const data: string):integer;
     end;
 
   TusersInVFS = class
@@ -162,12 +163,39 @@ type
     function getTheRest():RawByteString;
     end;
 
+  TconnDataMain = class  // data associated to a client connection
+  public
+    address: string;   // this is address shown in the log, and it is not necessarily the same as the socket address
+    time: Tdatetime;  // connection start time
+    requestTime: Tdatetime; // last request start time
+    { cache User-Agent because often retrieved by connBox.
+    { this value is filled after the http request is complete (HE_REQUESTED),
+    { or before, during the request as we get a file (HE_POST_FILE). }
+    agent: string;
+    conn: ThttpConn;
+    limiter: TspeedLimiter;
+    acceptedCredentials: boolean;
+    usr, pwd: string;
+    account: Paccount;
+    session,
+    vars, // defined by {.set.}
+    urlvars,  // as $_GET in php
+    postVars  // as $_POST in php
+      : THashedStringList;
+    tpl: Ttpl;
+    tplCounters: TstringToIntHash;
+    downloadingWhat: TdownloadingWhat;
+    disconnectReason: string;
+    uploadFailed: string; // reason (empty on success)
+    lastActivityTime: Tdatetime;
+  end;
+
 implementation
 
 uses
+  windows, dateUtils, forms, ansiStrings,
   RDFileUtil, RDUtils,
-  ansiStrings,
-  utilLib, main, windows, dateUtils, forms;
+  utilLib, hfsVars;
 
 constructor TperIp.create();
 begin
@@ -274,7 +302,7 @@ end; // match
 
 //////////// TiconsCache
 
-function TiconsCache.idxOf(data:shortstring):integer;
+function TiconsCache.idxOf(const data: string):integer;
 var
   b, e, c: integer;
 begin

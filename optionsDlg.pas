@@ -23,7 +23,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Math,
-  Dialogs, ExtCtrls, StdCtrls, Grids, ComCtrls, ValEdit, types, main, CheckLst;
+  Dialogs, ExtCtrls, StdCtrls, Grids, ComCtrls, ValEdit, types, hfsGlobal, CheckLst;
 
 type
   ToptionsFrm = class(TForm)
@@ -161,7 +161,7 @@ implementation
 {$R *.dfm}
 
 uses
-  utilLib, HSlib, strUtils, classesLib, listSelectDlg;
+  utilLib, HSlib, strUtils, classesLib, listSelectDlg, fileLib, main;
 
 var
   lastAccountSelected: integer = -1; // stores the previous selection index

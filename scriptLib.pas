@@ -21,11 +21,12 @@ unit scriptLib;
 
 interface
 
-uses main, classesLib, iniFiles, types;
+uses
+  iniFiles, types, hfsGlobal, classesLib, fileLib, HSLib;
 
 type
   TmacroData = record
-    cd: TconnData;
+    cd: TconnDataMain;
     tpl: Ttpl;
     folder, f: Tfile;
     afterTheList, archiveAvailable, hideExt, breaking: boolean;
@@ -41,15 +42,16 @@ var
 
 function tryApplyMacrosAndSymbols(var txt:string; var md:TmacroData; removeQuotings:boolean=true):boolean;
 function macroQuote(s:string):string;
-function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnData=NIL):string;
-function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnData=NIL):string;
+function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL):string;
+function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnDataMain=NIL):string;
 procedure resetLog();
 
 implementation
 
 uses
   windows, utilLib, parserLib, graphics, classes, sysutils, StrUtils,
-  hslib, comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
+  comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
+  main, hfsVars,
   RnQtrayLib, RDFileUtil, RDUtils;
 
 const
@@ -683,8 +685,7 @@ var
         e:=excludeTrailingPathDelimiter(e);
       if e <> fld.resource then
         begin
-        fld:=Tfile.createTemp(e);
-        fld.node:=md.f.node;
+        fld := Tfile.createTemp(e, md.f);
         freeIt:=TRUE;
         end
       end;
@@ -847,7 +848,7 @@ var
   f:=mainfrm.findFileByURL(p, md.folder);
   if f = NIL then exit; // doesn't exist
 
-  try f.setDynamicComment(macroDequote(parEx('comment'))) except end;
+  try f.setDynamicComment(mainFrm.getLP, macroDequote(parEx('comment'))) except end;
   try f.resource:=parEx('resource') except end;
   try f.diffTpl:=parEx('diff template') except end;
   try f.filesFilter:=parEx('files filter') except end;
@@ -884,7 +885,7 @@ var
   f:=mainfrm.findFileByURL(p);
   spaceIf(assigned(f)); // so you can know if something really has been deleted
   if f = NIL then exit; // doesn't exist
-  mainFrm.remove(f.node);
+  mainFrm.remove(f);
   VFSmodified:=TRUE;
   end; // deleteItem
 
@@ -911,7 +912,7 @@ var
     if w = 'exists' then
       result:='1'
     else if w = 'comment' then
-      result:=f.getDynamicComment()
+      result:=f.getDynamicComment(mainfrm.getLP)
     else if w = 'resource' then
       result:=f.resource
     else if getAttr('hide', FA_HIDDEN)
@@ -1288,14 +1289,16 @@ var
   var
     a: Taccount;
   begin
-  result:='';
-  if accountExists(p, TRUE) then exit; // username already in use
-  if not validUsername(p) then exit;
-  fillchar(a, sizeof(a), 0); // the account is disabled by default
-  a.user:=p;
-  setLength(accounts, length(accounts)+1);
-  accounts[length(accounts)-1]:=a;
-  setAccount();
+    result:='';
+    if accountExists(p, TRUE) then
+      exit; // username already in use
+    if not validUsername(p) then
+      exit;
+    ZeroMemory(@a, sizeof(a)); // the account is disabled by default
+    a.user:=p;
+    setLength(accounts, length(accounts)+1);
+    accounts[length(accounts)-1]:=a;
+    setAccount();
   end; // newAccount
 
   function fromTable(tbl, k:string):string;
@@ -1608,7 +1611,7 @@ var
       result:='/~img_file'
     else if md.f.isFolder() then
       if FA_UNIT in md.f.flags then
-        result:=format('/~img%d', [md.f.getIconForTreeview()])
+        result:=format('/~img%d', [md.f.getIconForTreeview(mainfrm.useSystemIconsChk.checked)])
       else
         result:='/~img_folder'
     else if md.f.isLink() then
@@ -1659,7 +1662,7 @@ var
   else if name = '%now%' then
     result:=floatToStr(now())
   else if name = '%version%' then
-    result:=main.VERSION
+    result:= hfsGlobal.VERSION
   else if name = '%build%' then
     result:=VERSION_BUILD
   else if name = '%uptime%' then
@@ -1726,10 +1729,10 @@ var
 
   if assigned(md.folder) then
     if name = '%folder-item-comment%' then
-      result:= md.folder.getDynamicComment()
+      result:= md.folder.getDynamicComment(mainfrm.getLP)
     else if name = '%folder-comment%' then
       begin
-      result:=md.folder.getDynamicComment();
+      result:=md.folder.getDynamicComment(mainfrm.getLP);
       if result > '' then
         result:= xtpl(tpl['folder-comment'], [ '%item-comment%', result ]);
       end
@@ -1778,7 +1781,7 @@ var
     else if name = '%item-modified%' then
       result:=if_(md.f.mtime=0, 'error', datetimeToStr(md.f.mtime))
     else if name = '%item-comment%' then
-      result:= md.f.getDynamicComment(TRUE)
+      result:= md.f.getDynamicComment(mainfrm.getLP, TRUE)
     else if name = '%item-url%' then
       result:=macroQuote(md.f.url())
   ;
@@ -1787,7 +1790,7 @@ var
     if name = '%new%' then
       result:=if_(md.f.isNew(), md.tpl['newfile'])
     else if name = '%comment%' then
-      result:=if_(md.f.getDynamicComment(TRUE) > '', md.tpl['comment'])
+      result:=if_(md.f.getDynamicComment(mainfrm.getLP, TRUE) > '', md.tpl['comment'])
   ;
 
   if assigned(md.tpl) then
@@ -2590,22 +2593,23 @@ finally
   end;
 end; // tryApplyMacrosAndSymbols
 
-function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnData=NIL):string;
+function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL):string;
 var
   md: TmacroData;
 begin
-result:=trim(script);
-if result = '' then exit;
-fillchar(md, sizeOf(md), 0);
-md.tpl:=first(tpl_, tpl);
-md.f:=f;
-md.folder:=folder;
-md.cd:=cd;
-md.table:=table;
-tryApplyMacrosAndSymbols(result, md);
+  result:=trim(script);
+  if result = '' then
+    exit;
+  ZeroMemory(@md, sizeOf(md));
+  md.tpl:=first(tpl_, tpl);
+  md.f:=f;
+  md.folder:=folder;
+  md.cd:=cd;
+  md.table:=table;
+  tryApplyMacrosAndSymbols(result, md);
 end; // runScript
 
-function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnData=NIL):string;
+function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnDataMain=NIL):string;
 begin
 addArray(table, ['%event%', event]);
 result:=runScript(eventScripts[event], table, eventScripts, NIL, NIL, cd);

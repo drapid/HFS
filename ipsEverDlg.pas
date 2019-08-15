@@ -30,7 +30,7 @@ implementation
 {$R *.dfm}
 
 uses
-  main, utilLib;
+  main, utilLib, hfsGlobal;
 
 procedure TipsEverFrm.resetBtnClick(Sender: TObject);
 begin

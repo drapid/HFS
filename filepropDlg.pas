@@ -4,8 +4,9 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, ComCtrls, StdCtrls, ExtCtrls, CheckLst, utilLib, main, types, Grids,
-  ValEdit, strutils, hslib, math;
+  Dialogs, ComCtrls, StdCtrls, ExtCtrls, CheckLst, types, Grids,
+  ValEdit, strutils, math,
+  utilLib, hslib, fileLib, hfsGlobal;
 
 type
   TfilepropFrm = class(TForm)
@@ -77,7 +78,7 @@ var
 implementation
 
 uses
-  optionsDlg, RDUtils;
+  optionsDlg, RDUtils, main;
 
 {$R *.dfm}
 
@@ -224,8 +225,9 @@ var
     i: integer;
   begin
   a:=NIL;
-  for i:=0 to min(mainFrm.filesBox.SelectionCount, MAX)-1 do
-    addString(mainFrm.filesBox.Selections[i].Text, a);
+  if mainFrm.filesBox.SelectionCount > 0 then
+    for i:=0 to min(mainFrm.filesBox.SelectionCount, MAX)-1 do
+      addString(mainFrm.filesBox.Selections[i].Text, a);
   if mainFrm.filesBox.SelectionCount > MAX then
     addString('...', a);
   caption:='Properties for '+join(', ', a);
@@ -246,13 +248,14 @@ diffTab.tabVisible:=FALSE;
 iconBox.clear();
 iconBox.Enabled:=FALSE;
 addiconBtn.Enabled:=FALSE;
-i:=if_(mainfrm.filesBox.SelectionCount > 1, -1, selectedFile.getIconForTreeview());
+i:=if_(mainfrm.filesBox.SelectionCount > 1, -1, selectedFile.getIconForTreeview(mainfrm.usesystemiconsChk.Checked));
 iconBox.itemsEx.addItem('Default', i, i, -1, 0, NIL);
 iconOfs:=iconBox.ItemsEx.count;
 for i:=0 to mainfrm.images.Count-1 do
   iconBox.itemsEx.addItem(idx_label(i), i, i, -1, 0, NIL);
 
 actions:=[FA_ACCESS];
+if mainFrm.filesBox.SelectionCount > 0 then
 for i:=0 to mainFrm.filesBox.SelectionCount-1 do
   begin
   f:=mainFrm.filesBox.Selections[i].data;
@@ -403,6 +406,7 @@ begin
 for act:=low(act) to high(act) do
   sortArray(users[act]);
 
+  if mainFrm.filesBox.SelectionCount > 0 then
 for i:=0 to mainFrm.filesBox.SelectionCount-1 do
   begin
   f:=mainFrm.filesBox.Selections[i].data;
@@ -448,7 +452,7 @@ for i:=0 to mainFrm.filesBox.SelectionCount-1 do
     begin
     applyFlag(FA_HIDDEN, hiddenChk);
     if iconBox.itemIndex > -1 then
-      f.setupImage(iconBox.itemIndex-iconOfs);
+      f.setupImage(mainfrm.useSystemIconsChk.checked, iconBox.itemIndex-iconOfs);
     end;
 
   if f.isRealFolder() then

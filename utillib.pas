@@ -30,7 +30,7 @@ uses
   OverbyteIcsWSocket, OverbyteIcshttpProt, gifimg,
   regexpr,
   longinputDlg,
-  classesLib;
+  classesLib, fileLib, hfsGlobal;
 
 const
   ILLEGAL_FILE_CHARS = [#0..#31,'/','\',':','?','*','"','<','>','|'];
@@ -46,16 +46,23 @@ type
   TreCB = procedure(re:TregExpr; var res:string; data:pointer);
   PstringDynArray = ^TstringDynArray;
   TnameExistsFun = function(user:string):boolean;
+type
+  TaccountRecursionStopCase = (ARSC_REDIR, ARSC_NOLIMITS, ARSC_IN_SET);
 
 procedure doNothing(); inline; // useful for readability
 function accountExists(user:string; evenGroups:boolean=FALSE):boolean;
 function getAccount(user:string; evenGroups:boolean=FALSE):Paccount;
-function nodeToFile(n:TtreeNode):Tfile;
+function accountRecursion(account:Paccount; stopCase:TaccountRecursionStopCase; data:pointer=NIL; data2:pointer=NIL):Paccount;
+function findEnabledLinkedAccount(account:Paccount; over:TStringDynArray; isSorted:boolean=FALSE):Paccount;
 procedure fixFontFor(frm:Tform);
 function hostFromURL(s:string):string;
 function hostToIP(name: string):string;
 function allocatedMemory():int64;
 function stringToGif(s: RawByteString; gif:TgifImage=NIL):TgifImage;
+function bmp2str(bmp:Tbitmap): RawByteString;
+function pic2str(idx:integer): RawByteString;
+function str2pic(s: RawByteString):integer;
+function getImageIndexForFile(fn:string):integer;
 function maybeUnixTime(t:Tdatetime):Tdatetime;
 function filetimeToDatetime(ft:TFileTime):Tdatetime;
 function localToGMT(d:Tdatetime):Tdatetime;
@@ -72,7 +79,7 @@ function minmax(min, max, v:integer):integer;
 function isLocalIP(const ip:string):boolean;
 function clearAndReturn(var v:string):string;
 function swapMem(var src,dest; count:dword; cond:boolean=TRUE):boolean;
-function pid2file(pid:integer):string;
+function pid2file(pid: cardinal):string;
 function port2pid(const port:string):integer;
 function holdingKey(key:integer):boolean;
 function blend(from,to_:Tcolor; perc:real):Tcolor;
@@ -93,6 +100,7 @@ function getExternalAddress(var res:string; provider:Pstring=NIL):boolean;
 function checkAddressSyntax(address:string; wildcards:boolean=TRUE):boolean;
 function inputQueryLong(const caption, msg:string; var value:string; ofs:integer=0):boolean;
 procedure purgeVFSaccounts();
+function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
 function exec(cmd:string; pars:string=''; showCmd:integer=SW_SHOW):boolean;
 function execNew(cmd:string):boolean;
 function captureExec(DosApp : string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
@@ -194,10 +202,12 @@ function str_(i:integer): RawByteString; overload;
 function str_(fa:TfileAttributes): RawByteString; overload;
 function str_(t:Tdatetime): RawByteString; overload;
 function str_(b:boolean): RawByteString; overload;
-function strToUInt(s:string):integer;
+function strToUInt(s:string): UInt;
 function elapsedToStr(t:Tdatetime):string;
 function dateToHTTP(gmtTime:Tdatetime):string; overload;
-function dateToHTTP(filename:string):string; overload;
+function dateToHTTP(const filename:string):string; overload;
+function dateToHTTPr(const filename: string): RawByteString; overload;
+function dateToHTTPr(gmtTime: Tdatetime): RawByteString; overload;
 function toSA(a:array of string):TstringDynArray; // this is just to have a way to typecast
 function stringToColorEx(s:string; default:Tcolor=clNone):Tcolor;
 // misc string
@@ -227,7 +237,8 @@ function poss(chars:TcharSet; s:string; ofs:integer=1):integer;
 //function optUTF8(bool:boolean; s:string):string; overload;
 //function optUTF8(tpl:Ttpl; s:string):string; overload;
 function optAnsi(bool:boolean; s:string):string;
-function utf8Test(s:string):boolean;
+function utf8Test(const s:string):boolean; OverLoad;
+function utf8Test(const s: RawByteString): boolean; OverLoad;
 function jsEncode(s, chars:string):string;
 function nonEmptyConcat(const pre,s:string; const post:string=''):string;
 function first(a,b:integer):integer; overload;
@@ -266,15 +277,15 @@ procedure enforceNUL(var s: RawbyteString); OverLoad;
 implementation
 
 uses
-  RDUtils, clipbrd, //AnsiStringReplaceJOHIA32Unit13,
+  clipbrd, //AnsiStringReplaceJOHIA32Unit13,
+  AnsiClasses, ansiStrings,
 //  OverbyteicsMD5, //JclNTFS, JclWin32,
   {$IFDEF HAS_FASTMM}
   fastmm4,
   {$ENDIF HAS_FASTMM}
-  RDFileUtil, RnQCrypt,
+  RDUtils, RDFileUtil, RnQCrypt,
   HFSJclNTFS, hfsJclOthers,
-  AnsiClasses, ansiStrings,
-  parserLib, newuserpassDlg, winsock;
+  hfsVars, parserLib, newuserpassDlg, winsock;
 
 var
   ipToInt_cache: ThashedStringList;
@@ -595,11 +606,11 @@ end;
 function dt_(s: RawByteString):Tdatetime;
 begin result:=Pdatetime(@s[1])^ end;
 
-function strToUInt(s:string):integer;
+function strToUInt(s:string): UInt;
 begin
 s:=trim(s);
 if s='' then result:=0
-else result:=strToInt(s);
+else result:= SysUtils.StrToUInt(s);
 if result < 0 then
   raise Exception.Create('strToUInt: Signed value not accepted');
 end; // strToUInt
@@ -1643,7 +1654,7 @@ result:=format('%d:%.2d:%.2d', [sec div 3600, sec div 60 mod 60, sec mod 60] );
 end; // elapsedToStr
 
 // ensure f.accounts does not store non-existent users
-function cbPurgeVFSaccounts(f:Tfile; callingAfterChildren:boolean; par, par2:integer):TfileCallbackReturn;
+function cbPurgeVFSaccounts(f:Tfile; callingAfterChildren:boolean; par, par2: IntPtr):TfileCallbackReturn;
 var
   usernames, renamings: THashedStringList;
   i: integer;
@@ -1689,12 +1700,43 @@ try
     if (a.wasUser > '') and (a.user <> a.wasUser) then
       renamings.Values[a.wasUser]:=a.user;
     end;
-  rootFile.recursiveApply(cbPurgeVFSaccounts, integer(usernames), integer(renamings));
+  rootFile.recursiveApply(cbPurgeVFSaccounts, NativeInt(usernames), NativeInt(renamings));
 finally
   usernames.free;
   renamings.free;
   end;
 end; // purgeVFSaccounts
+
+function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
+var
+  a: TStringDynArray;
+begin
+result:=FALSE;
+if f = NIL then exit;
+if action = FA_ACCESS then
+  begin
+  result:= f.accessFor(cd);
+  exit;
+  end;
+if f.isTemp() then
+  f:=f.parent;
+if (action = FA_UPLOAD) and not f.isRealFolder() then exit;
+
+  repeat
+  a:=f.accounts[action];
+  if assigned(a)
+  and not ((action = FA_UPLOAD) and not f.isRealFolder()) then break;
+  f:=f.parent;
+  if f = NIL then exit;
+  until false;
+
+result:=TRUE;
+if stringExists(USER_ANYONE, a, TRUE) then exit;
+result:=(cd.usr = '') and stringExists(USER_ANONYMOUS, a, TRUE)
+  or assigned(cd.account) and stringExists(USER_ANY_ACCOUNT, a, TRUE)
+  or (NIL <> findEnabledLinkedAccount(cd.account, a, TRUE));
+end; // accountAllowed
+
 
 function inputQueryLong(const caption, msg:string; var value:string; ofs:integer=0):boolean;
 begin
@@ -1813,7 +1855,7 @@ else
   begin
   loadIPservices();
   if IPservices = NIL then
-    loadIPservices(getRes('IPservices'));
+    loadIPservices(UnUTF(getRes('IPservices')));
   if IPservices = NIL then exit;
 
     repeat
@@ -1925,7 +1967,7 @@ bi.pszDisplayName:=@buff;
 bi.lpszTitle:=pchar(caption);
 bi.ulFlags:=BIF_RETURNONLYFSDIRS+BIF_NEWDIALOGSTYLE+BIF_SHAREABLE+BIF_UAHINT+BIF_EDITBOX+flags;
 bi.lpfn:=@cbSelectFolder;
-bi.lParam:=integer(@from[1]);
+bi.lParam:= INT_PTR(@from[1]);
 bi.iImage:=0;
 res:=SHBrowseForFolder(bi);
 if res = NIL then exit;
@@ -2009,7 +2051,7 @@ begin
   result:=copy(s, 1, i);
 end; // getTill
 
-function dateToHTTP(filename:string):string; overload;
+function dateToHTTP(const filename:string):string; overload;
 begin result:=dateToHTTP(getMtimeUTC(filename)) end;
 
 function dateToHTTP(gmtTime:Tdatetime):string; overload;
@@ -2017,6 +2059,16 @@ begin
 result:=formatDateTime('"'+DOW2STR[dayOfWeek(gmtTime)]+'," dd "'+MONTH2STR[monthOf(gmtTime)]
   +'" yyyy hh":"nn":"ss "GMT"', gmtTime);
 end; // dateToHTTP
+
+function dateToHTTPr(const filename: string): RawByteString; overload;
+begin result:=dateToHTTPr(getMtimeUTC(filename)) end;
+
+function dateToHTTPr(gmtTime: Tdatetime): RawByteString;
+begin
+  result := RawByteString(formatDateTime('"'+DOW2STR[dayOfWeek(gmtTime)]+'," dd "'+MONTH2STR[monthOf(gmtTime)]
+  +'" yyyy hh":"nn":"ss "GMT"', gmtTime));
+end; // dateToHTTP
+
 
 function getEtag(filename: string): string;
 var
@@ -2245,8 +2297,11 @@ end; // jsEncode
 function holdingKey(key:integer):boolean;
 begin result:=getAsyncKeyState(key) and $8000 <> 0 end;
 
-function utf8Test(s:string):boolean;
+function utf8Test(const s: String):boolean;
 begin result := ansiContainsText(s, 'charset=UTF-8') end;
+
+function utf8Test(const s: RawByteString): boolean;
+begin result := ansiContainsText(s, RawByteString('charset=UTF-8')) end;
 
 // concat pre+s+post only if s is non empty
 function nonEmptyConcat(const pre, s:string; const post:string=''):string;
@@ -2370,7 +2425,7 @@ while s > '' do
   end;
 end; // port2pid
 
-function pid2file(pid:integer):string;
+function pid2file(pid: cardinal):string;
 var
   h: Thandle;
 begin
@@ -2613,8 +2668,8 @@ begin
   l:=length(s);
   while i <= l do
   begin
-    p := posEx('&',s,i);
-    t := decodeURL(xtpl(substr(s,i,if_(p=0,0,p-1)), ['+',' ']));
+    p := posEx(RawByteString('&'),s,i);
+    t := decodeURL(xtpl(substr(s,i,if_(p=0,0,p-1)), [RawByteString('+'), RawByteString(' ')]));
      // TODO should we instead try to decode utf-8? doing so may affect calls to {.force ansi.} in the template
     sl.add(t);
     if p = 0 then
@@ -3046,6 +3101,136 @@ try
 finally ss.free end;
 end; // stringToGif
 
+function bmp2str(bmp:Tbitmap): RawByteString;
+var
+//  stream: Tstringstream;
+  str: TMemorystream;
+	gif: TGIFImage;
+begin
+{ the gif component has a GDI object leak while reducing colors of
+{ transparent images. this seems to be not a big problem since the
+{ icon cache system was introduced, but a real fix would be nice. }
+//stream:=Tstringstream.create('');
+  str := TMemorystream.Create;
+  gif := TGIFImage.Create();
+
+  gif.ColorReduction := rmQuantize;
+  //gif.Compression := gcLZW;
+  gif.Assign(bmp);
+  gif.SaveToStream(str);
+  gif.free;
+  SetLength(Result, str.Size);
+  str.Position := 0;
+  CopyMemory(@result[1], str.Memory, Length(Result));
+//result:=stream.DataString;
+
+  str.free;
+end; // bmp2str
+
+function pic2str(idx:integer): RawByteString;
+var
+  pic, pic2: Tbitmap;
+begin
+result:='';
+if idx < 0 then exit;
+idx:=idx_ico2img(idx);
+if length(imagescache) < idx+1 then setlength(imagescache, idx+1);
+result:=imagescache[idx];
+if result > '' then exit;
+pic:=Tbitmap.create();
+mainfrm.images.getBitmap(idx,pic);
+// pic2 is the transparent version of pic
+pic2:=Tbitmap.create();
+pic2.Width:=mainfrm.images.Width;
+pic2.height:=mainfrm.images.height;
+pic2.TransparentMode:=tmFixed;
+
+pic2.TransparentColor:=$2FFFFFF;
+pic2.Transparent:=TRUE;
+BitBlt(pic2.Canvas.Handle, 0,0,16,16, pic.Canvas.Handle, 0,0, SRCAND);
+BitBlt(pic2.Canvas.Handle, 0,0,16,16, pic.Canvas.Handle, 0,0, SRCPAINT);
+
+result:=bmp2str(pic2);
+pic2.free;
+pic.free;
+imagescache[idx]:=result;
+end; // pic2str
+
+function str2pic(s: RawByteString):integer;
+var
+	gif: TGIFImage;
+begin
+  for result:=0 to mainfrm.images.count-1 do
+    if pic2str(result) = s then
+      exit;
+// in case the pic was not found, it automatically adds it to the pool
+  gif := stringToGif(s);
+  try
+    result := mainfrm.images.addMasked(gif.bitmap, gif.Bitmap.TransparentColor);
+    etags.values['icon.'+intToStr(result)] := MD5PassHS(s);
+   finally
+    gif.free
+  end;
+end; // str2pic
+
+function getImageIndexForFile(fn:string):integer;
+var
+  i, n: integer;
+  ico: Ticon;
+  shfi: TShFileInfo;
+  s: string;
+begin
+  ZeroMemory(@shfi, SizeOf(TShFileInfo));
+// documentation reports shGetFileInfo() to be working with relative paths too,
+// but it does not actually work without the expandFileName()
+shGetFileInfo( pchar(expandFileName(fn)), 0, shfi, SizeOf(shfi), SHGFI_SYSICONINDEX);
+if shfi.iIcon = 0 then
+  begin
+  result:=ICON_FILE;
+  exit;
+  end;
+// as reported by official docs
+if shfi.hIcon <> 0 then
+  destroyIcon(shfi.hIcon);
+
+// have we already met this sysidx before?
+for i:=0 to length(sysidx2index)-1 do
+  if sysidx2index[i].sysidx = shfi.iIcon then
+  	begin
+    result:=sysidx2index[i].idx;
+    exit;
+    end;
+// found not, let's check deeper: byte comparison.
+// we first add the ico to the list, so we can use pic2str()
+ico:=Ticon.create();
+try
+  systemimages.getIcon(shfi.iIcon, ico);
+  i:=mainfrm.images.addIcon(ico);
+  s:=pic2str(i);
+  etags.values['icon.'+intToStr(i)] := MD5PassHS(s);
+finally ico.free end;
+// now we can search if the icon was already there, by byte comparison
+n:=0;
+while n < length(sysidx2index) do
+  begin
+  if pic2str(sysidx2index[n].idx) = s then
+    begin // found, delete the duplicate
+    mainfrm.images.delete(i);
+    setlength(imagescache, i);
+    i:=sysidx2index[n].idx;
+    break;
+    end;
+  inc(n);
+  end;
+
+n:=length(sysidx2index);
+setlength(sysidx2index, n+1);
+sysidx2index[n].sysidx:=shfi.iIcon;
+sysidx2index[n].idx:=i;
+result:=i;
+end; // getImageIndexForFile
+
+
 {$IFNDEF HAS_FASTMM}
 // this is to be used with the standard memory manager, while we are currently using a different one
 function allocatedMemory():int64;
@@ -3159,9 +3344,6 @@ if frm.scaled then
   frm.font.height:=nonClientMetrics.lfMessageFont.lfHeight;
 end; // fixFontFor
 
-function nodeToFile(n:TtreeNode):Tfile; inline;
-begin if n = NIL then result:=NIL else result:=Tfile(n.data) end;
-
 function getAccount(user:string; evenGroups:boolean=FALSE):Paccount;
 var
   i: integer;
@@ -3178,6 +3360,50 @@ end; // getAccount
 
 function accountExists(user:string; evenGroups:boolean=FALSE):boolean;
 begin result:=getAccount(user, evenGroups) <> NIL end;
+
+// this function follows account linking until it finds and returns the account matching the stopCase
+function accountRecursion(account:Paccount; stopCase:TaccountRecursionStopCase; data:pointer=NIL; data2:pointer=NIL):Paccount;
+
+  function shouldStop():boolean;
+  begin
+  case stopCase of
+    ARSC_REDIR: result:=account.redir > '';
+    ARSC_NOLIMITS: result:=account.noLimits;
+    ARSC_IN_SET: result:=stringExists(account.user, TstringDynArray(data), boolean(data2));
+    else result:=FALSE;
+    end;
+  end;
+
+var
+  tocheck: TStringDynArray;
+  i: integer;
+begin
+result:=NIL;
+if (account = NIL) or not account.enabled then exit;
+if shouldStop() then
+  begin
+  result:=account;
+  exit;
+  end;
+i:=0;
+toCheck:=account.link;
+while i < length(toCheck) do
+  begin
+  account:=getAccount(toCheck[i], TRUE);
+  inc(i);
+  if (account = NIL) or not account.enabled then continue;
+  if shouldStop() then
+    begin
+    result:=account;
+    exit;
+    end;
+  addUniqueArray(toCheck, account.link);
+  end;
+end; // accountRecursion
+
+function findEnabledLinkedAccount(account:Paccount; over:TStringDynArray; isSorted:boolean=FALSE):Paccount;
+begin result:=accountRecursion(account, ARSC_IN_SET, over, boolToPtr(isSorted)) end;
+
 
 type
   Tnewline = (NL_UNK, NL_D, NL_A, NL_DA, NL_MIXED);

@@ -26,7 +26,11 @@ program hfs;
 {$R 'data.res' 'res\data.rc'}
 
 uses
-//  FastMM4,
+  madExcept,
+  madLinkDisAsm,
+  madListHardware,
+  madListProcesses,
+  madListModules,
   {$IFDEF EX_DEBUG}
   ftmExceptionForm,
   {$ENDIF }
@@ -53,7 +57,10 @@ uses
   filepropDlg in 'filepropDlg.pas' {filepropFrm},
   runscriptDlg in 'runscriptDlg.pas' {runScriptFrm},
   scriptLib in 'scriptLib.pas',
-  hfsJclOthers in 'hfsJclOthers.pas';
+  hfsJclOthers in 'hfsJclOthers.pas',
+  FileLib in 'FileLib.pas',
+  hfsGlobal in 'hfsGlobal.pas',
+  hfsVars in 'hfsVars.pas';
 
 {$R *.res}
 
