@@ -122,6 +122,7 @@ var
     beforeRecalcMax: integer;  // countdown
     end;
   defaultIP: string;    // the IP address to use forming URLs
+  cachedIPs: String; // To optimize
 
 implementation
 

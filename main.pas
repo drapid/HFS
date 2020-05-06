@@ -705,7 +705,7 @@ type
     procedure showGraph();
     function  fileAttributeInSelection(fa:TfileAttribute):boolean;
     procedure progFrmHttpGetUpdate(sender:TObject; buffer:pointer; Len:integer);
-    procedure recalculateGraph();
+    function  recalculateGraph(): Boolean;
     procedure remove(node:Ttreenode=NIL); OverLoad;
  public
     function  getLP: TLoadPrefs;
@@ -818,7 +818,8 @@ uses
   OverbyteIcsZLibHigh, OverbyteIcsUtils,
   Base64, gifImg,
   RDFileUtil, RDUtils,
-  RnQzip, RnQCrypt, RnQNet.Uploads, RnQGraphics32, RnQLangs,
+  RnQzip, RnQCrypt, RnQNet.Uploads, RnQLangs,
+//  RnQGraphics32,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib, hfsVars;
 
@@ -974,18 +975,21 @@ begin result:=intToStr(idx_img2ico(i)) end;
 function getBaseTrayIcon(perc:real=0):Tbitmap;
 var
   x: integer;
+  h, h2: Integer;
 begin
-result:=Tbitmap.create();
-result.Width:=16;
-result.Height:=16;
+  Result := Tbitmap.create();
+  Result.PixelFormat := pf32bit;
+  Result.SetSize(mainfrm.images.Width, mainfrm.images.Height);
 mainfrm.images.GetBitmap( if_(assigned(srv) and srv.active,24,30), result);
 if perc > 0 then
   begin
-  x:=round(14*perc);
+    h := Result.Height;
+  x:=round((h-2)*perc);
+    h2 := h div 2 + 1;
   result.canvas.Brush.color:=clYellow;
-  result.Canvas.FillRect(rect(1,7,x+1,15));
+  result.Canvas.FillRect(rect(1, h2, x+1, h-1));
   result.canvas.Brush.color:=clGreen;
-  result.Canvas.FillRect(rect(x+1,7,15,15));
+  result.Canvas.FillRect(rect(x+1,h2,h-1, h-1));
   end;
 end; // getBaseTrayIcon
 
@@ -994,6 +998,7 @@ var
   x, i, idx: integer;
 begin
 x:=10;
+  if length(s) > 0 then
 for i:=length(s) downto 1 do
 	begin
   if s[i] = '%' then idx:=10
@@ -1011,18 +1016,18 @@ begin
 if quitting or (mainfrm = NIL) then exit;
 bmp:=getBaseTrayIcon();
 s:=trayShows;
-if s = 'connections' then s:=intTostr(srv.conns.count);
-if s = 'downloads' then s:=intToStr(downloadsLogged);
-if s = 'uploads' then s:=intToStr(uploadsLogged);
-if s = 'hits' then s:=intToStr(hitsLogged);
-if s = 'ips' then s:=intToStr(countIPs());
-if s = 'ips-ever' then s:=intToStr(ipsEverConnected.count);
+  if s = 'connections' then s:=intTostr(srv.conns.count)
+   else if s = 'downloads' then s:=intToStr(downloadsLogged)
+   else if s = 'uploads' then s:=intToStr(uploadsLogged)
+   else if s = 'hits' then s:=intToStr(hitsLogged)
+   else if s = 'ips' then s:=intToStr(countIPs())
+   else if s = 'ips-ever' then s:=intToStr(ipsEverConnected.count);
 
 drawTrayIconString(bmp.canvas, s);
-//tray_ico.Handle:=bmpToHico(bmp);
-//tray_ico.Handle := bmp2ico32(bmp);
-tray_ico.Handle := bmp2ico4M(bmp);
-tray_ico.Transparent:=FALSE;
+//tray_ico.Handle := bmpToHico(bmp);
+tray_ico.Handle := bmp2ico32(bmp);
+//tray_ico.Handle := bmp2ico4M(bmp);
+//tray_ico.Transparent := FALSE;
 bmp.free;
 tray.setIcon(tray_ico);
 end; // repaintTray
@@ -1981,6 +1986,7 @@ var
   begin
   if sectionName <> 'upload-results' then exit;
   files:='';
+    if length(data.uploadResults) > 0 then
   for i:=0 to length(data.uploadResults)-1 do
     with data.uploadResults[i] do
       files:=files+xtpl(tpl2use[ if_(reason='','upload-success','upload-failed') ],[
@@ -5620,6 +5626,7 @@ var
   data: TconnData;
 begin
 i:=0;
+  if toDelete.Count > 0 then
 while i < toDelete.Count do
   begin
   data:=toDelete[i];
@@ -5641,10 +5648,11 @@ while i < toDelete.Count do
 toDelete.clear();
 end; // purgeConnections
 
-procedure Tmainfrm.recalculateGraph();
+function Tmainfrm.recalculateGraph(): Boolean;
 var
   i: integer;
 begin
+  Result := False;
 if (srv = NIL) or quitting then exit;
 // shift samples
 i:=sizeOf(graph.samplesOut)-sizeOf(graph.samplesOut[0]);
@@ -5663,6 +5671,7 @@ if i > graph.maxV then
   graph.maxV:=i;
   graph.beforeRecalcMax:=100;
   end;
+Result := graph.maxV <> 0;
 dec(graph.beforeRecalcMax);
 if graph.beforeRecalcMax > 0 then exit;
 // recalculate max value
@@ -5671,6 +5680,7 @@ with graph do
   for i:=0 to length(samplesOut)-1 do
     maxV:=max(maxV, max(samplesOut[i], samplesIn[i]) );
 graph.beforeRecalcMax:=100;
+  Result := True;
 end; // recalculateGraph
 
 // parse the version-dependant notice
@@ -5942,6 +5952,7 @@ if eventsLastRun = NIL then
 
 re:=timedEventsRE; // a shortcut
 sections:=eventScripts.getSections();
+  if length(sections) > 0 then
 for i:=0 to length(sections)-1 do
   begin
   section:=sections[i]; // a shortcut
@@ -5999,8 +6010,13 @@ var
   var
     s: string;
     ss: Tstrings;
+    sa: TstringDynArray;
   begin
-  if not stringExists(defaultIP, getPossibleAddresses()) then
+    sa := getPossibleAddresses();
+    s := join(';', sa);
+    if (cachedIPs = s) and (defaultIP> '') and stringExists(defaultIP, sa) then
+      Exit;
+  if not stringExists(defaultIP, sa) then
     // previous address not available anymore (it happens using dial-up)
     findSimilarIP(defaultIP);
     
@@ -6031,12 +6047,14 @@ var
   // check if the window is outside the visible screen area
   outside:=left;
   if assigned(monitor) then  // checking here because the following line once thrown this AV http://www.rejetto.com/forum/?topic=5568
+   begin
     for i:=0 to monitor.MonitorNum do
       dec(outside, screen.monitors[i].width);
-  if (outside > 0)
-  or (boundsRect.bottom < 0)
-  or (boundsRect.right < 0) then
-    makeFullyVisible();
+    if (outside > 0)
+    or (boundsRect.bottom < 0)
+    or (boundsRect.right < 0) then
+      makeFullyVisible();
+   end;
 
   if dyndns.active and (dyndns.url > '') then
     begin
@@ -6206,8 +6224,8 @@ try
     updateSbar();
   if every(graph.rate) then
     begin
-    recalculateGraph();
-    graphBoxPaint(NIL);
+     if recalculateGraph() then
+       graphBoxPaint(NIL);
     end;
 finally lockTimerevent:=FALSE end;
 end; // timerEvent
@@ -6327,6 +6345,7 @@ CONST
   INDEX_FOR_NIC = 1;
 var
   a: TStringDynArray;
+  a6: TStringDynArray;
   i: integer;
 begin
 while IPaddress1.Items[INDEX_FOR_URL].Caption <> '-' do
@@ -6341,12 +6360,18 @@ for i:=0 to length(a)-1 do
 while Acceptconnectionson1.count > INDEX_FOR_NIC  do
   Acceptconnectionson1.delete(INDEX_FOR_NIC);
 Anyaddress1.checked:= listenOn = '';
-//a:=listToArray(localIPlist);
-a := listToArray(localIPlist(sfAny));
+a:=listToArray(localIPlist);
 addUniqueString('127.0.0.1', a);
 for i:=0 to length(a)-1 do
   Acceptconnectionson1.Insert(INDEX_FOR_NIC,
     newItem( a[i], 0, a[i]=listenOn, TRUE, acceptOnMenuclick, 0, '') );
+  a6 := listToArray(localIPlist(sfIPv6));
+  if length(a6) > 0 then
+   for i:=0 to length(a6)-1 do
+    Acceptconnectionson1.Insert(INDEX_FOR_NIC,
+      newItem( '[' + a6[i] + ']', 0,
+              ((a6[i]=listenOn)or (('[' + a6[i] + ']') = listenOn)),
+              TRUE, acceptOnMenuclick, 0, '') );
 end; // refreshIPlist
 
 procedure TmainFrm.filesBoxDblClick(Sender: TObject);
@@ -7227,23 +7252,32 @@ case ev of
 end; // downloadtrayEvent
 
 function Tmainfrm.getTrayTipMsg(tpl:string=''):string;
+var
+  a: array of string;
+  pat: String;
 begin
 if quitting or (rootFile = NIL) then
   begin
   result:='';
   exit;
   end;
-result:=xtpl(first(tpl, trayMsg), [
-  '%uptime%', uptimestr(),
-  '%url%', rootFile.fullURL(),
-  '%ip%', defaultIP,
+  a := ['%ip%', defaultIP,
   '%port%', srv.port,
-  '%hits%', intToStr(hitsLogged),
-  '%downloads%', intToStr(downloadsLogged),
-  '%uploads%', intToStr(uploadsLogged),
   '%version%', hfsGlobal.VERSION,
-  '%build%', VERSION_BUILD
-]);
+  '%build%', VERSION_BUILD];
+  pat := first(tpl, trayMsg);
+  Result := xtpl(pat, a);
+
+  if ipos('%uptime%', pat)>0 then
+    Result := xtpl(Result, ['%uptime%', uptimestr()]);
+  if ipos('%url%', pat)>0 then
+    Result := xtpl(Result, ['%url%', rootFile.fullURL()]);
+  if ipos('%hits%', pat)>0 then
+    Result := xtpl(Result, ['%hits%', intToStr(hitsLogged)]);
+  if ipos('%downloads%', pat)>0 then
+    Result := xtpl(Result, ['%downloads%', intToStr(downloadsLogged)]);
+  if ipos('%uploads%', pat)>0 then
+    Result := xtpl(Result, ['%uploads%', intToStr(uploadsLogged)]);
 end; // getTrayTipMsg
 
 procedure Tmainfrm.updateTrayTip();

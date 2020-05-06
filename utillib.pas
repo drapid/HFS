@@ -24,12 +24,13 @@ unit utilLib;
 interface
 
 uses
-  main, hslib, types, windows, graphics, dialogs, registry, classes, dateUtils,
+  types, windows, graphics, dialogs, registry, classes, dateUtils,
   comCtrls, shlobj, shellapi, activex, comobj, forms, stdctrls, controls, psAPI,
   menus, math, iniFiles, richedit, sysutils, strutils,
   OverbyteIcsWSocket, OverbyteIcshttpProt, gifimg,
   regexpr,
   longinputDlg,
+  main, hslib,
   classesLib, fileLib, hfsGlobal;
 
 const
@@ -84,7 +85,7 @@ function port2pid(const port:string):integer;
 function holdingKey(key:integer):boolean;
 function blend(from,to_:Tcolor; perc:real):Tcolor;
 function isNT():boolean;
-function setClip(s:string):boolean;
+function setClip(const s:string):boolean;
 function eos(s:Tstream):boolean;
 function safeDiv(a,b:real; default:real=0):real; overload;
 function safeDiv(a,b:int64; default:int64=0):int64; overload;
@@ -103,9 +104,9 @@ procedure purgeVFSaccounts();
 function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
 function exec(cmd:string; pars:string=''; showCmd:integer=SW_SHOW):boolean;
 function execNew(cmd:string):boolean;
-function captureExec(DosApp : string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
-function openURL(const url:string):boolean;
-function getRes(name:pchar; typ:string='TEXT'): RawByteString;
+function captureExec(const DosApp: string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
+function openURL(const url: string):boolean;
+function getRes(name:pchar; const typ:string='TEXT'): RawByteString;
 //function bmpToHico(bitmap:Tbitmap):hicon;
 function compare_(i1,i2:double):integer; overload;
 function compare_(i1,i2:int64):integer; overload;
@@ -118,7 +119,7 @@ function if_(v:boolean; v1:integer; v2:integer=0):integer; overload; inline;
 function if_(v:boolean; v1:Tobject; v2:Tobject=NIL):Tobject; overload; inline;
 function if_(v:boolean; v1:boolean; v2:boolean=FALSE):boolean; overload; inline;
 // file
-function getEtag(filename:string):string;
+function getEtag(const filename:string):string;
 function getDrive(fn:string):string;
 function diskSpaceAt(path:string):int64;
 function deltree(path:string):boolean;
@@ -134,7 +135,7 @@ function isAbsolutePath(path:string):boolean;
 function getTempDir():string;
 function createShellLink(linkFN:WideString; destFN:string):boolean;
 function readShellLink(linkFN:WideString):string;
-function getShellFolder(id:string):string;
+function getShellFolder(const id: String): String;
 function getTempFilename():string;
 function saveTempFile(data:string):string;
 function fileOrDirExists(fn:string):boolean;
@@ -147,7 +148,7 @@ function saveFileA(fn:string; data: RawByteString; append:boolean=FALSE): boolea
 function saveFileA(var f:file; data:RawByteString): boolean; overload;
 function moveFile(src, dst:string; op:UINT=FO_MOVE):boolean;
 function copyFile(src, dst:string):boolean;
-function resolveLnk(fn:string):string;
+function resolveLnk(const fn: String): String;
 function validFilename(s:string):boolean;
 function validFilepath(fn:string; acceptUnits:boolean=TRUE):boolean;
 function match(mask, txt:pchar; fullMatch:boolean=TRUE; charsNotWildcard:Tcharset=[]):integer;
@@ -158,29 +159,29 @@ function getFilename(var f:file):string;
 function filenameToDriveByte(fn:string):byte;
 function selectFile(var fn:string; title:string=''; filter:string=''; options:TOpenOptions=[]):boolean;
 function selectFiles(caption:string; var files:TStringDynArray):boolean;
-function selectFolder(caption:string; var folder:string):boolean;
+function selectFolder(const caption: String; var folder:string):boolean;
 function selectFileOrFolder(caption:string; var fileOrFolder:string):boolean;
 function isExtension(filename, ext:string):boolean;
 function getMtimeUTC(filename:string):Tdatetime;
 function getMtime(filename:string):Tdatetime;
 // registry
-function loadregistry(key,value:string; root:HKEY=0):string;
-function saveregistry(key,value,data:string; root:HKEY=0):boolean;
-function deleteRegistry(key,value:string; root:HKEY=0):boolean; overload;
-function deleteRegistry(key:string; root:HKEY=0):boolean; overload;
+function loadregistry(const key, value: String; root: HKEY=0): string;
+function saveregistry(const key, value, data: string; root: HKEY=0): boolean;
+function deleteRegistry(const key, value: string; root: HKEY=0): boolean; overload;
+function deleteRegistry(key: String; root:HKEY=0): boolean; overload;
 // strings array
 function split(const separator, s:string; nonQuoted:boolean=FALSE):TStringDynArray;
-function join(separator:string; ss:TstringDynArray):string;
-function addUniqueString(s:string; var ss:TStringDynArray):boolean;
-function addString(s:string; var ss:TStringDynArray):integer;
+function join(const separator: String; ss:TstringDynArray):string;
+function addUniqueString(const s: String; var ss: TStringDynArray): boolean;
+function addString(const s: String; var ss: TStringDynArray): integer;
 function replaceString(var ss:TStringDynArray; old, new:string):integer;
 function popString(var ss:TstringDynArray):string;
-procedure insertString(s:string; idx:integer; var ss:TStringDynArray);
+procedure insertString(const s: String; idx: integer; var ss: TStringDynArray);
 function removeString(var a:TStringDynArray; idx:integer; l:integer=1):boolean; overload;
 function removeString(find:string; var a:TStringDynArray):boolean; overload;
 procedure removeStrings(find:string; var a:TStringDynArray);
 procedure toggleString(s:string; var ss:TStringDynArray);
-function onlyString(s:string; ss:TStringDynArray):boolean;
+function onlyString(const s: String; ss: TStringDynArray): boolean;
 function addArray(var dst:TstringDynArray; src:array of string; where:integer=-1; srcOfs:integer=0; srcLn:integer=-1):integer;
 function removeArray(var src:TstringDynArray; toRemove:array of string):integer;
 function addUniqueArray(var a:TstringDynArray; b:array of string):integer;
@@ -273,13 +274,14 @@ function unescapeNL(s:string):string;
 function htmlEncode(const s:string):string;
 procedure enforceNUL(var s: string); OverLoad;
 procedure enforceNUL(var s: RawbyteString); OverLoad;
+function bmp2ico32(bitmap: Tbitmap): HICON;
+function bmp2ico24(bitmap: Tbitmap): HICON;
 
 implementation
 
 uses
-  clipbrd, //AnsiStringReplaceJOHIA32Unit13,
+  clipbrd, CommCtrl,
   AnsiClasses, ansiStrings,
-//  OverbyteicsMD5, //JclNTFS, JclWin32,
   {$IFDEF HAS_FASTMM}
   fastmm4,
   {$ENDIF HAS_FASTMM}
@@ -641,7 +643,7 @@ n:=0;
 setLength(result, n);
 end; // split
 
-function join(separator:string; ss:TstringDynArray):string;
+function join(const separator: String; ss:TstringDynArray):string;
 var
   i:integer;
 begin
@@ -720,7 +722,7 @@ result:=ss[0];
 removeString(ss, 0);
 end; // popString
 
-function addString(s:string; var ss:TStringDynArray):integer;
+function addString(const s: String; var ss: TStringDynArray): integer;
 begin
 result:=length(ss);
 addArray(ss, [s], result)
@@ -739,17 +741,17 @@ result:=0;
   until false;
 end; // replaceString
 
-function onlyString(s:string; ss:TStringDynArray):boolean;
+function onlyString(const s: String; ss: TStringDynArray): boolean;
 // we are case insensitive, just like other functions in this set
 begin result:=(length(ss) = 1) and sameText(ss[0], s) end;
 
-function addUniqueString(s:string; var ss:TStringDynArray):boolean;
+function addUniqueString(const s: String; var ss: TStringDynArray): boolean;
 begin
 result:=idxof(s, ss) < 0;
 if result then addString(s, ss)
 end; // addUniqueString
 
-procedure insertstring(s:string; idx:integer; var ss:TStringDynArray);
+procedure insertstring(const s: String; idx: Integer; var ss: TStringDynArray);
 begin addArray(ss, [s], idx) end;
 
 function removestring(var a:TStringDynArray; idx:integer; l:integer=1):boolean;
@@ -776,7 +778,7 @@ while i > 1 do
   end;
 end; // dotted
 
-function getRes(name:pchar; typ:string='TEXT'): RawByteString;
+function getRes(name:pchar; const typ:string='TEXT'): RawByteString;
 var
   h1, h2: Thandle;
   p: pByte;
@@ -1138,7 +1140,7 @@ begin
     saveFile2(result, data);
 end; // saveTempFile
 
-function loadregistry(key,value:string; root:HKEY=0):string;
+function loadregistry(const key, value: String; root: HKEY=0): string;
 begin
 result:='';
 with Tregistry.create do
@@ -1154,7 +1156,7 @@ with Tregistry.create do
   except end
   end; // loadregistry
 
-function saveregistry(key,value,data:string; root:HKEY=0):boolean;
+function saveregistry(const key,value,data:string; root:HKEY=0):boolean;
 begin
 result:=FALSE;
 with Tregistry.create do
@@ -1172,7 +1174,7 @@ with Tregistry.create do
   except end;
 end; // saveregistry
 
-function deleteRegistry(key,value:string; root:HKEY=0):boolean; overload;
+function deleteRegistry(const key,value:string; root:HKEY=0):boolean; overload;
 var
   reg:Tregistry;
 begin
@@ -1182,7 +1184,7 @@ result:=reg.OpenKey(key,FALSE) and reg.DeleteValue(value);
 reg.free
 end; // deleteRegistry
 
-function deleteRegistry(key:string; root:HKEY=0):boolean; overload;
+function deleteRegistry(key: String; root: HKEY=0): boolean; overload;
 var
   reg:Tregistry;
   ss:TstringList;
@@ -1210,7 +1212,7 @@ ss.free;
 reg.free
 end; // deleteRegistry
 
-function resolveLnk(fn:string):string;
+function resolveLnk(const fn: String): String;
 Var
   sl: IShellLink;
   buffer: array [0..MAX_PATH] of char;
@@ -1897,9 +1899,19 @@ while (x > x1) and (result < statusbar.Panels.Count-1) do
 end; // whatStatusPanel
 
 function getIPs():TStringDynArray;
+var
+  a6: TStringDynArray;
+  I: Integer;
 begin
   try
-    result := listToArray(localIPlist(sfAny))
+    result := listToArray(localIPlist(sfIPv4));
+    a6 := listToArray(localIPlist(sfIPv6));
+    if Length(a6) > 0 then
+      begin
+        for I := Low(a6) to High(a6) do
+          a6[i] := '[' + a6[i] + ']';
+        Result := Result + a6;
+      end;
    except
      result := NIL
   end;
@@ -1977,7 +1989,7 @@ from:=buff;
 result:=TRUE;
 end; // selectWrapper
 
-function selectFolder(caption:string; var folder:string):boolean;
+function selectFolder(const caption: String; var folder:string):boolean;
 begin result:=selectWrapper(caption, folder) end;
 
 // works only on XP
@@ -2070,7 +2082,7 @@ begin
 end; // dateToHTTP
 
 
-function getEtag(filename: string): string;
+function getEtag(const filename: string): string;
 var
   sr: TsearchRec;
   st: TSystemTime;
@@ -2114,7 +2126,7 @@ begin
   ipToInt_cache.Objects[i] := Tobject(result);
 end; // ipToInt
 
-function getShellFolder(id:string):string;
+function getShellFolder(const id: String): String;
 begin
 result:=loadregistry(
   'Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders', id,
@@ -2174,7 +2186,7 @@ l:=length(s);
 result:=(i = 0) or (i = l) or (i = l-1) and (s[l] = #10)
 end; // singleLine
 
-function setClip(s:string):boolean;
+function setClip(const s:string):boolean;
 begin
 result:=TRUE;
 try clipboard().AsText:=s
@@ -2333,7 +2345,7 @@ function first(a,b:pointer):pointer;
 begin if a = NIL then result:=b else result:=a end;
 
 // taken from http://www.delphi3000.com/articles/article_3361.asp
-function captureExec(DosApp : string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
+function captureExec(const DosApp: string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
 const
   ReadBuffer = 1048576;  // 1 MB Buffer
 var
@@ -3511,6 +3523,34 @@ begin
     setLength(s, ansistrings.strLen(PAnsiChar(@s[1])))
 end; // enforceNUL
 
+function bmp2ico32(bitmap: Tbitmap): HICON;
+var
+  il: THandle;
+  i: Integer;
+begin
+  il := ImageList_Create(min(bitmap.Width, bitmap.Height), min(bitmap.Width,bitmap.Height), ILC_COLOR32 or ILC_MASK, 0, 0);
+  i := ImageList_Add(il, bitmap.Handle, bitmap.MaskHandle);
+  if i >= 0 then
+    Result := ImageList_ExtractIcon(0, il, i)
+   else
+    Result := 0;
+  ImageList_Destroy(il);
+end;
+
+function bmp2ico24(bitmap: Tbitmap): HICON;
+var
+  il: THandle;
+  i: Integer;
+begin
+//  il := ImageList_Create(Min(bitmap.Width, iconX), Min(bitmap.Height, iconY), ILC_COLOR32 or ILC_MASK, 0, 0);
+  il := ImageList_Create(min(bitmap.Width, bitmap.Height), min(bitmap.Width,bitmap.Height), ILC_COLOR24 or ILC_MASK, 0, 0);
+  i := ImageList_Add(il, bitmap.Handle, bitmap.MaskHandle);
+  if i >= 0 then
+    Result := ImageList_ExtractIcon(0, il, i)
+   else
+    Result := 0;
+  ImageList_Destroy(il);
+end;
 
 var
   TZinfo:TTimeZoneInformation;

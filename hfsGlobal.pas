@@ -89,32 +89,6 @@ const
 
   USER_ICON_MASKS_OFS = 10000;
   // messages
-{2.4 commented
-  MSG_UNPROTECTED_LINKS = 'Links are NOT actually protected.'
-    +#13'The feature is there to be used with the "list protected items only..." option.'
-    +#13'Continue?';
-  MSG_SAME_NAME ='An item with the same name is already present in this folder.'
-    +#13'Continue?';
-  MSG_OPTIONS_SAVED = 'Options saved';
-  MSG_SOME_LOCKED = 'Some items were not affected because locked';
-  MSG_ITEM_LOCKED = 'The item is locked';
-  MSG_INVALID_VALUE = 'Invalid value';
-  MSG_EMPTY_NO_LIMIT = 'Leave blank to get no limits.';
-  MSG_ADDRESSES_EXCEED = 'The following addresses exceed the limit:'#13'%s';
-  MSG_NO_TEMP = 'Cannot save temporary file';
-  MSG_ERROR_REGISTRY = 'Can''t write to registry.'
-    +#13'You may lack necessary rights.';
-  MSG_MANY_ITEMS = 'You are putting many files.'
-    +#13'Try using real folders instead of virtual folders.'
-    +#13'Read documentation or ask on the forum for help.';
-  MSG_ADD_TO_HFS = '"Add to HFS" has been added to your Window''s Explorer right-click menu.';
-  MSG_SINGLE_INSTANCE = 'Sorry, this feature only works with the "Only 1 instance" option enabled.'
-    +#13#13'You can find this option under Menu -> Start/Exit'
-    +#13'(only in expert mode)';
-  MSG_ENABLED =   'Option enabled';
-  MSG_DISABLED = 'Option disabled';
-  MSG_COMM_ERROR = 'Network error. Request failed.';
-}
 resourcestring
   S_PORT_LABEL = 'Port: %s';
   S_PORT_ANY = 'any';

@@ -285,10 +285,10 @@ begin
   sa := loadFile(fn);
   if sa = '' then
     sa := loadFile(fn+'\descript.ion');
-//  if (sa > '') and mainfrm.oemForIonChk.checked then
-//    Result := UnUTF(sa)
-//   else
-    Result := sa;
+  if (sa > '') and mainfrm.oemForIonChk.checked then
+    Result := sa
+   else
+    Result := UnUTF(sa);
 end; // loadDescriptionFile
 
 function escapeIon(s:string):string;
@@ -848,7 +848,7 @@ try
   result:=comment;
   if result > '' then exit;
   if lpSnglCmnt in loadPrefs then
-    result:=loadFile(resource+COMMENT_FILE_EXT);
+    result:= UnUTF(loadFile(resource+COMMENT_FILE_EXT));
   if (result > '') or skipParent then exit;
   comments:=THashedStringList.create();
   try
@@ -889,7 +889,7 @@ if fileExists(path) then
   if cmt='' then
     deleteFile(path)
   else
-    saveFile2(path, cmt);
+    saveTextFile(path, cmt);
   exit;
   end;
 name:=extractFileName(resource);
@@ -899,7 +899,7 @@ name:=extractFileName(resource);
 path:=extractFilePath(resource)+COMMENTS_FILE;
 if not (lpION in loadPrefs)
 or fileExists(path) and not fileExists(extractFilePath(resource)+'descript.ion') then
-  saveTextFile(path, setKeyInString(loadfile(path), name, escapeNL(cmt)));
+  saveTextFile(path, setKeyInString(UnUTF(loadFile(path)), name, escapeNL(cmt)));
 
 if not (lpION in loadPrefs) then exit;
 
@@ -966,12 +966,15 @@ function Tfile.getFirstChild: TFile;
 var
   n: TTreeNode;
 begin
-  if isTemp or not isFolder or not Assigned(node) then
+  if isTemp or not isFolder then
     Result := NIL
    else
     begin
-      if Assigned(node) then
-        Result := nodeToFile(node.getFirstChild)
+      n := node;
+      if Assigned(n) then
+        Result := nodeToFile(n.getFirstChild)
+       else
+        Result := NIL
         ;
     end;
 end;
@@ -980,8 +983,9 @@ function Tfile.getNextSibling: TFile;
 var
   n: TTreeNode;
 begin
-   if Assigned(node) then
-        Result := nodeToFile(node.getNextSibling)
+  n := node;
+   if Assigned(n) then
+        Result := nodeToFile(n.getNextSibling)
     else
       Result := NIL;
 end;
@@ -1155,7 +1159,7 @@ while assigned(f) do
   // temp realFolder will cycle more than once, while non-temp only once
   while runPath > '' do
     begin
-    if add2diff(loadFile(basePath+'\'+runPath+'\'+DIFF_TPL_FILE)) and assigned(outFromDisk) then
+    if add2diff(UnUTF(loadFile(basePath+'\'+runPath+'\'+DIFF_TPL_FILE))) and assigned(outFromDisk) then
       outFromDisk^:=TRUE;
     runPath:=excludeTrailingPathDelimiter(ExtractFilePath(runPath));
     end;
@@ -1168,7 +1172,8 @@ while assigned(f) do
     if fileExists(fn) then doNothing()
     else if fileExists(exePath+fn) then fn:=exePath+fn
     else if fileExists(f.resource+'\'+fn) then fn:=f.resource+'\'+fn;
-    if fileExists(fn) then s:=loadFile(fn);
+    if fileExists(fn) then
+      s := UnUTF(loadFile(fn));
     end;
   if add2diff(s) and not first and assigned(outInherited) then
     outInherited^:=TRUE;
