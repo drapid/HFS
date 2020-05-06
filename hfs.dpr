@@ -26,11 +26,6 @@ program hfs;
 {$R 'data.res' 'res\data.rc'}
 
 uses
-  madExcept,
-  madLinkDisAsm,
-  madListHardware,
-  madListProcesses,
-  madListModules,
   {$IFDEF EX_DEBUG}
   ftmExceptionForm,
   {$ENDIF }

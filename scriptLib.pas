@@ -50,9 +50,9 @@ implementation
 
 uses
   windows, utilLib, parserLib, graphics, classes, sysutils, StrUtils,
-  comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
+  comctrls, math, controls, forms, clipbrd, MMsystem, contnrs, base64, OverbyteIcsSha1,
   main, hfsVars,
-  RnQtrayLib, RDFileUtil, RDUtils;
+  RnQtrayLib, RDFileUtil, RDUtils, RnQCrypt;
 
 const
   HEADER: RawByteString = RawByteString('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><style>'
@@ -657,8 +657,10 @@ var
     i: integer;
   begin
   result:=code;
+  if pars.count=0 then
+    exit;
   // the inverted order is to avoid problems with $10 being replaced as it was '$1'.'0'
-  for i:=40 downto pars.count do
+  for i:=pars.count+5 downto pars.count do
     result:=xtpl(result, [format('$%d',[i-ofs+1]), '']);
   for i:=pars.Count-1 downto ofs do
     result:=xtpl(result, [format('$%d',[i-ofs+1]), pars[i]]);
@@ -849,6 +851,11 @@ var
   if f = NIL then exit; // doesn't exist
 
   try f.setDynamicComment(mainFrm.getLP, macroDequote(parEx('comment'))) except end;
+  try
+    f.name:=parEx('name');
+    if assigned(f.node) then
+      f.node.text:=f.name;
+  except end;
   try f.resource:=parEx('resource') except end;
   try f.diffTpl:=parEx('diff template') except end;
   try f.filesFilter:=parEx('files filter') except end;
@@ -877,6 +884,25 @@ var
   VFSmodified:=TRUE;
   mainfrm.filesBox.repaint();
   end; // setItem
+
+  function getItemIcon(f:Tfile):string;
+  begin
+  if f = NIL then
+    result:=''
+  else if (f.icon >= 0) or (mainfrm.useSystemIconsChk.checked and f.isFile()) then
+    result:='/~img'+intToStr(f.getSystemIcon())
+  else if f.isFile() then
+    result:='/~img_file'
+  else if f.isFolder() then
+    if FA_UNIT in f.flags then
+      result:=format('/~img%d', [md.f.getIconForTreeview(mainfrm.useSystemIconsChk.checked)])
+    else
+      result:='/~img_folder'
+  else if f.isLink() then
+    result:='/~img_link'
+  else
+    result:='';
+  end; // getItemIcon
 
   procedure deleteItem();
   var
@@ -915,6 +941,8 @@ var
       result:=f.getDynamicComment(mainfrm.getLP)
     else if w = 'resource' then
       result:=f.resource
+    else if w = 'icon' then
+      result:=getItemIcon(f)
     else if getAttr('hide', FA_HIDDEN)
       or getAttr('hide tree', FA_HIDDENTREE)
       or getAttr('no log', FA_DONT_LOG) then
@@ -1117,7 +1145,7 @@ var
     begin
     path:=uri2disk(chop(lastDelimiter('/\',s)+1, 0, s), md.folder);
     if path > '' then
-      s:=path+'\'+s; // mod by mars
+      s:=path+'\'+trim(s); // mod by mars
     end;
   result:=s;
   end; // uri2diskMaybeFolder
@@ -1601,24 +1629,6 @@ var
   end; // dir
 
   procedure handleSymbol();
-
-    procedure itemIcon();
-    begin
-    if md.f = NIL then exit;
-    if (md.f.icon >= 0) or (mainfrm.useSystemIconsChk.checked and md.f.isFile()) then
-      result:='/~img'+intToStr(md.f.getSystemIcon())
-    else if md.f.isFile() then
-      result:='/~img_file'
-    else if md.f.isFolder() then
-      if FA_UNIT in md.f.flags then
-        result:=format('/~img%d', [md.f.getIconForTreeview(mainfrm.useSystemIconsChk.checked)])
-      else
-        result:='/~img_folder'
-    else if md.f.isLink() then
-      result:='/~img_link'
-    else result:='';
-    end; // itemIcon
-
   var
     s, usr: string;
     i: integer;
@@ -1642,7 +1652,7 @@ var
   if ansiStartsText('%sym-', name) then // legacy: surpassed by {.section.}
     result:=tpl[substr(name,2,-1)]
   else if name = '%item-icon%' then
-    itemIcon()
+    result:=first(getItemIcon(md.f), name)
   else if name = '%item-archive%' then
     if assigned(md.f) and assigned(md.tpl) and md.f.hasRecursive(FA_ARCHIVABLE) then result:=md.tpl['item-archive']
     else result:=''
@@ -1761,6 +1771,13 @@ var
         setLength(s, length(s)-length(extractFileExt(s)) );
       result:=htmlEncode(macroQuote(s))
       end
+    else if name = '%item-type%' then
+      if md.f.isLink() then
+        result:='link'
+      else if md.f.isFolder() then
+        result:='folder'
+      else
+        result:='file'
     else if name = '%item-size-b%' then
       result:=intToStr(md.f.size)
     else if name = '%item-size-kb%' then
@@ -1823,6 +1840,8 @@ var
   if isExtension(srcReal, '.lnk') 
   and not isExtension(src, '.lnk') then
     dstReal := dstReal + '.lnk';
+  if extractFilePath(dstReal)='' then
+    dstReal:=extractFilePath(srcReal)+dstReal;
   result:=renameFile(srcReal, dstReal)
   end; // renameIt
 
@@ -2001,6 +2020,18 @@ try
     if name = 'js encode' then
       result:=jsEncode(p, first(par(1),'''"'))
      else
+    if name = 'base64' then
+      result := Base64EncodeString(UTF8Encode(p))
+     else
+    if name = 'base64decode' then
+      result := UnUTF(Base64DecodeString(RawByteString(p)))
+     else
+    if name = 'md5' then
+      result:= MD5PassHS(AnsiString(p))
+     else
+    if name = 'sha1' then
+        result:=SHA1toHex(sha1OfStr(p))
+     else
     if name = 'vfs select' then
       if pars.count = 0 then
         try result:=selectedFile.url()
@@ -2073,6 +2104,8 @@ try
 
     if name = 'decodeuri' then
       result := decodeURL(p);
+    if name = 'set cfg' then
+      trueIf(mainfrm.setcfg(p));
 
     if name = 'dialog' then
       dialog();

@@ -1092,16 +1092,16 @@ procedure updateDynDNS();
   function interpretResponse(s:string):string;
   const
     ERRORS: array [1..10] of record code,msg:string; end = (
-      (code:'badauth'; msg:'invalid user/password'),
-      (code:'notfqdn'; msg:'incomplete hostname, required form aaa.bbb.com'),
-      (code:'nohost'; msg:'specified hostname does not exist'),
-      (code:'!yours'; msg:'specified hostname belongs to another username'),
-      (code:'numhost'; msg:'too many or too few hosts found'),
-      (code:'abuse'; msg:'specified hostname is blocked for update abuse'),
-      (code:'dnserr'; msg:'server error'),
-      (code:'911'; msg:'server error'),
-      (code:'!donator'; msg:'an option specified requires payment'),
-      (code:'badagent'; msg:'banned client')
+      (code:'badauth';  msg:MSG_DDNS_badauth),
+      (code:'notfqdn';  msg:MSG_DDNS_notfqdn),
+      (code:'nohost';   msg:MSG_DDNS_nohost),
+      (code:'!yours';   msg:MSG_DDNS_notyours),
+      (code:'numhost';  msg:MSG_DDNS_numhost),
+      (code:'abuse';    msg:MSG_DDNS_abuse),
+      (code:'dnserr';   msg:MSG_DDNS_dnserr),
+      (code:'911';      msg:MSG_DDNS_911),
+      (code:'!donator'; msg:MSG_DDNS_notdonator),
+      (code:'badagent'; msg:MSG_DDNS_badagent)
     );
   var
     i: integer;
@@ -1175,6 +1175,7 @@ time:=now();
 lastActivityTime:=time;
 downloadingWhat:=DW_UNK;
 urlvars:=THashedStringList.create();
+urlvars.lineBreak:='&';
 tplCounters:=TstringToIntHash.create();
 vars:=THashedStringList.create();
 postVars:=THashedStringList.create();
@@ -1416,7 +1417,8 @@ for i:=0 to length(parts)-1 do
   while assigned(n) do
     begin
 //    found:=stringExists(n.text, s) or sameText(n.text, UTF8toAnsi(s));
-        found := stringExists(n.text, s) or sameText(n.text, s);
+//        found := stringExists(n.text, s) or sameText(n.text, s);
+        found := sameText(n.text, s);
     if found then break;
     n:=n.getNextSibling();
     end;
@@ -1466,7 +1468,7 @@ setlength(result, n);
 end; // getAccountList
 
 function banAddress(ip:string):boolean;
-const
+resourcestring
   MSG = 'There are %d open connections from this address.'#13+
         'Do you want to kick them all now?';
   MSG2 = 'You can edit the address.'#13'Masks and ranges are allowed.';
@@ -1603,11 +1605,11 @@ var
     if not f.isLink and ansiContainsStr(f.resource, '?') then
       exit; // unicode filename?   //mod by mars
 
-    if f.size > 0 then
-      inc(totalBytes, f.size);
+//    if f.size > 0 then
+//      inc(totalBytes, f.size);
 
   // build up the symbols table
-  md.table:=NIL;
+  md.table:=table;
   nonPerc:=NIL;
   if f.icon >= 0 then
     begin
@@ -1716,7 +1718,8 @@ var
   end; // handleItem
 
 var
-  i: integer;
+  i, n: integer;
+  f: Tfile;
   lp: TLoadPrefs;
 begin
   result := '';
@@ -1784,6 +1787,31 @@ try
     listing.fromFolder(lp, folder, cd, recur );
     listing.sort(mainfrm.foldersBeforeChk.checked, mainfrm.linksBeforeChk.checked, cd, if_(recur or (otpl = filelistTpl), '?', diffTpl['sort by']) ); // '?' is just a way to cause the sort to fail in case the sort key is not defined by the connection
 
+    n:=length(listing.dir);
+    for i:=0 to n-1 do
+      begin
+      f:=listing.dir[i];
+      if f.size > 0 then
+        inc(totalBytes, f.size);
+      if f.isLink() then
+        inc(numberLinks)
+      else if f.isFolder() then
+        inc(numberFolders)
+      else
+        inc(numberFiles);
+      end;
+    table:=toSA([
+      '%upload-link%', if_(accountAllowed(FA_UPLOAD, cd, folder), diffTpl['upload-link']),
+      '%files%', diffTpl[if_(n>0, 'files','nofiles')],
+      '%number%', intToStr(n),
+      '%number-files%', intToStr(numberFiles),
+      '%number-folders%', intToStr(numberFolders),
+      '%number-links%', intToStr(numberlinks),
+      '%total-bytes%', intToStr(totalBytes),
+      '%total-kbytes%', intToStr(totalBytes div KILO),
+      '%total-size%', smartsize(totalBytes)
+    ]);
+
     for i:=0 to length(listing.dir)-1 do
       begin
       application.ProcessMessages();
@@ -1804,17 +1832,9 @@ try
 
   // build final page
   if not oneAccessible then md.archiveAvailable:=FALSE;
-  md.table:=toSA([
-    '%upload-link%', if_(accountAllowed(FA_UPLOAD, cd, folder), diffTpl['upload-link']),
-    '%files%', if_(list='', diffTpl['nofiles'], diffTpl['files']),
-    '%list%', list,
-    '%number%', intToStr(numberFiles+numberFolders+numberLinks),
-    '%number-files%', intToStr(numberFiles),
-    '%number-folders%', intToStr(numberFolders),
-    '%number-links%', intToStr(numberlinks),
-    '%total-bytes%', intToStr(totalBytes),
-    '%total-kbytes%', intToStr(totalBytes div KILO),
-    '%total-size%', smartsize(totalBytes)
+  md.table:=table;
+  addArray(md.table, [
+    '%list%',list
   ]);
   result:=diffTpl[''];
   md.f:=NIL;
@@ -1974,6 +1994,7 @@ var
         '%smart-speed%', smartsize(speed)
       ]);
   addArray(md.table, ['%uploaded-files%', files]);
+  data.uploadResults:=NIL; // reset
   end; // addUploadResultsSymbols
 
 var
@@ -2051,7 +2072,7 @@ finally
 end; // getPage
 
 procedure TmainFrm.findExtOnStartupChkClick(Sender: TObject);
-const
+resourcestring
   MSG = 'This option is NOT compatible with "dynamic dns updater".'
     +#13'Continue?';
 begin
@@ -2252,7 +2273,7 @@ and ((logFile.filename = '') or (logFile.apacheFormat > '')) then
   exit;
 
 if clr = Graphics.clDefault then
-  clr:=clBlack;
+  clr:=clWindowText;
 
 if logDateChk.checked then
   begin
@@ -2399,7 +2420,7 @@ msgDlg('Cannot open port.'#13+if_(fn>'', 'It is already used by '+fn, 'Something
 end; // sayPortBusy
 
 procedure toggleServer();
-const
+resourcestring
   MSG2 = 'There are %d connections open.'#13'Do you want to close them now?';
 begin
 if srv.active then stopServer()
@@ -2426,8 +2447,8 @@ end; // restartServer
 procedure updatePortBtn();
 begin
 if assigned(srv) then
-  mainfrm.portBtn.Caption:=format('Port: %s', [
-    if_(srv.active, srv.port, first(port,'any'))]);
+  mainfrm.portBtn.Caption:=format(S_PORT_LABEL, [
+    if_(srv.active, srv.port, first(port,S_PORT_ANY))]);
 end; // updatePortBtn
 
 procedure apacheLogCb(re:TregExpr; var res:string; data:pointer);
@@ -2470,7 +2491,10 @@ try
     'a', 'h': res:=cd.address;
     'l': res:='-';
     'u': res:=first(cd.usr, '-');
-    't': res:='['+xtpl(formatDatetime(APACHE_TIMESTAMP_FORMAT, now()), ['!!!',MONTH2STR[monthOf(now())]])+' '+logfile.apacheZoneString+']';
+    't': res:='['
+      +xtpl(formatDatetime(APACHE_TIMESTAMP_FORMAT, now()),
+         ['!!!',MONTH2STR[monthOf(now())]])
+      +' '+logfile.apacheZoneString+']';
     'r': res:=getTill(CRLF, cd.conn.request.full);
     's': res:=code;
     'B': res:=intToStr(cd.conn.bytesSentLastItem);
@@ -2499,21 +2523,36 @@ var
   procedure doTheTranche();
   var
     i, b: integer;
-    s: string;
+    fn, s: string;
     sa: RawByteString;
+    anyChange: boolean;
   begin
+  // leave only the files' name
+  for i:=trancheStart to trancheEnd do
+    files[i]:=copy(files[i],length(lastPath)+1,MAXINT);
   // comments file
   try
-    ss.loadFromFile(lastPath+COMMENTS_FILE);
+    fn:=lastPath+COMMENTS_FILE;
+    ss.loadFromFile(fn);
+    anyChange:=FALSE;
     for i:=trancheStart to trancheEnd do
-      try ss.delete(ss.indexOfName(files[i]));
-      except end;
-    ss.saveToFile(path+COMMENTS_FILE);
+      begin
+      b:=ss.indexOfName(files[i]);
+      if b < 0 then continue;
+      ss.delete(b);
+      anyChange:=TRUE;
+      end;
+    if anyChange then
+      if ss.count = 0 then
+        deleteFile(fn)
+      else
+        ss.saveToFile(fn);
   except end;
   // descript.ion
   if not mainfrm.supportDescriptionChk.checked then exit;
   try
-    sa:=loadFile(path+'descript.ion');
+    fn:=path+DESCRIPT_ION;
+    sa:=loadFile(fn);
     if sa = '' then exit;
     if mainfrm.oemForIonChk.checked then
       begin
@@ -2522,13 +2561,19 @@ var
       end
      else
       s := UnUTF(sa);
+    anyChange:=FALSE;
     for i:=trancheStart to trancheEnd do
       begin
       b:=findNameInDescriptionFile(s, files[i]);
-      if b > 0 then
-        delete(s, b, findEOL(s,b)-b+1);
+      if b = 0 then continue;
+      delete(s, b, findEOL(s,b)-b+1);
+      anyChange:=TRUE;
       end;
-    saveTextFile(path+'descript.ion', s);
+    if anyChange then
+      if s='' then
+        deleteFile(fn)
+      else
+        saveTextfile(fn, s);
   except end;
   end; // doTheTranche
 
@@ -2542,7 +2587,7 @@ try
   for trancheEnd:=0 to length(files)-1 do
     begin
     fn:=files[trancheEnd];
-    path:=getTill(lastDelimiter('\/', fn)+1, fn);
+    path:=getTill(lastDelimiter('\/', fn), fn);
     if trancheEnd = 0 then
       lastPath:=path;
     if path <> lastPath then
@@ -2553,6 +2598,7 @@ try
       lastPath:=path;
       end;
     end;
+  trancheEnd:=length(files)-1; // after the for-loop, the variable seems to not be trustable
   doTheTranche();
 finally ss.free end;
 end; // removeFilesFromComments
@@ -2881,9 +2927,11 @@ var
     url:=chop('?',s);
     data.urlvars.clear();
     if s > '' then
-      extractStrings(['&'], [], @s[1], data.urlvars);
-    for i:=0 to data.urlvars.count-1 do
-      data.urlvars[i]:=decodeURL(xtpl(data.urlvars[i],['+',' ']));
+      begin
+        extractStrings(['&'], [], @s[1], data.urlvars);
+        for i:=0 to data.urlvars.count-1 do
+          data.urlvars[i]:=decodeURL(data.urlvars[i]);
+      end;
   end; // extractParams
 
   procedure closeUploadingFile();
@@ -2968,6 +3016,13 @@ var
     end;
   assignFile(data.f^, data.uploadDest);
   end; // getUploadDestinationFileName
+
+  procedure addContentDisposition(fn: String; attach:boolean=TRUE);
+  begin
+//  conn.addHeader( 'Content-Disposition: '+if_(attach, 'attachment; ')+'filename*=UTF-8''"'+UTF8encode(data.lastFN)+'";');
+//  conn.addHeader('Content-Disposition', RawByteString('attachment; filename="')+encodeURL(data.lastFN)+'";');
+  conn.addHeader('Content-Disposition', if_(attach, RawByteString('attachment; ')) + RawByteString('filename*=UTF-8''"')+encodeURL(UTF8encode(fn))+'";');
+  end;
 
   procedure sessionSetup();
   begin
@@ -3117,7 +3172,7 @@ var
       '%archive-size%', intToStr(tar.size)
     ]), data.lastFN);
     if not noContentdispositionChk.checked then
-      conn.addHeader('Content-Disposition', RawByteString('attachment; filename="')+encodeURL(data.lastFN)+'";');
+      addContentDisposition(data.lastFN);
   except tar.free end;
   end; // serveTar
 
@@ -3140,6 +3195,8 @@ var
     urlCmd: string;
 
     function accessGranted(forceFile:Tfile=NIL):boolean;
+    resourcestring
+      FAILED = 'Login failed';
     var
       m: TStringDynArray;
       fTemp: Tfile;
@@ -3170,7 +3227,7 @@ var
     // log anyone trying to guess the password
     if (forceFile = NIL) and stringExists(data.usr, getAccountList(TRUE, FALSE))
     and logOtherEventsChk.checked then
-      add2log('Login failed', data);
+      add2log(FAILED, data);
     end; // accessGranted
 
     function isAllowedReferer():boolean;
@@ -3472,14 +3529,17 @@ var
     end;
   if data.urlvars.values['mode'] = 'jquery' then
     begin
+      if notModified(conn,'jquery'+FloatToStr(uptime), '') then
+        exit;
       replyWithRes('jquery', 'text/javascript');
       exit;
     end;
 
   // forbid using invalid credentials
   if not freeLoginChk.checked and not specialGrant then
-    if assigned(data.account) and (data.account.pwd <> data.pwd)
-    or (data.account = NIL) and (data.usr > '') and not usersInVFS.match(data.usr, data.pwd) then
+    if (data.usr>'')
+    and ((data.account=NIL) or (data.account.pwd <> data.pwd))
+    and not usersInVFS.match(data.usr, data.pwd) then
       begin
       data.acceptedCredentials:=FALSE;
       runEventScript('unauthorized');
@@ -3594,7 +3654,9 @@ var
         section:=getsection(s);
         if assigned(section) and not section.nourl then // it has to exist and be accessible 
           begin
-          getPage(s, data, f, me());
+          if not section.cache
+          or not notModified(conn, s+floatToStr(section.ts), '') then
+            getPage(s, data, f, me());
           exit;
           end;
       finally free end;
@@ -3680,11 +3742,10 @@ OutputDebugString(PChar('Prepared reply for folder by ' + floattostr(TimingSecon
     exit;
     end;
 
+  if notModified(conn, f) then // calling notModified before limitsExceededOnDownload makes possible for [download] to manipualate headers set here
+    exit;
   data.countAsDownload:=f.shouldCountAsDownload();
   if data.countAsDownload and limitsExceededOnDownload() then
-    exit;
-
-  if notModified(conn, f) then
     exit;
 
   setupDownloadIcon(data);
@@ -3710,7 +3771,7 @@ OutputDebugString(PChar('Prepared reply for folder by ' + floattostr(TimingSecon
   if (data.agent = 'MSIE') and (conn.getHeader('Accept') = '*/*') then
     s:=xtpl(s, [' ','%20']);
   if not noContentdispositionChk.checked or not b then
-    conn.addHeader( 'Content-Disposition', if_(not b, 'attachment; ')+'filename="'+encodeURL(s)+'";' );
+    addContentDisposition(s, not b);
   end; // handleRequest
 
   procedure lastByte();
@@ -3788,7 +3849,8 @@ var
   ur: TuploadResult;
   i: integer;
 begin
-if assigned(conn) and (conn.getLockCount <> 1) then add2log('please report on the forum about this message');
+if assigned(conn) and (conn.getLockCount <> 1) then
+  add2log('please report on the forum about this message');
 
 f:=NIL;
 data:=NIL;
@@ -3986,8 +4048,6 @@ if event in [HE_CONNECTED, HE_DISCONNECTED, HE_OPEN, HE_CLOSE, HE_REQUESTED, HE_
   updateTrayTip();
   end;
 doLog();
-if event = HE_LAST_BYTE_DONE then
-  data.uploadResults:=NIL;
 end; // httpEvent
 
 procedure findSimilarIP(fromIP:string);
@@ -4031,32 +4091,46 @@ begin
 if newValue < 0 then newValue:=0;
 variable:=newValue;
 menuItem.caption:=format(menuLabel,
-  [if_(newValue=0,'disabled',intToStr(newValue))]);
+  [if_(newValue=0,DISABLED,intToStr(newValue))]);
 end; // setLimitOption
 
 procedure setMaxIPs(v:integer);
-begin setLimitOption(maxIPs,v, mainfrm.maxIPs1, 'Max simultaneous addresses: %s ...') end;
+resourcestring
+  LIMIT = 'Max simultaneous addresses: %s ...';
+begin setLimitOption(maxIPs,v, mainfrm.maxIPs1, LIMIT) end;
 
 procedure setMaxIPsDLing(v:integer);
-begin setLimitOption(maxIPsDLing,v, mainfrm.maxIPsDLing1, 'Max simultaneous addresses downloading: %s ...') end;
+resourcestring
+  LIMIT = 'Max simultaneous addresses downloading: %s ...';
+begin setLimitOption(maxIPsDLing,v, mainfrm.maxIPsDLing1, LIMIT) end;
 
 procedure setMaxConnections(v:integer);
-begin setLimitOption(maxConnections,v, mainfrm.maxConnections1, 'Max connections: %s ...') end;
+resourcestring
+  LIMIT = 'Max connections: %s ...';
+begin setLimitOption(maxConnections,v, mainfrm.maxConnections1, LIMIT) end;
 
 procedure setMaxConnectionsIP(v:integer);
-begin setLimitOption(maxConnectionsIP, v, mainfrm.MaxconnectionsfromSingleaddress1, 'Max connections from single address: %s ...') end;
+resourcestring
+  LIMIT = 'Max connections from single address: %s ...';
+begin setLimitOption(maxConnectionsIP, v, mainfrm.MaxconnectionsfromSingleaddress1, LIMIT) end;
 
 procedure setMaxDLs(v:integer);
-begin setLimitOption(maxContempDLs, v, mainfrm.maxDLs1, 'Max simultaneous downloads: %s ...') end;
+resourcestring
+  LIMIT = 'Max simultaneous downloads: %s ...';
+begin setLimitOption(maxContempDLs, v, mainfrm.maxDLs1, LIMIT) end;
 
 procedure setMaxDLsIP(v:integer);
-begin setLimitOption(maxContempDLsIP, v, mainfrm.maxDLsIP1, 'Max simultaneous downloads from single address: %s ...') end;
+resourcestring
+  LIMIT = 'Max simultaneous downloads from single address: %s ...';
+begin setLimitOption(maxContempDLsIP, v, mainfrm.maxDLsIP1, LIMIT) end;
 
 procedure setAutoFingerprint(v:integer);
+resourcestring
+  FINGERPRINT = 'Create fingerprint on addition under %d KB';
+  NO_FINGERPRINT = 'Create fingerprint on addition: disabled';
 begin
 autoFingerprint:=v;
-mainfrm.Createfingerprintonaddition1.caption:='Create fingerprint on addition'
-  +if_(v=0, ': disabled', format(' under %d KB',[v]) );
+mainfrm.Createfingerprintonaddition1.caption:=format(if_(v=0, NO_FINGERPRINT, FINGERPRINT), [v]);
 end;
 
 function loadFingerprint(fn:string):string;
@@ -4115,7 +4189,7 @@ else
 end; // checkVfsOnQuit
 
 procedure inputComment(f:Tfile);
-const
+resourcestring
   MSG= 'Please insert a comment for "%s".'
     +#13'You should use HTML: <br> for break line.';
 begin
@@ -4450,11 +4524,14 @@ kickByIP(cd.address);
 end;
 
 procedure setAutosave(var rec:Tautosave; v:integer);
+resourcestring
+  AUTOSAVE = 'Auto save every: ';
+  SECONDS = '%d seconds';
 begin
 rec.every:=v;
 if assigned(rec.menu) then
   rec.menu.caption:=
-    'Auto save every: '+if_(v=0,'disabled',intToStr(v)+' seconds');
+    AUTOSAVE+if_(v=0,DISABLED, format('%d seconds',[v]));
 end; // setAutosave
 
 procedure setSpeedLimitIP(v:real);
@@ -4468,7 +4545,7 @@ for i:=0 to ip2obj.Count-1 do
   with ip2obj.Objects[i] as TperIp do
     if not customizedLimiter then
       limiter.maxSpeed:=vi;
-mainfrm.Speedlimitforsingleaddress1.Caption:='Speed limit for single address: '+if_(v<0, 'disabled', floatToStr(v)+' KB/s' );
+mainfrm.Speedlimitforsingleaddress1.Caption:='Speed limit for single address: '+if_(v<0, DISABLED, floatToStr(v)+' KB/s' );
 end; // setSpeedLimitIP
 
 procedure setSpeedLimit(v:real);
@@ -4476,11 +4553,11 @@ begin
 speedLimit:=v;
 if v < 0 then globalLimiter.maxSpeed:=MAXINT
 else globalLimiter.maxSpeed:=round(v*1000);
-mainfrm.speedLimit1.caption:='Speed limit: '+if_(v<0, 'disabled', floatToStr(v)+' KB/s' );
+mainfrm.speedLimit1.caption:='Speed limit: '+if_(v<0, DISABLED, floatToStr(v)+' KB/s' );
 end; // setSpeedLimit
 
 procedure autosaveClick(var rec:Tautosave; name:string);
-const
+resourcestring
   MSG = 'Auto-save %s.'
     +#13'Specify in seconds.'
     +#13'Leave blank to disable.';
@@ -5466,7 +5543,7 @@ end;
 function Tmainfrm.saveCFG():boolean;
 
   procedure proposeUserRegistry();
-  const
+  resourcestring
     MSG = 'Can''t save options there.'
       +#13'Should I try to save to user registry?';
   begin
@@ -5618,10 +5695,11 @@ while s > '' do
 end; // parseVersionNotice
 
 function doTheUpdate(url:string):boolean;
-const
+resourcestring
   MSG_SAVE_ERROR = 'Cannot save the update';
   MSG_LIMITED = 'The auto-update feature cannot work because it requires the "Only 1 instance" option enabled.'
     +#13#13'Your browser will now be pointed to the update, so you can install it manually.';
+const
   UPDATE_BATCH_FILE = 'hfs.update.bat';
   UPDATE_BATCH = 'START %0:s /WAIT "%1:s" -q'+CRLF
     +'ping 127.0.0.1 -n 3 -w 1000> nul'+CRLF
@@ -5695,7 +5773,7 @@ finally progFrm.hide() end;
 end; // doTheUpdate
 
 function promptForUpdating(url:string):boolean;
-const
+resourcestring
   MSG_UPDATE = 'You are invited to use the new version.'#13#13'Update now?';
 begin
 result:=FALSE;
@@ -5711,6 +5789,7 @@ function downloadUpdateInfo():Ttpl;
 const
   URL = 'http://www.rejetto.com/hfs/hfs.updateinfo.txt';
   ON_DISK = 'hfs.updateinfo.txt';
+resourcestring
   MSG_FROMDISK = 'Update info has been read from local file.'
     +#13'To resume normal operation of the updater, delete the file '
       +ON_DISK+' from the HFS program folder.';
@@ -5792,12 +5871,15 @@ procedure loadEvents();
 begin eventScripts.fullText:=loadFile(cfgpath+EVENTSCRIPTS_FILE) end;
 
 procedure Tmainfrm.updateCopyBtn();
+resourcestring
+  COPY = 'Copy to clipboard';
+  ALREADY = 'Already in clipboard';
 var
   s: string;
 begin
 s:=copyBtn.caption;
 try
-  copyBtn.Caption:=if_(clipboard.asText = urlBox.text, 'Already in clipboard', 'Copy to clipboard');
+  copyBtn.Caption:=if_(clipboard.asText = urlBox.text, ALREADY, COPY);
   if copyBtn.caption <> s then FormResize(NIL);
 except end;
 end; // updateCopyBtn
@@ -6148,6 +6230,8 @@ var
   end; // addPanel
 
   procedure checkDiskSpace();
+  resourcestring
+    NOSPACE = 'Out of space';
   type
     Tdrive = 1..26;
   var
@@ -6174,19 +6258,30 @@ var
         addString(driveLetter, driveLetters);
       end;
   if driveLetters = NIL then exit;
-  sbarIdxs.oos:=addPanel( 'Out of space: '+join(',', driveLetters));
+  sbarIdxs.oos:=addPanel( NOSPACE+': '+join(',', driveLetters));
   end; // checkDiskSpace
 
   function getConnectionsString():string;
+  resourcestring
+    CONN = 'Connections: %d';
   var
     i: integer;
   begin
-  result:=format('Connections: %d', [srv.conns.Count]);
+  result:=format(CONN, [srv.conns.Count]);
   if easyMode then exit;
   i:=countIPs();
   if i < srv.conns.count then result:=result+' / '+intToStr(i);
   end;
 
+resourcestring
+  TOT_IN = 'Total In: %s';
+  TOT_OUT = 'Total Out: %s';
+  OUT_SPEED = 'Out: %.1f KB/s';
+  IN_SPEED = 'In: %.1f KB/s';
+  BANS = 'Ban rules: %d';
+  MEMORY = 'Mem';
+  CUSTOMIZED = 'Customized template';
+  ITEMS = 'VFS: %d items';
 var
   tempText: string;
 begin
@@ -6197,27 +6292,27 @@ else tempText:=sbar.Panels[sbar.Panels.Count-1].text;
 pn:=0;
 if not easyMode then
   addPanel( getConnectionsString() );
-sbarIdxs.out:=addPanel( format('Out: %.1f KB/s',[srv.speedOut/1000]) );
-addPanel( format('In: %.1f KB/s',[srv.speedIn/1000]) );
+sbarIdxs.out:=addPanel( format(OUT_SPEED,[srv.speedOut/1000]) );
+addPanel( format(IN_SPEED,[srv.speedIn/1000]) );
 if not easyMode then
   begin
-  sbarIdxs.totalOut:=addPanel( format('Total Out: %s',[
+  sbarIdxs.totalOut:=addPanel( format(TOT_OUT,[
     smartSize(outTotalOfs+srv.bytesSent)]) );
-  sbarIdxs.totalIn:=addPanel( format('Total In: %s',[
+  sbarIdxs.totalIn:=addPanel( format(TOT_IN,[
     smartSize(inTotalOfs+srv.bytesReceived)]) );
-  sbarIdxs.notSaved:=addPanel( format('VFS: %d items',[filesBox.items.count-1])
+  sbarIdxs.notSaved:=addPanel( format(ITEMS,[filesBox.items.count-1])
     +if_(VFSmodified,' - not saved') );
   if not vFsmodified then sbarIdxs.notSaved:=-1;
   end;
 checkDiskSpace();
 
 if showMemUsageChk.checked then
-  addPanel('Mem: '+dotted(allocatedMemory()));
+  addPanel(MEMORY+': '+dotted(allocatedMemory()));
 
 if assigned(banlist) then
-  sbarIdxs.banStatus:=addPanel(format('Ban rules: %d', [length(banlist)]));
+  sbarIdxs.banStatus:=addPanel(format(BANS, [length(banlist)]));
 
-if tplIsCustomized then sbarIdxs.customTpl:=addPanel('Customized template');
+if tplIsCustomized then sbarIdxs.customTpl:=addPanel(CUSTOMIZED);
 
 // if tempText empty, ensures a final panel terminator
 addPanel(tempText, taLeftJustify);
@@ -6435,8 +6530,9 @@ var
   folderKindFrm.Free;
   end; // selectFolderKind
 
-const
+resourcestring
   MSG1 = '%s item(s) already exists:'#13'%s'#13#13'Continue?';
+const
   MAX_DUPE = 50;
 var
   f: Tfile;
@@ -7243,7 +7339,7 @@ tray.show();
 end; // addTray
 
 procedure TmainFrm.Allowedreferer1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Leave empty to disable this feature.'
     +#13'Here you can specify a mask.'
     +#13'When a file is requested, if the mask doesn''t match the "Referer" HTTP field, the request is rejected.';
@@ -7344,6 +7440,7 @@ const
   FK_CRC = 6;
   FK_COMMENT = 7;
   FK_USERPWD = 8;
+  FK_USERPWD_UTF8 = 108;
   FK_ADDEDTIME = 9;
   FK_DLCOUNT = 10;
   FK_ROOT = 11;
@@ -7385,7 +7482,7 @@ function Tmainfrm.getVFS(node:Ttreenode=NIL):string;
 var
   i: integer;
   f: Tfile;
-  commonFields, s: string;
+  commonFields, s: RawByteString;
 begin
 if node = NIL then node:=rootNode;
 if node = NIL then exit;
@@ -7394,6 +7491,7 @@ commonFields:=TLV(FK_FLAGS, str_(f.flags))
     +TLV_NOT_EMPTY(FK_RESOURCE, f.resource)
     +TLV_NOT_EMPTY(FK_COMMENT, f.comment)
     +if_(f.user>'', TLV(FK_USERPWD, Base64EncodeString(f.user+':'+f.pwd)))
+    +if_(f.user>'', TLV(FK_USERPWD_UTF8, Base64EncodeString(UTF8Encode((f.user+':'+f.pwd)))))
     +TLV_NOT_EMPTY(FK_ACCOUNTS, join(';',f.accounts[FA_ACCESS]) )
     +TLV_NOT_EMPTY(FK_UPLOADACCOUNTS, join(';',f.accounts[FA_UPLOAD]))
     +TLV_NOT_EMPTY(FK_DELETEACCOUNTS, join(';',f.accounts[FA_DELETE]))
@@ -7429,7 +7527,7 @@ result:=TLV(FK_NODE, commonFields
 end; // getVFS
 
 procedure Tmainfrm.setVFS2(vfs: RawByteString; node:Ttreenode=NIL);
-const
+resourcestring
   MSG_BETTERSTOP = #13'Going on may lead to problems.'
     +#13'It is adviced to stop loading.'
     +#13'Stop?';
@@ -7505,7 +7603,7 @@ while not tlv.isOver() do
       { Explanation for the #0 workaround.
       { I found an uncompressable vfs file, with ZDecompressStr2() raising an exception.
       { In the end i found it was missing a trailing #0, maybe do to an incorrect handling of strings
-      { containing a trailing #0. You know, being using a zlib wrapper there is some underlying C code.
+      { containing a trailing #0. Using a zlib wrapper there is some underlying C code.
       { I was unable to reproduce the bug, but i found that correct data doesn't complain if i add an extra #0. }
       try
 //        data := ZDecompressStr2(data+#0, 31);
@@ -7553,6 +7651,13 @@ while not tlv.isOver() do
       f.pwd := UnUTF(data2);
       usersInVFS.track(f.user, f.pwd);
       end;
+    FK_USERPWD_UTF8:
+    	begin
+      data2 := Base64DecodeString(data2);
+      f.user := UnUTF(chop(':', data2));
+      f.pwd := UnUTF(data2);
+      usersInVFS.track(f.user, f.pwd);
+      end;
     FK_DLCOUNT: f.DLcount:=int_(data2);
     FK_ACCOUNTS: f.accounts[FA_ACCESS]:= split(';', data2);
     FK_UPLOADACCOUNTS: f.accounts[FA_UPLOAD]:=split(';',data2);
@@ -7592,7 +7697,8 @@ for act:=low(act) to high(act) do
 
 if FA_VIS_ONLY_ANON in f.flags then
   loadingVFS.visOnlyAnon:=TRUE;
-if f.isVirtualFolder() or f.isLink() then f.mtime:=f.atime;
+if f.isVirtualFolder() or f.isLink() then
+  f.mtime:=f.atime;
 if assigned(f.accounts[FA_UPLOAD]) and (f.resource > '') then
   addString(f.resource, uploadPaths);
 f.setupImage(mainfrm.useSystemIconsChk.checked, node);
@@ -7691,6 +7797,9 @@ var
   else result:=colors[idx]
   end; // getColor
 
+resourcestring
+  LIMIT = 'Limit';
+  TOP_SPEED = 'Top speed';
 begin
 r:=cnv.cliprect;
 // clear
@@ -7726,10 +7835,10 @@ cnv.Font.Name:='Small Fonts';
 cnv.font.size:=7;
 SetBkMode(cnv.handle, TRANSPARENT);
 top:=(graph.maxV/1000)*safeDiv(10.0, graph.rate);
-s:=format('Top speed: %.1f KB/s    ---    %d kbps', [top, round(top*8)]);
+s:=format(TOP_SPEED+': %.1f KB/s    ---    %d kbps', [top, round(top*8)]);
 cnv.TextOut(r.right-cnv.TextWidth(s)-20, 3, s);
 if assigned(globalLimiter) and (globalLimiter.maxSpeed < MAXINT) then
-  cnv.TextOut(r.right-180+25, 15, format('Limit: %.1f KB/s', [globalLimiter.maxSpeed/1000]));
+  cnv.TextOut(r.right-180+25, 15, format(LIMIT+': %.1f KB/s', [globalLimiter.maxSpeed/1000]));
 end; // drawGraphOn
 
 procedure TmainFrm.graphBoxPaint(Sender: TObject);
@@ -7850,20 +7959,22 @@ procedure TmainFrm.expandBtnClick(Sender: TObject);
 begin setLogToolbar(TRUE) end;
 
 procedure TmainFrm.Speedlimit1Click(Sender: TObject);
-const
-  MSG = 'Max bandwidth (KB/s).'#13+MSG_EMPTY_NO_LIMIT;
+resourcestring
+  MSG_MAX_BW = 'Max bandwidth (KB/s).';
+  ZEROMSG = 'Zero is an effective limit.'#13'To disable instead, leave empty.';
+  LIMIT = 'Speed limit';
 var
   s: string;
 begin
 if speedLimit < 0 then s:=''
 else s:=floatToStr(speedLimit);
-if inputquery('Speed limit', MSG, s) then
+if inputquery(LIMIT, MSG_MAX_BW+#13+MSG_EMPTY_NO_LIMIT, s) then
 	try
   	s:=trim(s);
   	if s = '' then setSpeedLimit(-1)
     else setSpeedLimit(strToFloat(s));
     if speedLimit = 0 then
-      msgDlg('Zero is an effective limit.'#13'To disable instead, leave empty.', MB_ICONWARNING);
+      msgDlg(ZEROMSG, MB_ICONWARNING);
     // a manual set of speedlimit voids the pause command
     Pausestreaming1.Checked:=FALSE;
   except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
@@ -7871,14 +7982,15 @@ if inputquery('Speed limit', MSG, s) then
 end;
 
 procedure TmainFrm.Speedlimitforsingleaddress1Click(Sender: TObject);
-const
-  MSG = 'Max bandwidth for single address (KB/s).'#13+MSG_EMPTY_NO_LIMIT;
+resourcestring
+  MSG_MAX_BW_1 = 'Max bandwidth for single address (KB/s).';
+  LIMIT1 = 'Speed limit for single address';
 var
   s: string;
 begin
 if speedLimitIP <= 0 then s:=''
 else s:=floatToStr(speedLimitIP);
-if inputquery('Speed limit for single address', MSG, s) then
+if inputquery(LIMIT1, MSG_MAX_BW_1+#13+MSG_EMPTY_NO_LIMIT, s) then
 	try
   	s:=trim(s);
   	if s = '' then setSpeedLimitIP(-1)
@@ -7888,16 +8000,17 @@ if inputquery('Speed limit for single address', MSG, s) then
 end;
 
 procedure Tmainfrm.setnoDownloadTimeout(v:integer);
+resourcestring
+  NODL = 'No downloads timeout: ';
 begin
 if v < 0 then v:=0;
 if v <> noDownloadTimeout then lastActivityTime:=now();
 noDownloadTimeout:=v;
-noDownloadTimeout1.caption:=
-	'No downloads timeout: '+if_(v=0, 'disabled', intToStr(v) );
+noDownloadTimeout1.caption:=NODL+if_(v=0, DISABLED, intToStr(v) );
 end;
 
 procedure Tmainfrm.setGraphRate(v:integer);
-const
+resourcestring
   MSG = 'Graph refresh rate: %d (tenths of second)';
 begin
 if v < 1 then v:=1;
@@ -7911,17 +8024,16 @@ graph.maxV:=0;
 end; // setGraphRate
 
 procedure TmainFrm.Maxconnections1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Max simultaneous connections to serve.'
-    +#13'Most people don''t know this function well, and have problems. If you are unsure, please use the "Max simultaneous downloads".'
-    +#13+MSG_EMPTY_NO_LIMIT;
+    +#13'Most people don''t know this function well, and have problems. If you are unsure, please use the "Max simultaneous downloads".';
   MSG2 = 'In this moment there are %d active connections';
 var
   s: string;
 begin
 if maxConnections > 0 then s:=intToStr(maxConnections)
 else s:='';
-if inputquery('Max connections', MSG, s) then
+if inputquery('Max connections', MSG+#13+MSG_EMPTY_NO_LIMIT, s) then
 	try setMaxConnections(strToUInt(s))
   except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
   end;
@@ -7930,8 +8042,8 @@ if (maxConnections > 0) and (srv.conns.count > maxConnections) then
 end;
 
 procedure TmainFrm.maxDLs1Click(Sender: TObject);
-const
-  MSG = 'Max simultaneous downloads.'#13+MSG_EMPTY_NO_LIMIT;
+resourcestring
+  MSG = 'Max simultaneous downloads.';
   MSG2 = 'In this moment there are %d active downloads';
 var
   s: string;
@@ -7939,7 +8051,7 @@ var
 begin
 if maxContempDLs > 0 then s:=intToStr(maxContempDLs)
 else s:='';
-if inputquery('Max downloads', MSG, s) then
+if inputquery('Max downloads', MSG+#13+MSG_EMPTY_NO_LIMIT, s) then
 	try setMaxDLs(strToUInt(s))
   except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
   end;
@@ -7950,10 +8062,9 @@ if i > maxContempDLs then
 end;
 
 procedure TmainFrm.Maxconnectionsfromsingleaddress1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Max simultaneous connections to accept from a single IP address.'
-    +#13'Most people don''t know this function well, and have problems. If you are unsure, please use the "Max simultaneous downloads from a single IP address".'
-    +#13+MSG_EMPTY_NO_LIMIT;
+    +#13'Most people don''t know this function well, and have problems. If you are unsure, please use the "Max simultaneous downloads from a single IP address".';
 var
   s: string;
   addresses: TStringDynArray;
@@ -7961,7 +8072,7 @@ var
 begin
 if maxConnectionsIP > 0 then s:=intToStr(maxConnectionsIP)
 else s:='';
-if inputquery('Max connections by IP', MSG, s) then
+if inputquery('Max connections by IP', MSG+#13+MSG_EMPTY_NO_LIMIT, s) then
 	try setMaxConnectionsIP(strToUInt(s))
   except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
   end;
@@ -7976,9 +8087,8 @@ if assigned(addresses) then
 end;
 
 procedure TmainFrm.MaxDLsIP1Click(Sender: TObject);
-const
-  MSG = 'Max simultaneous downloads from a single IP address.'
-    +#13+MSG_EMPTY_NO_LIMIT;
+resourcestring
+  MSG = 'Max simultaneous downloads from a single IP address.';
 var
   s: string;
   addresses: TStringDynArray;
@@ -7986,7 +8096,7 @@ var
 begin
 if maxContempDLsIP > 0 then s:=intToStr(maxContempDLsIP)
 else s:='';
-if inputquery('Max downloads by IP', MSG, s) then
+if inputquery('Max downloads by IP', MSG+#13+MSG_EMPTY_NO_LIMIT, s) then
 	try setMaxDLsIP(strToUInt(s))
   except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
   end;
@@ -8204,7 +8314,7 @@ Loadrecentfiles1.visible:=Loadrecentfiles1.count>0;
 end; // updateRecentFilesMenu
 
 procedure Tmainfrm.loadVFS(fn:string);
-const
+resourcestring
   MSG_TITLE = 'Loading VFS';
   MSG_OLD = 'This file is old and uses different settings.'
     +#13'The "let browse" folder option will be reset.'
@@ -8370,7 +8480,7 @@ procedure TmainFrm.Changeport1Click(Sender: TObject);
 begin portBtnClick(portBtn) end;
 
 procedure TmainFrm.Checkforupdates1Click(Sender: TObject);
-const
+resourcestring
   MSG_INFO = 'Last stable version: %s'#13#13'Last untested version: %s'#13;
   MSG_NEWER = 'There''s a new version available online: %s';
 var
@@ -8411,14 +8521,18 @@ promptForUpdating(updateURL);
 end;
 
 procedure Tmainfrm.setEasyMode(easy:boolean=TRUE);
+resourcestring
+  ARE_EXPERT = 'You are in Expert mode';
+  ARE_EASY = 'You are in Easy mode';
+  SW2EXPERT = 'Switch to Expert mode';
+  SW2EASY = 'Switch to Easy mode';
 const
-  LAB :array [boolean] of string = ('Expert mode', 'Easy mode');
   ICO :array [boolean] of integer = (ICON_EXPERT, ICON_EASY);
 begin
 easyMode:=easy;
-switchMode.caption:='Switch to '+LAB[not easyMode];
+switchMode.caption:=ifThen(easyMode, SW2EXPERT, SW2EASY);
 //switchMode.imageIndex:=ICO[not easyMode];  disabled because it's ugly, it uses the same icon as the next menu item (accounts)
-modeBtn.caption:='You are in '+LAB[easyMode];
+modeBtn.caption:=ifThen(easyMode, ARE_EASY, ARE_EXPERT);
 modeBtn.imageIndex:=ICO[easyMode];
 if not easyMode or graphInEasyMode then showGraph()
 else hideGraph();
@@ -8436,7 +8550,7 @@ if assigned(selectedFile) then
 end;
 
 procedure TmainFrm.noDownloadtimeout1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Enter the number of MINUTES with no download after which the program automatically shuts down.'
     +#13'Leave blank to get no timeout.';
 var
@@ -8650,7 +8764,7 @@ freeAndNIL(tray_ico);
 end;
 
 procedure TmainFrm.Logfile1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'This function does not save any previous information to the log file.'
     +#13'Instead, it saves all information that appears in the log box in real-time (from when you click "OK", below).'
     +#13'Specify a filename for the log.'
@@ -8684,7 +8798,7 @@ dlg.free;
 end;
 
 procedure TmainFrm.SetURL1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Please insert an URL for the link'
     +#13
     +#13'Do not forget to specify http:// or whatever.'
@@ -8790,7 +8904,7 @@ finally queryingClose:=FALSE end;
 end;
 
 procedure TmainFrm.Loginrealm1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'The realm string is shown on the user/pass dialog of the browser.'
     +#13'Here you can customize the realm for the login button';
 begin
@@ -8847,7 +8961,7 @@ while i < srv.conns.count do
 end;
 
 procedure TmainFrm.Connectionsinactivitytimeout1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'The connection is kicked after a timeout.'
     +#13'Specify in seconds.'
     +#13'Leave blank to get no timeout.';
@@ -8865,7 +8979,7 @@ procedure TmainFrm.splitHMoved(Sender: TObject);
 begin if connPnl.height > 0 then lastGoodConnHeight:=connPnl.height end;
 
 procedure TmainFrm.Clearfilesystem1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'All changes will be lost'#13'Continue?';
 begin
 checkIfOnlyCountersChanged();
@@ -9054,7 +9168,7 @@ if (cd.workaroundForIEutf8  = toDetect) and (cd.agent > '') then
 end; // compressReply
 
 procedure TmainFrm.Flagfilesaddedrecently1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Enter the number of MINUTES files stay flagged from their addition.'
     +#13'Leave blank to disable.';
 var
@@ -9125,14 +9239,14 @@ procedure TmainFrm.Donate1Click(Sender: TObject);
 begin openURL('http://www.rejetto.com/hfs-donate') end;
 
 procedure TmainFrm.Donotlogaddress1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Any event from the following IP address mask will be not logged.';
 begin
 inputQuery('Do not log address', MSG, dontLogAddressMask)
 end;
 
 procedure TmainFrm.Custom1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Specify your addresses, each per line';
 var
   s: string;
@@ -9149,7 +9263,7 @@ if assigned(a) and not stringExists(defaultIP, a) then
 end;
 
 procedure TmainFrm.Findexternaladdress1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Can''t find external address'#13'( %s )';
 var
   service: string;
@@ -9192,7 +9306,7 @@ if button = mbRight then
 end;
 
 procedure forceDynDNSupdate(url:string='');
-const
+resourcestring
   MSG = 'This option makes pointless the option "Find external address at startup", which has now been disabled for your convenience.';
 begin
 dyndns.url:=url;
@@ -9211,7 +9325,7 @@ externalIP:='';
 end; // forceDynDNSupdate
 
 procedure TmainFrm.Custom2Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Enter URL for updating.'
     +#13'%ip% will be translated to your external IP.';
 var
@@ -9290,7 +9404,7 @@ finalizeDynDNS();
 end;
 
 procedure TmainFrm.Minimumdiskspace1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'The upload will fail if your disk has less than the specified amount of free MegaBytes.';
 var
   s: string;
@@ -9351,7 +9465,7 @@ else ipsEverFrm.show()
 end;
 
 procedure TmainFrm.Renamepartialuploads1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'This string will be appended to the filename.'
     +#13
     +#13'If you need more control, enter a string with %name% in it, and this symbol will be replaced by the original filename.';
@@ -9360,7 +9474,7 @@ InputQuery('Rename partial uploads', MSG, renamePartialUploads)
 end;
 
 procedure TmainFrm.SelfTest1Click(Sender: TObject);
-const
+resourcestring
   MSG_BEFORE = 'Here you can test if your server does work on the Internet.'
     +#13'If you are not interested in serving files over the Internet, this is NOT for you.'
     +#13
@@ -9599,7 +9713,7 @@ finally
 end;
 
 procedure TmainFrm.Opendirectlyinbrowser1Click(Sender: TObject);
-const
+resourcestring
   MSG = '"Suggest" the browser to open directly the specified files.'
     +#13'Other files should pop up a save dialog.';
 begin
@@ -9607,7 +9721,7 @@ InputQuery('Open directly in browser', MSG, openInBrowser)
 end;
 
 procedure TmainFrm.noPortInUrlChkClick(Sender: TObject);
-const
+resourcestring
   MSG = 'You should not use this option unless you really know its meaning.'
     +#13'Continue?';
 begin
@@ -9637,7 +9751,7 @@ exec(getTplEditor(), '"'+tplFilename+'"');
 end;
 
 procedure TmainFrm.Editeventscripts1Click(Sender: TObject);
-const
+resourcestring
   HELP = 'For help on how to use this file please refer http://www.rejetto.com/wiki/?title=HFS:_Event_scripts';
 var
   fn: string;
@@ -9649,7 +9763,7 @@ exec(getTplEditor(), '"'+fn+'"');
 end;
 
 procedure TmainFrm.Editresource1Click(Sender: TObject);
-const
+resourcestring
   CAPTION = 'Edit resource';
 var
   oldRes, oldName, res: string;
@@ -9670,7 +9784,7 @@ selectedFile.setupImage(mainfrm.useSystemIconsChk.checked);
 end;
 
 procedure TmainFrm.enableMacrosChkClick(Sender: TObject);
-const
+resourcestring
   MSG = 'The current template is using macros.'
     +#13'Do you want to cancel this action?';
 begin
@@ -9691,7 +9805,14 @@ end;
 procedure TmainFrm.menuBtnClick(Sender: TObject);
 begin popupMainMenu() end;
 
+var
+  bakShellMenuText: string;
 procedure TmainFrm.menuPopup(Sender: TObject);
+resourcestring
+  REMOVE_SHELL = 'Remove from shell context menu';
+  S_OFF = 'Switch OFF';
+  S_ON = 'Switch ON';
+  LOG = 'Log';
 
   procedure showSetting(mi:Tmenuitem; v:integer; unit_:string); overload;
   begin mi.caption:=getTill('...', mi.caption, TRUE)+if_(v>0, format('       (%d %s)', [v, unit_])) end;
@@ -9705,17 +9826,19 @@ refreshIPlist();
 for i:=1 to Fingerprints1.Count-1 do
   Fingerprints1.items[i].Enabled:=fingerprintsChk.checked;
 
-logmenu.items.caption:='Log';
+logmenu.items.caption:=LOG;
 if menu.items.find(logmenu.items.caption) = NIL then
   menu.items.insert(7,logmenu.items);
 
 SwitchON1.imageIndex:=if_(srv.active, 11, 4);
-SwitchON1.caption:='Switch '+if_(srv.active, 'OFF', 'ON');
+SwitchON1.caption:=if_(srv.active, S_OFF, S_ON);
 
 Appendmacroslog1.Enabled:=macrosLogChk.checked;
 stopSpidersChk.Enabled:=not fileExistsByURL('/robots.txt');
 Showbandwidthgraph1.visible:=not graphBox.visible;
-Shellcontextmenu1.Caption:=if_(isIntegratedInShell(), 'Remove from shell context menu', 'Integrate in shell context menu');
+if bakShellMenuText='' then
+  bakShellMenuText:=Shellcontextmenu1.Caption;
+Shellcontextmenu1.Caption:=if_(isIntegratedInShell(), REMOVE_SHELL, bakShellMenuText);
 showSetting(mainFrm.Connectionsinactivitytimeout1, connectionsInactivityTimeout, 'seconds');
 showSetting(mainFrm.Minimumdiskspace1, minDiskSpace, 'MB');
 showSetting(mainFrm.Flagfilesaddedrecently1, filesStayFlaggedForMinutes, 'minutes');
@@ -9867,7 +9990,7 @@ function Tmainfrm.finalInit():boolean;
   end; // fixAddToHFS
 
   function loadAndApplycfg():boolean;
-  const
+  resourcestring
     MSG = 'You are invited to re-insert your No-IP configuration, otherwise the updater won''t work as expected.';
   var
     iniS, tplS: string;
@@ -10140,8 +10263,8 @@ uninstall();
 end;
 
 procedure TmainFrm.maxIPs1Click(Sender: TObject);
-const
-  MSG = 'Max simultaneous addresses.'#13+MSG_EMPTY_NO_LIMIT;
+resourcestring
+  MSG = 'Max simultaneous addresses.';
   MSG2 = 'In this moment there are %d different addresses';
 var
   s: string;
@@ -10149,7 +10272,7 @@ var
 begin
 if maxIPs > 0 then s:=intToStr(maxIPs)
 else s:='';
-if inputquery('Max addresses', MSG, s) then
+if inputquery('Max addresses', MSG+#13+MSG_EMPTY_NO_LIMIT, s) then
 	try setMaxIPs(strToUInt(s))
   except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
   end;
@@ -10160,8 +10283,8 @@ if i > maxIPs then
 end;
 
 procedure TmainFrm.maxIPsDLing1Click(Sender: TObject);
-const
-  MSG = 'Max simultaneous addresses downloading.'#13+MSG_EMPTY_NO_LIMIT;
+resourcestring
+  MSG = 'Max simultaneous addresses downloading.';
   MSG2 = 'In this moment there are %d different addresses downloading';
 var
   s: string;
@@ -10169,7 +10292,7 @@ var
 begin
 if maxIPsDLing > 0 then s:=intToStr(maxIPsDLing)
 else s:='';
-if inputquery('Max addresses downloading', MSG, s) then
+if inputquery('Max addresses downloading', MSG+#13+MSG_EMPTY_NO_LIMIT, s) then
 	try setMaxIPsDLing(strToUInt(s))
   except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
   end;
@@ -10180,7 +10303,7 @@ if i > maxIPsDLing then
 end;
 
 procedure TmainFrm.Maxlinesonscreen1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Max lines on screen';
 var
   s: string;
@@ -10199,7 +10322,7 @@ procedure TmainFrm.Autosaveevery1Click(Sender: TObject);
 begin autosaveClick(autosaveVFS, 'file system') end;
 
 procedure TmainFrm.Apachelogfileformat1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'Here you can specify how to format the log file complying Apache standard.'
     +#13'Leave blank to get bare copy of screen on file.'
     +#13
@@ -10412,7 +10535,7 @@ msgDlg('Dynamic DNS updater disabled');
 end;
 
 procedure TmainFrm.saveNewFingerprintsChkClick(Sender: TObject);
-const
+resourcestring
   MSG = 'This option creates an .md5 file for every new calculated fingerprint.'
     +#13'Use with care to get not your disk invaded by these files.';
 begin
@@ -10421,7 +10544,7 @@ if saveNewFingerprintsChk.Checked then
 end;
 
 procedure TmainFrm.Createfingerprintonaddition1Click(Sender: TObject);
-const
+resourcestring
   MSG = 'When you add files and no fingerprint is found, it is calculated.'
     +#13'To avoid long waitings, set a limit to file size (in KiloBytes).'
     +#13'Leave empty to disable, and have no fingerprint created.';
@@ -10436,7 +10559,7 @@ except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR) end;
 end;
 
 procedure TmainFrm.pwdInPagesChkClick(Sender: TObject);
-const
+resourcestring
   MSG = 'This feature is INCOMPATIBLE with Internet Explorer.';
 begin
 if pwdInPagesChk.Checked
@@ -10550,7 +10673,7 @@ if mi.Checked then
   begin
   cnv.font.Name:='WingDings';
   with cnv.Font do size:=size+2;
-  cnv.TextOut(r.Left+images.width, r.Top, 'ü'); // check mark
+  cnv.TextOut(r.Left+images.width, r.Top, #$0252); // check mark
   end;
 end;
 

@@ -1,5 +1,5 @@
-Welcome! This is the default template for HFS 2.3
-template revision TR2.
+Welcome! This is the default template for HFS 2.4
+template revision TR3.
 
 Here below you'll find some options affecting the template.
 Consider 1 is used for "yes", and 0 is used for "no".
@@ -10,8 +10,6 @@ put this text [+special:strings]
 and following all the options you want to change, using the same syntax you see here.
 
 [+special:strings]
-option.paged=1
-COMMENT this option causes your file list to be paged by default
 
 option.newfolder=1
 option.move=1
@@ -19,200 +17,241 @@ option.comment=1
 option.rename=1
 COMMENT with these you can disable some features of the template. Please note this is not about user permissions, this is global!
 
-[]
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">
+[common-head]
+<!DOCTYPE html>
 <html>
 <head>
 	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
-	<title>{.!HFS.} %folder%</title>
-	<link rel="stylesheet" href="/?mode=section&id=style.css" type="text/css">
-    <script type="text/javascript" src="/?mode=jquery"></script>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="shortcut icon" href="/favicon.ico">
+	<link rel="stylesheet" href="/?mode=section&id=style.css" type="text/css">
+
+[]
+{.$common-head.}
+	<title>{.!HFS.} %folder%</title>
+    <script type="text/javascript" src="/?mode=jquery"></script>
 	<style class='trash-me'>
 	.onlyscript, button[onclick] { display:none; }
 	</style>
     <script>
     // this object will store some %symbols% in the javascript space, so that libs can read them
-    HFS = { folder:'{.js encode|%folder%.}', number:%number%, paged:{.!option.paged.} }; 
+    HFS = { folder:'{.js encode|%folder%.}' };
     </script>
 	<script type="text/javascript" src="/?mode=section&id=lib.js"></script>
 </head>
 <body>
-<!--{.comment|--><h1 style='margin-bottom:100em'>WARNING: this template is only to be used with HFS 2.3 (and macros enabled)</h1> <!--.} -->
-{.$box panel.}
-{.$list.}
+	<div id="wrapper">
+	<!--{.comment|--><h1 style='margin-bottom:100em'>WARNING: this template is only to be used with HFS 2.3 (and macros enabled)</h1> <!--.} -->
+	{.$menu panel.}
+	{.$folder panel.}
+	{.$list panel.}
+	</div>
 </body>
-</html>
 <!-- Build-time: %build-time% -->
+</html>
 
-[list]
-<div id='files_outer'>
-	<div style='height:1.6em;'></div> {.comment| this is quite ugly, i know, but if i use any vertical padding with height:100% i'll get a scrollbar .} 
-	{.if not| %number% |{: <div style='font-size:200%; padding:1em;'>{.!{.if|{.length|{.?search.}.}|No results|No files.}.}</div> :}|{:
-        <form method='post'>
-            <table id='files'>
-            {.set|sortlink| {:<a href="{.trim|
-                    {.get|url|sort=$1| {.if| {.{.?sort.} = $1.} |  rev={.not|{.?rev.} .} /if.} /get.}
-                /trim.}">{.!$2.}{.if| {.{.?sort.} = $1.} | &{.if|{.?rev.}|u|d.}Arr;.}</a>:} .}
-            <th>{.^sortlink|n|Name.}{.^sortlink|e|.extension.}
-            <th>{.^sortlink|s|Size.}
-            <th>{.^sortlink|t|Timestamp.}
-            <th>{.^sortlink|d|Hits.}
-            %list%
-            </table>
-        </form>
-	:}.}
+[list panel]
+{.if not| %number% |{:
+	<div id='nothing'>{.!{.if|{.length|{.?search.}.}|No results|No files.}.}</div> 
+:}|{:
+	<div id='files' class="hideTs {.for each|z|mkdir|comment|move|rename|delete|{: {.if|{.can {.^z.}.}|can-{.^z.} .}:}.}">
+	%list%
+	</div>
+:}.}
+<div id="serverinfo">
+	<a href="http://www.rejetto.com/hfs/"><i class="fa fa-coffee"></i> {.!Uptime.}: %uptime%</a>
 </div>
 
-[box panel]
-<div id='panel'>
-    {.$box messages.}
-    {.$box login.}
-    {.$box folder.}
-    {.$box search.}
-    {.$box selection.}
-    {.$box upload.}
-    {.$box actions.}
-    {.$box server info.}
-</div>
 
-[box messages] 
-	<fieldset id='msgs'>
-		<legend><img src="/~img10"> {.!Messages.}</legend>
-		<ul style='padding-left:2em'>
-		</ul>
-	</fieldset>
+[menu panel]
+<script>
+	$(function(){
+        if ($('#menu-panel').css('position').indexOf('sticky') < 0) // sticky is not supported
+            setInterval(function(){ $('#wrapper').css('margin-top', $('#menu-panel').height()+5) }, 300); // leave space for the fixed panel
+    });
 
-[box login]		
-	<fieldset id='login'>
-		<legend><img src="/~img27"> {.!User.}</legend>
-		<center>
-		{.if| {.length|%user%.} |{:
-            %user%
-            {.if|{.can change pwd.} | 
-                <button onclick='changePwd.call(this)' style='font-size:x-small;'>{.!Change password.}</button>
-            .}
-            :}
-            | <a href="~login">{.!Login.}</a>
-        .}
-		</center>
-	</fieldset>                                       
+    function changePwd() {
+        {.if|{.can change pwd.}
+        | ask(this.innerHTML, 'password', function(s){
+            s && ajax('changepwd', {'new':s}, getStdAjaxCB([
+                "!{.!Password changed, you'll have to login again..}",
+                '>~login'
+            ]))
+        })
+        | showError("{.!Sorry, you lack permissions for this action.}")
+		.}
+    }//changePwd
 
-[box folder]
-	<fieldset id='folder'>
-		<legend><img src="/~img8"> {.!Folder.}</legend>
+    function ajax(method, data, cb) {
+        if (!data)
+            data = {};
+        data.token = "{.cookie|HFS_SID_.}";
+        return $.post("?mode=section&id=ajax."+method, data, cb||getStdAjaxCB());
+    }//ajax
 
-       <div style='float:right; position:relative; top:-1em; font-weight:bold;'>
-		{.if| {.length|{.?search.}.} | <a href="."><img src="/~img14"> {.!Back.}</a>
-		| {.if| {.%folder% != / .} | <a href=".."><img src="/~img14"> {.!Up.}</a> .}
+</script>
+
+<div id='menu-panel'>
+	<div id="title-bar">
+		{.$title-bar.}
+	</div>
+	<div id="menu-bar">
+		{.if| {.length|%user%.}
+		| <button class='pure-button' onclick='$("#user-panel").toggle()'><i class='fa fa-user-circle'></i><span>%user%</span></button>
+		| <button class='pure-button' title="{.!Login.}" onclick='location = "~login"'><i class='fa fa-user'></i><span>{.!Login.}</span></button>
+		.}
+		{.if| {.get|can recur.} |
+		<button class='pure-button' onclick="{.if|{.length|{.?search.}.}| location = '.'| $('#search-panel').toggle().find(':input:first').focus().}">
+			<i class='fa fa-search'></i><span>{.!Search.}</span>
+		</button>
 		/if.}
-		</div>
-
-		<div id='breadcrumbs'>
-		{.comment|we need this to start from 1 {.count|folder levels.}.}
-		{.breadcrumbs|{:<a href="%bread-url%" {.if|{.length|%bread-name%.}|style='padding-left:{.calc|{.count|folder levels.}*0.7.}em;'.} /> {.if|{.length|%bread-name%.}|&raquo; %bread-name%|<img src="/~img1"> {.!Home.}.}</a>:} .}
-       </div>
-        
-		<div id='folder-stats'>%number-folders% {.!folders.}, %number-files% {.!files.}, {.add bytes|%total-size%.}
-		</div>
-		
-		{.123 if 2| <div id='foldercomment'>|{.commentNL|%folder-item-comment%.}|</div> .}
-	</fieldset>
-
-[box search]	
-	{.if| {.get|can recur.} |
-	<fieldset id='search'>
-		<legend><img src="/~img3"> {.!Search.}</legend>
-		<form style='text-align:center'>
-			<input name='search' size='15' value="{.escape attr|{.?search.}.}">
-			<input type='submit' value="{.!go.}">
-		</form>
-		<div style='margin-top:0.5em;' class='hidden popup'>
-			<fieldset>
-				<legend>{.!Where to search.}</legend>
-					<input type='radio' name='where' value='fromhere' checked='true' />  {.!this folder and sub-folders.}
-					<br><input type='radio' name='where' value='here' />  {.!this folder only.}
-					<br><input type='radio' name='where' value='anywhere' />  {.!entire server.}
-			</fieldset>
-		</div>
-	</fieldset>
-	/if.}
-
-[box selection]	
-	<fieldset id='select' class='onlyscript'>
-		<legend><img src="/~img15"> {.!Select.}</legend>
-		<center>
-    	<button onclick="
-            var x = $('#files .selector');
-            if (x.size() > x.filter(':checked').size())
-                x.attr('checked', true).closest('tr').addClass('selected');
-			else
-                x.attr('checked', false).closest('tr').removeClass('selected');
-			selectedChanged();
-			">{.!All.}</button>
-    	<button onclick="
-            $('#files .selector').attr('checked', function(i,v){ return !v }).closest('tr').toggleClass('selected');
-			selectedChanged();
-            ">{.!Invert.}</button>
-    	<button onclick='selectionMask.call(this)'>{.!Mask.}</button>
-		<p style='display:none; margin-top:1em;'><span id='selected-number'>0</span> {.!items selected.}</p>
-		</center>
-	</fieldset>
-
-[box upload]
-	{.if| {.get|can upload.} |{:
-		<fieldset id='upload'>
-    		<legend><img src="/~img32"> {.!Upload.}</legend>
-    		<form action="." method='post' enctype="multipart/form-data" style='text-align:right;'>
-    		<input type='file' name='file' multiple style='display:block;' />
-    		<input type='submit' value='{.!Upload.}' style='margin-top:0.5em;' />
-    		</form>
-		</fieldset>
-	:}.}
-
-[box actions]	
-	<fieldset id='actions'>
-		<legend><img src="/~img18"> {.!Actions.}</legend>
-		<center>
+		<button id="multiselection" class='pure-button' title="{.!Enable multi-selection.}"  onclick='toggleSelection()'>
+			<i class='fa fa-check-square'></i>
+			<span>{.!Selection.}</span>
+		</button>
 		{.if|{.can mkdir.}|
-		<button id='newfolderBtn' onclick='ezprompt(this.innerHTML, {type:"text"}, function(s){
-				ajax("mkdir", {name:s});
-		    });'>{.!New folder.}</button>
+			<button title="{.!New folder.}" class='pure-button' id='newfolderBtn' onclick='ask(this.innerHTML, "text", name=> ajax("mkdir", { name:name }))'>
+				<i class="fa fa-folder"></i>
+				<span>{.!New folder.}</span>
+			</button>
 		.}
-		{.if|{.can comment.}|
-		<button id='commentBtn' onclick='setComment.call(this)'>{.!Comment.}</button>
-		.}
-		{.if|{.get|can delete.}|
-		<button id='deleteBtn' onclick='if (confirm("{.!confirm.}")) submit({action:"delete"}, "{.get|url.}")'>{.!Delete.}</button>
+		<button id="toggleTs" class='pure-button' title="{.!Display timestamps.}"  onclick="toggleTs()">
+			<i class='fa fa-clock-o'></i>
+			<span>{.!Toggle timestamp.}</span>
+		</button>
 
-		{.if|{.and|{.!option.move.}|{.can move.}.}| <button id='moveBtn' onclick='moveClicked()'>{.!Move.}</button> .}
-		.}
-		{.if|{.can rename.}|
-		<button id='renameBtn' onclick='
-            var a = selectedItems();
-                if (a.size() != 1)
-				return alert("You must select a single item to rename");
-			ezprompt(this.innerHTML, {type:"text"}, function(s){
-				ajax("rename", {from:getItemName(a[0]), to:s});
-		    });'>{.!Rename.}</button>
-		.}
 		{.if|{.get|can archive.}|
-		<button id='archiveBtn' onclick='if (confirm("{.!confirm.}")) submit({}, "{.get|url|mode=archive|recursive.}")'>{.!Archive.}</button>
+		<button id='archiveBtn' class='pure-button' onclick='ask("{.!Download these files as a single archive?.}", function() { submit({ selection: getSelectedItemsName() }, "{.get|url|mode=archive|recursive.}") })'>
+			<i class="fa fa-file-archive-o"></i>
+			<span>{.!Archive.}</span>
+		</button>
 		.}
-		<a href="{.get|url|tpl=list|sort=|{.if not|{.length|{.?search.}.}|{:folders-filter=\|recursive:}.}.}">{.!Get list.}</a>
-		</center>
-	</fieldset>
+		{.if| {.get|can upload.} |{:
+			<button id="upload" onclick="upload()" class='pure-button' title="{.!Upload.}">
+				<i class='fa fa-upload'></i>
+				<span>{.!Upload.}</span>
+			</button>
+		:}.}
 
-[box server info]
-	<fieldset id='serverinfo'>
-		<legend><img src="/~img0"> {.!Server information.}</legend>
-		<a href="http://www.rejetto.com/hfs/">HttpFileServer %version%</a>
-		<br />{.!Server time.}: %timestamp%
-		<br />{.!Server uptime.}: %uptime%
-	</fieldset>
+		<button id="sort" onclick="changeSort()" class='pure-button'>
+			<i class='fa fa-sort'></i>
+			<span></span>
+		</button>
+	</div>
 
+    <div id="additional-panels">
+        <div id="user-panel" class="additional-panel" style="display:none;">
+			<span>{.!User.}: %user%</span>
+			<button class="pure-button" onclick='changePwd.call(this)'><i class="fa fa-key"></i> {.!Change password.}</button>
+        </div>
+		{.$search panel.}
+		{.$upload panel.}
+		<div id="selection-panel" class="additional-panel" style="display:none">
+			<label><span id="selected-counter">0</span> {.!selected.}</label>
+			<span class="buttons">
+				<button id="select-mask" class="pure-button"><i class="fa fa-asterisk"></i><span>{.!Mask.}</span></button>
+				<button id="select-invert" class="pure-button"><i class="fa fa-retweet"></i><span>{.!Invert.}</span></button>
+				<button id="delete-selection" class="pure-button"><i class="fa fa-trash"></i><span>{.!Delete.}</span></button>
+				<button id="move-selection" class="pure-button"><i class="fa fa-truck"></i><span>{.!Move.}</span></button>
+			</span>
+		</div>
+    </div>
+</div>
+
+[title-bar]
+<i class="fa fa-globe"></i> {.!title.}
+<i class="fa fa-lightbulb" id="switch-theme"></i>
+<script>
+$('body').addClass(getCookie('theme'))
+$(function(){
+
+    var titleBar = $('#title-bar')
+	var h = titleBar.height()
+	var on = true
+	var k = 'shrink'
+    window.onscroll = function(){
+        if (window.scrollY > h)
+        	titleBar.addClass(k)
+		else if (!window.scrollY)
+            titleBar.removeClass(k)
+    }
+
+    $('#switch-theme').click(function(ev) {
+        var k = 'dark-theme';
+        $('body').toggleClass(k);
+        setCookie('theme', $('body').hasClass(k) ? k : '');
+    });
+});
+</script>
+<style>
+	#title-bar { color:white; height:1.5em; transition:height .2s ease; overflow:hidden; position: relative; top: 0.2em;font-size:120%; }
+	#title-bar.shrink { height:0; }
+	#foldercomment { clear:left; }
+	#switch-theme { color: #aaa; position: absolute; right: .5em; }
+</style>
+
+[folder panel]
+<div id='folder-path'>
+	{.breadcrumbs|{:<a class='pure-button' href="%bread-url%"/> {.if|{.length|%bread-name%.}|/ %bread-name%|<i class='fa fa-home'></i>.}</a>:} .}
+</div>
+{.if|%number%|
+<div id='folder-stats'>
+	%number-folders% {.!folders.}, %number-files% {.!files.}, {.add bytes|%total-size%.}
+</div>
+.}
+{.123 if 2| <div id='foldercomment' class="comment"><i class="fa fa-quote-left"></i>|{.commentNL|%folder-item-comment%.}|</div> .}
+
+[upload panel]
+<div id="upload-panel" class="additional-panel closeable" style="display:none">
+	<div id="upload-counters">
+		{.!Uploaded.}: <span id="upload-ok">0</span> - {.!Failed.}: <span id="upload-ko">0</span> - {.!Queued.}: <span id="upload-q">0</span>
+	</div>
+	<div id="upload-results"></div>
+	<div id="upload-progress">
+		{.!Uploading....} <span id="progress-text"></span>
+		<progress max="1"></progress>
+	</div>
+	<button class="pure-button" onclick="reload()"><i class="fa fa-refresh"></i> {.!Reload page.}</button>
+</div>
+
+[search panel]
+<div id="search-panel" class="additional-panel closeable" style="{.if not|{.length|{.?search.}.}|display:none.}">
+	<form>
+		{.!Search.} <input name="search" value="{.escape attr|{.?search.}.}" />
+		<br><input type='radio' name='where' value='fromhere' checked='true' />  {.!this folder and sub-folders.}
+		<br><input type='radio' name='where' value='here' />  {.!this folder only.}
+		<br><input type='radio' name='where' value='anywhere' />  {.!entire server.}
+		<button type="submit" class="pure-button">{.!Go.}</button>
+	</form>
+</div>
+<style>
+	#search-panel [name=search] { margin: 0 0 0.3em 0.1em; }
+	#search-panel button { float:right }
+</style>
+<script>
+    $('#search-panel').submit(function(){
+        var s = $(this).find('[name=search]').val()
+        var folder = ''
+        var ps = []
+        switch ($('[name=where]:checked').val()) {
+            case 'anywhere': folder = '/'
+            case 'fromhere':
+                ps.push('search='+s)
+                break
+            case 'here':
+                if (s.indexOf('*') < 0)
+                    s = '*'+s+'*'
+                ps.push('files-filter='+s)
+                ps.push('folders-filter='+s)
+                break
+        }
+        location = folder+'?'+ps.join('&')
+        return false
+    })
+</script>
 
 [+special:strings]
+title=HTTP File Server
 max s dl msg=There is a limit on the number of <b>simultaneous</b> downloads on this server.<br>This limit has been reached. Retry later.
 retry later=Please, retry later.
 item folder=in folder
@@ -220,66 +259,187 @@ no files=No files in this folder
 no results=No items match your search query
 confirm=Are you sure?
 
-[style.css|no log]
-body { font-family:tahoma, verdana, arial, helvetica, sans; font-weight:normal; font-size:9pt; background-color:#eef; }
-html, body { padding:0; border:0; height:100%; }
-html, body, p, form { margin:0 }
-a { text-decoration:none; color:#47c; border:1px solid transparent; padding:0 0.1em; }
-a:visited { color:#55F; }
-a:hover { background-color:#fff; border-color:#47c; }
-img { border-style:none }
-fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
+[icons.css|no log]
+@font-face { font-family: 'fontello';
+	src: url('data:application/x-font-woff;base64,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') format('woff');
+}
+.fa { font-family: "fontello"; font-style: normal; font-weight: normal; }
+.fa-asterisk::before { content:"\e800" }
+.fa-check-circled::before { content:"\e801" }
+.fa-user::before { content:"\e802" }
+.fa-clock-o::before { content:"\e803" }
+.fa-download::before { content:"\e804" }
+.fa-ban::before { content:"\e805" }
+.fa-edit::before { content:"\e806" }
+.fa-check-square::before { content:"\e807" }
+.fa-folder::before { content:"\e808" }
+.fa-globe::before { content:"\e809" }
+.fa-home::before { content:"\e80a" }
+.fa-key::before { content:"\e80b" }
+.fa-lock::before { content:"\e80c" }
+.fa-refresh::before { content:"\e80d" }
+.fa-retweet::before { content:"\e80e" }
+.fa-search::before { content:"\e80f" }
+.fa-star::before { content:"\e810" }
+.fa-cancel-circled::before { content:"\e811"; }
+.fa-truck::before { content:"\e812" }
+.fa-upload::before { content:"\e813" }
+.fa-bars::before { content:"\f0c9" }
+.fa-coffee::before { content:"\f0f4" }
+.fa-quote-left::before { content:"\f10d" }
+.fa-file-archive-o::before { content:"\f1c6" }
+.fa-trash::before { content:"\f1f8" }
+.fa-user-circle::before { content:"\f2bd" }
+.fa-lightbulb:before { content: '\f0eb' }
+.fa-sort:before { content: '\f0dc' }
+.fa-sort-alt-up:before { content: '\f160' }
+.fa-sort-alt-down:before { content: '\f161' }
 
-#panel { float:left; margin-top:1em; margin-left:1em; max-width:250px; }
-#panel hr { width:80%; margin:1em auto; }
-#files_outer { height:100%; overflow:auto; text-align:left; padding:0 1.6em; }
-#files { background:#ddf; border:0; }
-#files tr { background:#fff; }
-#files tr.even { background:#eef; }
-#files tr.selected { background:#bcf; }
-#files td { padding:0.2em 0.5em; text-align:right; }
-#files tr td:first-child { text-align:left; }
-#files th { padding:0.5em 1em; background:#47c; text-align:center; }
-#files th a { color:white; font-size:130%; }
-#files th a:hover { background:transparent; border-color:#fff; color:#fff; font-size:130%; }
-#files td:first-child { text-align:left; }
-#files td.nosize { text-align:center; font-style:italic; }
-#files .selector { display:none; }
-#actions button { margin:0.2em; } 
-#breadcrumbs { margin-top:1em; padding-left:0.5em; }
-#breadcrumbs a { padding:0.15em 0; border-width:2px; display:block; word-break:break-all; }
-#folder-stats, #foldercomment { margin-top:1em; padding-top:0.5em; border-top:1px solid #666;  }
-#folder-stats { color:#666; text-align:center; }
+[style.css|no log|cache]
+/*! normalize.css v8.0.0 | MIT License | github.com/necolas/normalize.css */html{line-height:1.15;-webkit-text-size-adjust:100%}body{margin:0}h1{font-size:2em;margin:.67em 0}hr{box-sizing:content-box;height:0;overflow:visible}pre{font-family:monospace,monospace;font-size:1em}a{background-color:transparent}abbr[title]{border-bottom:none;text-decoration:underline;text-decoration:underline dotted}b,strong{font-weight:bolder}code,kbd,samp{font-family:monospace,monospace;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}img{border-style:none}button,input,optgroup,select,textarea{font-family:inherit;font-size:100%;line-height:1.15;margin:0}button,input{overflow:visible}button,select{text-transform:none}[type=button],[type=reset],[type=submit],button{-webkit-appearance:button}[type=button]::-moz-focus-inner,[type=reset]::-moz-focus-inner,[type=submit]::-moz-focus-inner,button::-moz-focus-inner{border-style:none;padding:0}[type=button]:-moz-focusring,[type=reset]:-moz-focusring,[type=submit]:-moz-focusring,button:-moz-focusring{outline:1px dotted ButtonText}fieldset{padding:.35em .75em .625em}legend{box-sizing:border-box;color:inherit;display:table;max-width:100%;padding:0;white-space:normal}progress{vertical-align:baseline}textarea{overflow:auto}[type=checkbox],[type=radio]{box-sizing:border-box;padding:0}[type=number]::-webkit-inner-spin-button,[type=number]::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}[type=search]::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}details{display:block}summary{display:list-item}template{display:none}[hidden]{display:none}
+
+{.$icons.css.}
+
+.pure-button {
+	background-color: #cde; padding: .5em 1em; color: #444; color: rgba(0,0,0,.8); border: 1px solid #999; border: transparent; text-decoration: none; box-sizing: border-box;
+	border-radius: 2px; display: inline-block; zoom: 1; white-space: nowrap; vertical-align: middle; text-align: center; cursor: pointer; user-select: none;
+}
+body { font-family:tahoma, verdana, arial, helvetica, sans; transition:background-color 1s ease; }
+a { text-decoration:none; color:#26c; border:1px solid transparent; padding:0 0.1em; }
+#folder-path { float:left; margin-bottom: 0.2em; }
+#folder-path a { padding: .5em; }
+#folder-path a:first-child { padding:.28em } #folder-path i.fa { font-size:135% }
+button i.fa { font-size:110% }
+.item { margin-bottom:.3em; padding:.3em  .8em; border-top:1px solid #ddd;  }
+.item:hover { background:#f8f8f8; }
+.item-props { float:right; font-size:90%; margin-left:12px; color:#777; margin-top:.2em; }
+.item-link { float:left; word-break:break-word; /* fix long names without spaces on mobile */ }
+.item img { vertical-align: text-bottom; margin:0 0.2em; }
+.item .fa-lock { margin-right: 0.2em; }
+.item .clearer { clear:both }
+.comment { color:#666; padding:.1em .5em .2em; background-color: #f5f5f5; border-radius: 1em; margin-top: 0.1em; }
+.comment>i { margin-right:0.5em; }
+.item-size { margin-left:.3em }
+.selector { float:left; width: 1.2em; height:1.2em; margin-right: .5em;}
+.item-menu { padding:0.1em 0.3em; border-radius:0.6em; border: 1px outset; position: relative; top: -0.1em;}
+.dialog-content .buttons { margin-top:1.5em }
+.dialog-content .buttons button { margin:.5em auto; min-width: 9em; display:block; }
+.dialog-content.error { background: #fcc; }
+.dialog-content.error h2 { text-align:center }
+.dialog-content.error button { background-color: #f77; color: white; }
+#wrapper { max-width:60em; margin:auto; } /* not too wide or it will be harder to follow rows */
+#serverinfo { font-size:80%; text-align:center; margin: 1.5em 0 0.5em; }
+#selection-panel { text-align:center; }
+#selection-panel label { margin-right:0.8em }
+#selection-panel button { vertical-align:baseline; }
+#selection-panel .buttons { white-space:nowrap }
+
+.item-menu { display:none }
+.can-comment .item-menu,
+.can-rename .item-menu,
+.can-delete .item-menu { display:inline-block; display:initial; }
+
+#folder-stats { font-size:90%; padding:.1em .3em; margin:.5em; float:right; }
+#files,#nothing { clear:both }
+#nothing { padding:1em }
+
+.dialog-overlay { background:rgba(0,0,0,.75); position:fixed; top:0; left:0; width:100%; height:100%; z-index:100; }
+.dialog-content { position: absolute; top: 50%; left: 50%;
+	transform: translate(-50%, -50%);
+	-webkit-transform: translate(-50%, -50%);
+	-moz-transform: translate(-50%, -50%);
+	-ms-transform: translate(-50%, -50%);
+	-o-transform: translate(-50%, -50%);
+	background:#fff; border-radius: 1em; padding: 1em; text-align:center; min-width: 10em;
+}
+.ask input { border:1px solid rgba(0,0,0,0.5); padding: .2em; margin-top: .5em; }
+.ask .close { float: right; font-size: 1.2em; color: red; position: relative; top: -0.4em; right: -0.3em; }
+
+#additional-panels input {     color: #555; padding: .1em 0.3em; border-radius: 0.4em; }
+
+.additional-panel { position:relative; max-height: calc(100vh - 5em); text-align:left; margin: 0.5em 1em; padding: 0.5em 1em; border-radius: 1em; background-color:#555; border: 2px solid #aaa; color:#fff; line-height: 1.5em; display:inline-block;  }
+.additional-panel .close { position: absolute; right: -0.8em; top: -0.2em; color: #aaa; font-size: 130%; }
+
+body.dark-theme { background:#222; color:#aaa; }
+body.dark-theme #title-bar { color:#bbb }
+body.dark-theme a { color:#79b }
+body.dark-theme a.pure-button { color:#444 }
+body.dark-theme .item:hover { background:#111; }
+body.dark-theme .pure-button { background:#89a; }
+body.dark-theme .item .comment { background-color:#444; color:#888; }
+body.dark-theme #foldercomment { background-color:#333; color:#999; }
+body.dark-theme .dialog-overlay { background:rgba(100,100,100,.5) }
+body.dark-theme .dialog-content { background:#222; color:#888; }
+body.dark-theme input,
+body.dark-theme textarea,
+body.dark-theme select,
+body.dark-theme #additional-panels input
+{ background: #111; color: #aaa; }
+
 #msgs { display:none; }
 #msgs li:first-child { font-weight:bold; }
-#pages span { padding-left:0.5em; padding-right:0.5em; cursor:pointer; }
-#pages button { font-size:smaller; }
-.selectedPage { font-weight:bold; font-size:larger; }
-.hidden { display:none; }
-                             
+
+#menu-panel { position:fixed; top:0; left:0; width: 100%; background:#555; text-align:center;
+position: -webkit-sticky; position: -moz-sticky; position: -ms-sticky; position: -o-sticky; position: sticky; margin-bottom:0.3em;
+z-index:1; /* without this .item-menu will be over*/ }
+#menu-panel button span { margin-left:.8em }
+#user-panel button { padding:0.3em 0.6em; font-size:smaller; margin-left:1em; }
+#user-panel span { position: relative; top: 0.1em; }
+#menu-bar { padding:0.2em 0 }
+
+@media (min-width: 50em) {
+#toggleTs { display: none }
+}
+@media (max-width: 50em) {
+#menu-panel button { padding: .4em .6em; }
+.additional-panel button span,
+#menu-bar button span { display:none } /* icons only */
+#menu-bar i { font-size:120%; } /* bigger icons */
+#menu-bar button { width: 3em; max-width:10.7vw; padding: .4em 0; }
+.hideTs .item-ts { display:none }
+}
+
+#upload-panel { font-size: 88%;}
+#upload-progress { margin-top:.5em; display:none; }
+#upload-progress progress { width:10em; position:relative; top:.1em; }
+#progress-text { position: absolute; color: #000; font-size: 80%; margin-left:.5em; z-index:1; }
+#upload-results a { color:#b0c2d4; }
+#upload-results>* { display:block; word-break: break-all; }
+#upload-results>span { margin-left:.15em; } /* better alignment */
+#upload-results { max-height: calc(100vh - 11em); overflow: auto;}
+#upload-panel>button { margin: auto; display: block; margin-top:.8em;} /* center it*/
+
+
 [file=folder=link|private]
-	<tr class='{.if|{.mod|{.count|row.}|2.}|even.}'><td>
-        <input type='checkbox' class='selector' name='selection' value="%item-url%" {.if not|{.or|{.get|can delete.}|{.get|can access.}|{.get|can archive item.}.}|disabled='disabled'.} />
-		{.if|{.get|is new.}|<span class='flag'>&nbsp;NEW&nbsp;</span>.}
-		{.if not|{.get|can access.}|<img src='/~img_lock'>.}
-		<a href="%item-url%"><img src="%item-icon%"> %item-name%</a>
-		{.if| {.length|{.?search.}.} |{:{.123 if 2|<div class='item-folder'>{.!item folder.} |{.breadcrumbs|{:<a href="%bread-url%">%bread-name%/</a>:}|from={.count substring|/|%folder%.}/breadcrumbs.}|</div>.}:} .}
-		{.123 if 2|<div class='comment'>|{.commentNL|%item-comment%.}|</div>.}
-
+<div class='item item-type-%item-type% {.if|{.get|can access.}||cannot-access.} {.if|{.get|can archive item.}|can-archive.}'>
+	<div class="item-link">
+		<a href="%item-url%">
+			<img src="%item-icon%" />
+			%item-name%
+		</a>
+	</div>
+	<div class='item-props'>
+		<span class="item-ts"><i class='fa fa-clock-o'></i> {.cut||-3|%item-modified%.}</span>
 [+file]
-<td>%item-size%B<td>%item-modified%<td>%item-dl-count%
-
-[+folder]
-<td class='nosize'>{.!folder-item|folder.}<td>%item-modified%<td>%item-dl-count%
-
-[+link]
-<td class='nosize'>link<td colspan='2'>
+		<span class="item-size"><i class='fa fa-download' title="{.!Download counter:.} %item-dl-count%"></i> %item-size%B</span>
+[+file=folder=link]
+		{.if|{.get|is new.}|<i class='fa fa-star' title="{.!NEW.}"></i>.}
+[+file=folder]
+        <button class='item-menu pure-button' title="{.!More options.}"><i class="fa fa-bars"></i></button>
+[+file=folder=link]
+ 	</div>
+	<div class='clearer'></div>
+[+file=folder=link]
+    {.if| {.length|{.?search.}.} |{:{.123 if 2|<div class='item-folder'>{.!item folder.} |{.breadcrumbs|{:<a href="%bread-url%">%bread-name%/</a>:}|from={.count substring|/|%folder%.}/breadcrumbs.}|</div>.}:} .}
+	{.123 if 2|<div class='comment'><i class="fa fa-quote-left"></i><span class="comment-text">|{.commentNL|%item-comment%.}|</span></div>.}
+</div>
 
 [error-page]
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">
+<!DOCTYPE html>
 <html>
-  <head>
-  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style type="text/css">
   {.$style.css.}
   </style>
@@ -288,8 +448,7 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 %content%
 <hr>
 <div style="font-family:tahoma, verdana, arial, helvetica, sans; font-size:8pt;">
-<a href="http://www.rejetto.com/hfs/">HttpFileServer %version%</a>
-<br>%timestamp%
+<a href="http://www.rejetto.com/hfs/">HFS</a> - %timestamp%
 </div>
 </body>
 </html>
@@ -324,43 +483,22 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 [upload-file]
 
 [upload-results]
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">
-<html>
-<head>
-	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
-	<title>HFS %folder%</title>
-	<link rel="stylesheet" href="/?mode=section&id=style.css" type="text/css">
-	<style>
-	li {list-style-image:url(/~img7); padding-bottom:1em; }
-    li.bad { list-style-image:url(/~img11); }
-	ul { border:1px solid #999; border-left:0; border-right:0; padding-top:1em; }
-	a.back { display: block; width: 10em; white-space:nowrap; padding:0.3em 0.5em; margin-top:1em; }
-    </style>
-</head>
-<body style='margin:2em;'>
-<h1>{.!Upload results.}</h1>
-{.or|{.^ok.}|0.} {.!files uploaded correctly..}
-{.123 if 2|<br /> |{.^ko.}| files failed..}
-<a href="." class='back'><img src="/~img14"> {.!Back.}</a>
-{.^back.}
-<ul>
-%uploaded-files%
-</ul>
-<a href="." class='back'><img src="/~img14"> {.!Back.}</a>
-</body>
-</html>
+[{.cut|1|-1|%uploaded-files%.}
+]
 
 [upload-success]
-{.inc|ok.}
-<li> <a href="%item-url%">%item-name%</a>
-<br />%item-size% @ %smart-speed%B/s
-{.if| {.length|%user%.} |{: {.append| %folder-resource%\hfs.comments.txt |{.filename|%item-resource%.}=uploaded by %user%
-/append.} :}/if.}
+{
+"url":"%item-url%",
+"name":"%item-name%",
+"size":"%item-size%",
+"speed":"%smart-speed%"
+},
+{.if| {.length|%user%.} |{:
+	{.set item|{.force ansi|%folder%%item-name%.}|comment={.!uploaded by.} %user%.}
+:}.}
 
 [upload-failed]
-{.inc|ko.}
-<li class='bad'>%item-name%
-<br />{.!%reason%.}
+{ "err":"{.!%reason%.}", "name":"%item-name%" },
 
 [progress|no log]
 <style>
@@ -385,7 +523,7 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 
 [progress-download-file]
 {.if not|{.{.?only.} = up.}|{:
-	<li> Downloading %total% @ %speed-kb% KB/s
+	<li> {.!Downloading.} %total% @ %speed-kb% KB/s
 	<br /><span class='fn'>%filename%</span>
     <br />{.!Time left.} %time-left%"
 	<br><div class='out_bar'><div class='in_bar' style="width:%perc%px"></div></div> %perc%%
@@ -399,7 +537,7 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 {.set|x|{.force ansi|%folder%{.^x.}.}.}
 {.break|if={.exists|{.^x.}.}|result=exists.}
 {.break|if={.not|{.length|{.mkdir|{.^x.}.}.}.}|result=failed.}
-{.add to log|User %user% created folder "{.^x.}".}
+{.add to log|{.!User.} %user% {.!created folder.} "{.^x.}".}
 {.pipe|ok.}
 
 [ajax.rename|no log]
@@ -408,17 +546,23 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 {.break|if={.is file protected|{.postvar|from.}.}|result=forbidden.}
 {.break|if={.is file protected|{.postvar|to.}.}|result=forbidden.}
 {.set|x|{.force ansi|%folder%{.postvar|from.}.}.}
-{.set|y|{.force ansi|%folder%{.postvar|to.}.}.}
+{.set|yn|{.force ansi|{.postvar|to.}.}.}
+{.set|y|{.force ansi|%folder%.}{.^yn.}.}
 {.break|if={.not|{.exists|{.^x.}.}.}|result=not found.}
 {.break|if={.exists|{.^y.}.}|result=exists.}
-{.break|if={.not|{.length|{.rename|{.^x.}|{.^y.}.}.}.}|result=failed.}
-{.add to log|User %user% renamed "{.^x.}" to "{.^y.}".}
+{.set|comment| {.get item|{.^x.}|comment.} .}
+{.set item|{.^x.}|comment=.}
+{.break|if={.not|{.length|{.rename|{.^x.}|{.^yn.}.}.}.}|result=failed.}
+{.set item|{.^x.}|resource={.filepath|{.get item|{.^x.}|resource.}.}{.^yn.}.}
+{.set item|{.^x.}|name={.^yn.}.}
+{.set item|{.^y.}|comment={.^comment.}.}
+{.add to log|{.if|%user%|{.!User.} %user%|{.!Anonymous.}.} {.!renamed.} "{.^x.}" {.!to.} "{.^yn.}".}
 {.pipe|ok.}
 
 [ajax.move|no log]
 {.check session.}
 {.set|dst|{.force ansi|{.postvar|dst.}.}.}
-{.break|if={.not|{.and|{.can move.}|{.get|can delete.}|{.get|can upload|path={.^dst.}.}/and.}.} |result={.!forbidden.}.}
+{.break|if={.not|{.and|{.can move.}|{.get|can delete.}|{.get|can upload|path={.^dst.}.}/and.}.} |result=forbidden.}
 {.set|log|{.!Moving items to.} {.^dst.}.}
 {.for each|fn|{.replace|:|{.no pipe||.}|{.force ansi|{.postvar|files.}.}.}|{:
     {.break|if={.is file protected|var=fn.}|result=forbidden.}
@@ -447,7 +591,7 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 {.break|if={.not|{.can comment.}.} |result=forbidden.}
 {.for each|fn|{.replace|:|{.no pipe||.}|{.postvar|files.}.}|{:
      {.break|if={.is file protected|var=fn.}|result=forbidden.}
-     {.set item|{.force ansi|%folder%{.^fn.}.}|comment={.encode html|{.force ansi|{.postvar|text.}.}.}.}
+     {.set item|{.force ansi|%folder%{.^fn.}.}|comment={.force ansi|{.postvar|text.}.}.}
 :}.}
 {.pipe|ok.}
 
@@ -457,20 +601,21 @@ fieldset { margin-bottom:0.7em; text-align:left; padding:0.6em; }
 {.if|{.length|{.set account||password={.force ansi|{.postvar|new.}.}.}/length.}|ok|failed.}
 
 [special:alias]
-check session=if|{.{.cookie|HFS_SID_.} != {.postvar|token.}.}|{:{.cookie|HFS_SID_|value=|expires=-1.} {.break|result=bad session}:}
+check session=if|{.{.cookie|HFS_SID_.} != {.postvar|token.}.}|{:{.cookie|HFS_SID_|value=|expires=-1.} {.break|result=bad session.}:}
 can mkdir=and|{.get|can upload.}|{.!option.newfolder.}
 can comment=and|{.get|can upload.}|{.!option.comment.}
 can rename=and|{.get|can delete.}|{.!option.rename.}
+can delete=get|can delete
 can change pwd=member of|can change password
 can move=or|1|1
 escape attr=replace|"|&quot;|$1
 commentNL=if|{.pos|<br|$1.}|$1|{.replace|{.chr|10.}|<br />|$1.}
-add bytes=switch|{.cut|-1||$1.}|,|0,1,2,3,4,5,6,7,8,9|$1 {.!Bytes.}|K,M,G,T|$1{.!Bytes.}
+add bytes=switch|{.cut|-1||$1.}|,|0,1,2,3,4,5,6,7,8,9|$1 {.!Bytes.}|K,M,G,T|$1B
 
 [special:import]
 {.new account|can change password|enabled=1|is group=1|notes=accounts members of this group will be allowed to change their password.}
 
-[lib.js|no log]
+[lib.js|no log|cache]
 // <script> // this is here for the syntax highlighter
 
 function outsideV(e, additionalMargin) {
@@ -480,207 +625,17 @@ function outsideV(e, additionalMargin) {
     return e.offset().top + e.height() > outsideV.w.height() - (additionalMargin || 0) - 17;
 } // outsideV
 
-function quotedString(s) { return '"'+s.replace(/(['"\\])/g, "\\$1")+'"' }
-
-$(function(){
-    // make these links into buttons for homogeneity
-    $('#actions a').replaceWith(function(){ return "<button onclick='location = "+quotedString(this.getAttribute('href'))+"'>"+this.innerHTML+"</button>"; });
-    // selecting functionality
-    $('#files .selector').show().change(function(){
-        $(this).closest('tr').toggleClass('selected');
-        selectedChanged();
-    });
-    $('.trash-me').detach(); // this was hiding things for those w/o js capabilities
-    // infinite upload fields available
-    var x = $('input[type=file]');
-    x.change(function(){
-        if ($(this).data('fired')) return;
-        $(this).data('fired',1);
-        fileTpl.clone(true).insertAfter(this).css('display','block');
-    });
-    // we must create an empty "template", by cloning before it's set to a file, because on some browsers (Opera 10) emptying the value run-time is not allowed.
-    // this must be done after the above instruction, so we'll clone also the behavior. 
-    var fileTpl = x.clone(true).css('display','none');
-
-    var x = $('#upload');
-    if  (x.size()) {
-        // make it popup by button, so we save some vertical space and avoid some scrollbar
-        x.hide(); 
-        $('#actions button:first').before(
-            $("<button>{.!Upload.}</button>").click(function(){ 
-                $(this).slideUp(); x.fadeIn(); 
-            })
-        );
-        // on submit			
-        x.find('form').submit(function(){ 
-            if (!$("[name=file]").val()) return false; // no file, no submit
-            $(this).hide(); // we don't need the form anymore, make space for the progress bars
-            // build the gui
-            x.append("<div id='progress'>{.!in progress....}</div>");
-            x.append($("<button style='float:right'>{.!Cancel.}</button>").click(function(){
-                // stop submit/upload
-                if (typeof stop == 'function')
-                    stop(); 
-                else
-                    document.execCommand("Stop");
-                $(this).add($("#progress")).remove(); // remove progress indicators and this button too
-                $("#upload form").slideDown(); // re-show the form
-            }));
-
-            // refresh information
-            function updateProgress() {
-                var now = new Date();
-                if (now-updateProgress.last < updateProgress.refresh*3) return; // until the request is fulfilled, we give it 3 times the refresh time
-                updateProgress.last = now;
-                $.get('/?mode=section&id=progress&only=up', function(txt) {
-                    if (!txt) return;
-                    var x = $('#progress');
-                    if (!x.size()) return clearInterval(updateProgress.handle);
-                    if (txt.indexOf('<li>') >= 0) x.html(txt);
-                    updateProgress.last = 0;
-                });
-            }//updateProgress
-            updateProgress.refresh = 3; // choose the time, in seconds
-            updateProgress.refresh *= 1000; // javascript wants it in milliseconds
-            updateProgress.handle = setInterval(updateProgress, updateProgress.refresh);
-            return true;
-        });
-    }
-
-    // search options appear when it gets focus
-    $('#search').focusin(function(evt){
-        inSearch = 1;
-        if (evt.target.getAttribute('type') == 'submit') return; // the submitter button won't expand the popup, but sets the flag to avoid the popup to be closed
-        $("#search .popup").slideDown();
-    }).focusout(function(evt){
-        inSearch = 0;
-        setTimeout(function(){
-            if (!inSearch)
-                $("#search .popup").fadeOut();
-        });
-    });
-    $('#search form').submit(function(){
-        var s = $(this).find('[name=search]').val();
-        var a = '';
-        var ps = [];
-        switch ($('[name=where]:checked').val()) {
-            case 'anywhere': 
-                a = '/';
-            case 'fromhere':
-                ps.push('search='+s);
-                break;
-            case 'here':
-                if (s.indexOf('*') < 0) s = '*'+s+'*';
-                ps.push('files-filter='+s);
-                ps.push('folders-filter='+s);
-                break;
-        }
-        location = a+'?'+ps.join('&');
-        return false;
-    });
-    
-    // workaround for those browsers not supporting :first-child selector used in style
-    if ($('#files td:first').css('text-align') != 'left')
-        $('#files tr td:first-child').css('text-align','left');
-
-    // here we make some changes trying to make the panel fit the window
-    var removed = 0;
-    var e = $('#panel'); 
-    while (outsideV(e)) {
-        switch (++removed) {
-            case 1: $('#serverinfo').hide(); continue;
-            case 2: $('#select').hide(); continue;
-            case 3: $('#breadcrumbs a').css({display:'inline',paddingLeft:0}); continue;
-            case 4: $('#login').replaceWith($('#login center').prepend('<img src="/~img27">')); continue;
-        }
-        break; // give up
-    }
-    if (HFS.paged)
-        if (getCookie('paged') == 'no')
-            addPagingButton('#actions button:first');
-        else
-            pageIt();
-               
-    {.$more onload.}
-    selectedChanged();
-    // darn you ie6!
-    if (!$.browser.msie || $.browser.version > 6) return;
-    $('fieldset').width('250px').after('<br>');
-    $('#panel').css('margin-right','1.5em');
-    $('a').css('border-width','0');
-    setTimeout(pageIt, 500); // at this time the page is not correctly formatted in IE6
-});//onload
-
-function ajax(method, data, cb) {
-	if (!data)
-		data = {};
-	data.token = "{.cookie|HFS_SID_.}";
-	return $.post("?mode=section&id=ajax."+method, data, cb||getStdAjaxCB());
-}//ajax
-
-function addPagingButton(where) {
-    $("<button>{.!Paged list.}</button>").insertBefore(where || '#files').click(function(){
-        $(this).remove();
-        pageIt(true);
-        delCookie('paged');
-    });
-}//addPagingButton
-
-function pageIt(anim) {
-    var rows = $('#files tr');
-    if (!rows.size()) return;
-    
-    page = 0; // this is global
-    var pages = $("<div id='pages'>{.!Page.} </div>").css('visibility','hidden').insertBefore('#files');
-    var pageSize = 0;
-    while (!outsideV(rows[pageSize], 20))
-        if (++pageSize >= rows.size())
-            return pages.remove();
-    if (pageSize == 0) return; // this happens when the page is not formatted at this exact time, and the table is misplaced 
-
-    Npages = Math.ceil(HFS.number / pageSize);
-    if (Npages == 1)
-        return pages.remove();
-    $('#files').width($('#files').width()); // hold it still
-
-    var s = '';
-    for (var i=1; i <= Npages; i++)
-        s += '<span>'+i+'</span> ';
-    s = $(s);
-    s.appendTo(pages).click(function(){
-        page = Number(this.innerHTML)-1;
-        $('#files tr:gt(0):visible').hide();
-        $('#files tr:gt('+(page*pageSize)+'):lt('+pageSize+')').show();
-        pages.find('span').removeClass('selectedPage').filter(':nth('+page+')').addClass('selectedPage');
-    });
-    s.first().addClass('selectedPage');		
-    $('#files tr:gt('+((page+1)*pageSize)+')').hide();
-    pages.append($("<button type='button'>{.!No pages.}</button>").click(function(){
-        pages.slideUp(function(){ pages.remove(); });
-        $('#files tr:hidden').show();
-        addPagingButton();
-        setCookie('paged', 'no');
-    }));
-    pages.css({visibility:'', display:'none'});
-    if (anim) pages.slideDown()
-    else pages.show();		
-}//pageIt
-
-function selectedChanged() {
-    $("#selected-number").text( selectedItems().size() ).parent().show();
-} // selectedChanged
+function selectionChanged() { $('#selected-counter').text( getSelectedItems().length ) }
 
 function getItemName(el) {
-    if (typeof el == 'undefined')
-        return false;
-    // we handle elements, not jquery sets
-    if (el.jquery)
-        if (el.size())
-            el = el[0];
-        else
-            return false;
+    if (!el)
+        return false
+    el = $(el)
+    var a = el.closest('a')
+    if (!a.length)
+        a = el.closest('.item').find('.item-link:first a')
     // take the url, and ignore any #anchor part
-    var s = el.getAttribute('href') || el.getAttribute('value');
+    var s = a.attr('href') || a.attr('value');
     s = s.split('#')[0];
     // remove protocol and hostname
     var i = s.indexOf('://');
@@ -693,29 +648,23 @@ function getItemName(el) {
     if (s.slice(-1) == '/')
         s = s.slice(0,-1);
     // it is encoded
-    s = (decodeURIComponent || unescape)(s);        
+    s = (decodeURIComponent || unescape)(s);
     return s;
 } // getItemName
 
 function submit(data, url) {
-    var f = $('#files').closest('form');
-    if (url) f.attr('action', url);
-    f.find('.temp').remove();
-    for (var k in data)
-        f.append("<input class='temp' type='hidden' name='"+k+"' value='"+data[k]+"' />");
-    f.submit();
+    var f = $('<form method="post">').attr('action',url||undefined).hide().appendTo('body')
+    for (var k in data) {
+        var v = data[k]
+		if (!Array.isArray(v))
+            f.append("<input type='hidden' name='"+k+"' value='"+v+"' />")
+		else
+		    v.forEach(function(v2) {
+				f.append("<input type='hidden' name='"+k+"' value='"+v2+"' />")
+        	})
+    }
+    f.submit()
 }//submit
-
-function putMsg(txt, time) {
-    if (!time) time = 4000;
-    var msgs = $('#msgs');
-    msgs.slideDown();
-    if (msgs.find('ul li:first').html() == txt)
-        clearTimeout(lastTimeoutID);
-    else
-        msgs.find('ul').prepend("<li>"+txt+"</li>");
-    lastTimeoutID = setTimeout("$('#msgs li:last').fadeOut(function(){$(this).detach(); if (!$('#msgs li').size()) $('#msgs').slideUp(); });", time);
-}//putMsg
 
 RegExp.escape = function(text) {
     if (!arguments.callee.sRE) {
@@ -725,64 +674,73 @@ RegExp.escape = function(text) {
     return text.replace(arguments.callee.sRE, '\\$1');
 }//escape
 
-function include(url, type) {
-    $.ajaxSetup({async: false}); // we'll wait.
-    if (!type)
-        type = /[^.]+$/.exec(url);
-    var res;
-    if  (type == 'js')
-        res = $.getScript(url);
-    else res = $.get(url, function(){ 
-        if (type == 'css')
-            $('head').append('<link rel="stylesheet" href="'+url+'" type="text/css" />');
-    });
-    $.ajaxSetup({async: true}); // restore it
-    return res.responseText;
-}//include
+function dialog(content, cb) {
+    var ret = $('<div class="dialog-content">').html(content).keydown(function(ev) {
+		if (ev.keyCode===27)
+			ret.close()
+	})
+	ret.close = function() {
+        ret.closest('.dialog-overlay').remove()
+        cb && cb()
+    }
+    ret.appendTo(
+        $('<div class="dialog-overlay">').appendTo('body')
+            .click(ret.close)
+    ).click(function(ev){
+        ev.stopImmediatePropagation()
+    })
+    return ret
+} // dialog
 
-function ezprompt(msg, options, cb) {
+function showMsg(content, cb) {
+	if (~content.indexOf('<'))
+		content = content.replace(/\n/g, '<br>')
+    var ret = dialog($('<div>').css({ display:'inline-block', textAlign:'left' }).html(content), cb).css('text-align', 'center')
+		.append(
+			$('<div class="buttons">').html(
+				$('<button class="pure-button">').text("{.!Ok.}")	
+					.click(ev=> ret.close() ) ) )
+	return ret
+}//showMsg
+
+function showError(msg, cb) {
+    return msg && showMsg("<h2>{.!Error.}</h2>"+msg, cb).addClass('error')
+}
+
+/*  cb: function(value, dialog)
+	options: type:string(text,textarea,number), value:any, keypress:function
+*/
+function ask(msg, options, cb) {
     // 2 parameters means "options" is missing
     if (arguments.length == 2) {
         cb = options;
         options = {};
     }
-    if (!$.prompt) { // load on demand
-        include('/?mode=section&id=impromptu.css');
-        include('/?mode=section&id=jquery.impromptu.js');
-    }
-    var v;
-    if (v = options.type) {
-        msg += '<br />';
-        if (v == 'textarea')
-            msg += '<textarea name="txt" cols="30" rows="8">'+options['default']+'</textarea>';
-        else
-            msg += '<input name="txt" type="'+v+'"'
-                + ((v = options['default']) ? ' value="'+v+'"' : '')
-                + ' />';
-    }
-    $.prompt(msg, {
-        opacity: 0.9,
-        overlayspeed: 'fast',
-        loaded: function(){
-            $('#jqibox').find(':input').keypress(function (e) {
-                var c = (e.keyCode || e.which);
-                if (options.keypress && options.keypress(c, this, e) === false) return;
-                if (c != 13 || this.tagName == 'TEXTAREA') return; // ENTER key is like submit, but not in textarea
-                $('.jqibuttons button:first').click();
-                return false;
-            }).filter(':first').focus()[0].select();
-        },
-        submit: function(val,div,form) {
-            var res = cb(options.type ? $.trim(form.txt) : form, $('#jqibox'), options.cbData );
-            if (res === false) {
-                $('#jqibox').find(':input:first').focus();
-                return false;
+	if (typeof options==='string')
+		options = { type:options }
+    msg += '<br />';
+    var v = options.type
+	if (!v)
+	    msg += '<br><button class="pure-button">{.!Ok.}</button>'
+	else if (v == 'textarea')
+		msg += '<textarea name="txt" cols="30" rows="8">'+options.value+'</textarea><br><button type="submit" class="pure-button">Ok</button>';
+	else
+		msg += '<input name="txt" type="'+v+'" value="'+(options.value||'')+'" />';
+	var ret = dialog($('<form class="ask">')
+		//.html($(`<i class="fa fa-times-rectangle close">`).click(ev=>ret.close()))
+		.append(msg)
+		.submit(function(ev) {
+			if (false !== cb(options.type ? $.trim(ret.find(':input').val()) : $(ev.target), $(ev.target).closest('form'))) {
+                ret.close()
+                return false
             }
-            return true;
-        }, 
-        fadeClicked: function() { $('#jqibox').find(':input:first').focus(); }
-    });
-}//ezprompt
+		})
+	)
+
+    ret.find(':input').focus().select() // autofocus attribute seems to work only first time :(
+
+	return ret
+}//ask
 
 // this is a factory for ajax request handlers
 function getStdAjaxCB(what2do) {
@@ -792,92 +750,80 @@ function getStdAjaxCB(what2do) {
         res = $.trim(res);
 
         if (res !== "ok") {
-            alert("{.!Error.}: "+res);
+            showError("{.!"+res+".}")
             if (res === 'bad session')
                 location.reload();
             return;
         }
         // what2do is a list of actions we are supposed to do if the ajax result is "ok"
-        if (typeof what2do == 'undefined') 
-            return;            
+        if (what2do === null)
+            return;
         if (!$.isArray(what2do))
             what2do = [what2do];
-        for (var i=0; i<what2do.length; i++) {
-            var w = what2do[i];
-            switch (typeof w) {
-                case 'function': w(); break; // you specify exactly what to do
-                case 'string':
-                    switch (w[0]) {
-                        case '!': alert(w.substr(1)); break;
-                        case '>': location = w.substr(1); break;
-                        default: putMsg(w); break;
-                    }
-                case 'boolean': if (w) location = location; break;
-            }
-        }
+        what2do.forEach(w=>{
+			if (w===true)
+				return location.reload()
+			if (typeof w==='function')
+				return w() // you specify exactly what to do
+			switch (w[0]) {
+				case '!': return showMsg(w.substr(1))
+				case '>': return location = w.substr(1)
+			}
+        })
     }
 }//getStdAjaxCB
-        
-function changePwd() {
-    ezprompt(this.innerHTML, {type:'password'}, function(s){
-        if (s) ajax('changepwd', {'new':s}, getStdAjaxCB([
-            "!{.!Password changed, you'll have to login again..}", 
-            '>~login'
-        ]));
-    });
-}//changePwd
 
-function selectedItems() { return $('#files .selector:checked') }
+function getSelectedItems() {
+    return $('#files .selector:checked')
+}
 
-function selectedFilesAsStr() {
-    var a = [];
-    selectedItems().each(function(){
-        a.push(getItemName(this));
-    });
-    return a.join(":");
-}//selectedFilesAsStr
+function getSelectedItemsName() {
+    return getSelectedItems().get().map(function(x) {
+        return getItemName(x)
+    })
+}//getSelectedItemsName
 
-function setComment() {
-    var sel = selectedItems();
-    if (!sel.size())
-        return putMsg("{.!No file selected.}");
-    var def = sel.closest('tr').find('.comment').html() || '';
-    ezprompt(this.innerHTML, {type:'textarea', 'default':def}, function(s){
-        if (s == def && sel.size() == 1) return true; // there s no work to do
-        ajax('comment', {text:s, files:selectedFilesAsStr()});
-    });
-}//setComment
+function deleteFiles(files) {
+	ask("{.!confirm.}", function(){
+		return submit({ action:'delete', selection:files })
+	})
+}
 
-function moveClicked() {
-    ezprompt("{.!Enter the destination folder.}", {type:'text'}, function(s){
-        ajax('move', {dst:s, files:selectedFilesAsStr()}, function(res){
-            var a = res.split(";");
-            if (a.length < 2)
-                return alert($.trim(res));
-            var failed = 0;
-            var ok = 0;
-            var msg = "";
-            for (var i=0; i<a.length-1; i++) {
-                var s = $.trim(a[i]);
-                if (!s.length) {
-                    ok++;
-                    continue;
-                }
-                failed++;
-                msg += s+"\n";
-            }
-            if (failed) 
-                msg = "{.!We met the following problems:.}\n"+msg;
-            msg = (ok ? ok+" {.!files were moved..}\n" : "{.!No file was moved..}\n")+msg;
-            alert(msg);
-            if (ok) location = location; // reload
-        });
-    });
-}//moveClicked
+function moveFiles(files) {
+	ask("{.!Enter the destination folder.}", 'text', function(dst) {
+		return ajax('move', { dst: dst, files: files.join(':') }, function(res) {
+			var a = res.split(';')
+			a.pop()
+			if (!a.length)
+				return showMsg($.trim(res))
+			var failed = 0;
+			var ok = 0;
+			var msg = '';
+			a.forEach(function(s) {
+				s = $.trim(s)
+				if (!s.length) {
+					ok++
+					return
+				}
+				failed++;
+				msg += s+'\n'
+			})
+			if (failed)
+				msg = "{.!We met the following problems:.}\n"+msg
+			msg = (ok ? ok+' {.!files were moved..}\n' : "{.!No file was moved..}\n")+msg
+			if (ok)
+				showMsg(msg, reload)
+			else
+				showError(msg)
+		})
+	})
+}//moveFiles
+
+function reload() { location = '.' }
 
 function selectionMask() {
-    ezprompt('{.!Please enter the file mask to select.}', {'type':'text', 'default':'*'}, function(s){
-        if (!s) return false;
+    ask("{.!Please enter the file mask to select.}", {type:'text', value:'*'}, function(s){
+        if (!s) return;
         var re = s.match('^/([^/]+)/([a-zA-Z]*)');
         if (re)
             re = new RegExp(re[1], re[2]);
@@ -888,619 +834,322 @@ function selectionMask() {
             s = RegExp.escape(s).replace(/[?]/g,".");;
             if (s.match(/\\\*/)) {
                 s = s.replace(/\\\*/g,".*");
-                s = "^ *"+s+" *$";   // in this case let the user decide exactly how it is placed in the string  
+                s = "^ *"+s+" *$"; // in this case var the user decide exactly how it is placed in the string
             }
             re = new RegExp(s, "i");
         }
         $("#files .selector")
-            .filter(function(){ return invert ^ re.test(getItemName(this)); })
-            .closest('tr').addClass("selected").find('.selector').attr('checked',true);
-        selectedChanged();
-    }); 
+            .filter(function(i, e) {
+                return invert ^ re.test(getItemName(e));
+            })
+            .prop('checked',true);
+        selectionChanged()
+    });
 }//selectionMask
 
 function setCookie(name,value,days) {
-	if (days) {
-		var date = new Date();
-		date.setTime(date.getTime()+(days*24*60*60*1000));
-		var expires = "; expires="+date.toGMTString();
-	}
-	else var expires = "";
-	document.cookie = name+"="+value+expires+"; path=/";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime()+(days*24*60*60*1000));
+        var expires = "; expires="+date.toGMTString();
+    }
+    else var expires = "";
+    document.cookie = name+"="+value+expires+"; path=/";
 } // setCookie
 
-function getCookie(name) {    
-    var a = document.cookie.match(new RegExp('(^|;\s*)('+name+'=)([^;]*)'));
-    return (a && a[2]) ? a[3] : null;
+function delCookie(name) { setCookie(name,'', -1) }
+
+function getCookie(name) {
+	var a = document.cookie.match(new RegExp('(?:^| )' + name + '=([^;]+)'))
+	return a && a[1]
 } // getCookie
 
-function delCookie(name) {
-	setCookie(name,"",-1);
-} // delCookie
+// quando in modalità selezione, viene mostrato una checkbox per ogni item, e viene anche mostrato un pannello per all/none/invert
+var multiSelection = false
+function toggleSelection() {
+    $('#selection-panel').toggle()
+	if (multiSelection = !multiSelection)
+		$("<input type='checkbox' class='selector' />")
+			.prependTo('.item-selectable a') // having the checkbox inside the A element will put it on the same line of A even with long A, otherwise A will start on a new line.
+			.click(ev=>{ // we are keeping the checkbox inside an A tag for layout reasons, and firefox72 is triggering the link when the checkbox is clicked. So we reprogram the behaviour.
+				setTimeout(()=>{ 
+					ev.target.checked ^= 1
+					selectionChanged() 
+				})
+				return false 
+			})
+	else
+		$('#files .selector').remove()
+}//toggleSelection
 
+function upload(){
+	$("<input type='file' name='file' multiple>").change(function(){
+		var files = this.files
+		if (!files.length) return
+		$('#upload-panel').slideDown('fast')
+		uploadQ.add(function(done){
+			sendFiles(files, done)
+		})
+  	}).click()
+} //upload
 
-[jquery.impromptu.js|no log]
-/*
- * jQuery Impromptu
- * By: Trent Richardson [http://trentrichardson.com]
- * Version 2.7
- * Last Modified: 6/7/2009
- * 
- * Copyright 2009 Trent Richardson
- * Dual licensed under the MIT and GPL licenses.
- * http://trentrichardson.com/Impromptu/GPL-LICENSE.txt
- * http://trentrichardson.com/Impromptu/MIT-LICENSE.txt
- * 
- */
- 
-(function($) {
-	$.prompt = function(message, options) {
-		options = $.extend({},$.prompt.defaults,options);
-		$.prompt.currentPrefix = options.prefix;
+uploadQ = newQ().on('change', function(ev) {
+    var n = Math.max(0, ev.count-1) // we don't consider the one we are working
+    $('#upload-q').text(n)
+})
 
-		var ie6		= ($.browser.msie && $.browser.version < 7);
-		var $body	= $(document.body);
-		var $window	= $(window);
+function newQ(){
+    var a = []
+	var ret = $({})
+    ret.add = function(job) {
+        a.push(job)
+		change()
+        if (a.length!==1) return
+		job(function consume(){
+			a.shift() // trash it
+			if (a.length)
+				a[0](consume) // next
+			else
+				ret.trigger('empty')
+			change()
+		})
+    }
 
-		//build the box and fade
-		var msgbox = '<div class="'+ options.prefix +'box" id="'+ options.prefix +'box">';
-		if(options.useiframe && (($('object, applet').length > 0) || ie6)) {
-			msgbox += '<iframe src="javascript:false;" style="display:block;position:absolute;z-index:-1;" class="'+ options.prefix +'fade" id="'+ options.prefix +'fade"></iframe>';
-		} else {
-			if(ie6) {
-				$('select').css('visibility','hidden');
-			}
-			msgbox +='<div class="'+ options.prefix +'fade" id="'+ options.prefix +'fade"></div>';
-		}
-		msgbox += '<div class="'+ options.prefix +'" id="'+ options.prefix +'"><div class="'+ options.prefix +'container"><div class="';
-		msgbox += options.prefix +'close">X</div><div id="'+ options.prefix +'states"></div>';
-		msgbox += '</div></div></div>';
+    function change(){ ret.trigger({ type:'change', count:a.length }) }
 
-		var $jqib	= $(msgbox).appendTo($body);
-		var $jqi	= $jqib.children('#'+ options.prefix);
-		var $jqif	= $jqib.children('#'+ options.prefix +'fade');
+	return ret
+}//newQ
 
-		//if a string was passed, convert to a single state
-		if(message.constructor == String){
-			message = {
-				state0: {
-					html: message,
-				 	buttons: options.buttons,
-				 	focus: options.focus,
-				 	submit: options.submit
-			 	}
-		 	};
-		}
+function changeSort(){
+    dialog([
+        $('<h3>').text('{.!Sort by.}'),
+        $('<div class="buttons">').html(objToArr(sortOptions, function(label,code){
+            return $('<button class="pure-button">')
+				.text(label)
+				.prepend(urlParams.sort===code ? '<i class="fa fa-sort-alt-'+(urlParams.rev?'down':'up')+'"></i> ' : '')
+                .click(function(){
+					urlParams.rev = (urlParams.sort===code && !urlParams.rev) ? 1 : undefined
+					urlParams.sort = code||undefined
+                    location.search = encodeURL(urlParams)
+				})
+		}))
+	])
+}//changeSort
 
-		//build the states
-		var states = "";
-
-		$.each(message,function(statename,stateobj){
-			stateobj = $.extend({},$.prompt.defaults.state,stateobj);
-			message[statename] = stateobj;
-
-			states += '<div id="'+ options.prefix +'_state_'+ statename +'" class="'+ options.prefix + '_state" style="display:none;"><div class="'+ options.prefix +'message">' + stateobj.html +'</div><div class="'+ options.prefix +'buttons">';
-			$.each(stateobj.buttons, function(k, v){
-				states += '<button name="' + options.prefix + '_' + statename + '_button' + k + '" id="' + options.prefix +	'_' + statename + '_button' + k + '" value="' + v + '">' + k + '</button>';
-			});
-			states += '</div></div>';
-		});
-
-		//insert the states...
-		$jqi.find('#'+ options.prefix +'states').html(states).children('.'+ options.prefix +'_state:first').css('display','block');
-		$jqi.find('.'+ options.prefix +'buttons:empty').css('display','none');
-		
-		//Events
-		$.each(message,function(statename,stateobj){
-			var $state = $jqi.find('#'+ options.prefix +'_state_'+ statename);
-
-			$state.children('.'+ options.prefix +'buttons').children('button').click(function(){
-				var msg = $state.children('.'+ options.prefix +'message');
-				var clicked = stateobj.buttons[$(this).text()];
-				var forminputs = {};
-
-				//collect all form element values from all states
-				$.each($jqi.find('#'+ options.prefix +'states :input').serializeArray(),function(i,obj){
-					if (forminputs[obj.name] === undefined) {
-						forminputs[obj.name] = obj.value;
-					} else if (typeof forminputs[obj.name] == Array) {
-						forminputs[obj.name].push(obj.value);
-					} else {
-						forminputs[obj.name] = [forminputs[obj.name],obj.value];	
-					} 
-				});
-
-				var close = stateobj.submit(clicked,msg,forminputs);
-				if(close === undefined || close) {
-					removePrompt(true,clicked,msg,forminputs);
-				}
-			});
-			$state.find('.'+ options.prefix +'buttons button:eq('+ stateobj.focus +')').addClass(options.prefix +'defaultbutton');
-
-		});
-
-		var ie6scroll = function(){
-			$jqib.css({ top: $window.scrollTop() });
-		};
-
-		var fadeClicked = function(){
-			if(options.persistent){
-			    if (options.fadeClicked() === false) return; // mod by rejetto
-				var i = 0;
-				$jqib.addClass(options.prefix +'warning');
-				var intervalid = setInterval(function(){
-					$jqib.toggleClass(options.prefix +'warning');
-					if(i++ > 1){
-						clearInterval(intervalid);
-						$jqib.removeClass(options.prefix +'warning');
-					}
-				}, 100);
-			}
-			else {
-				removePrompt();
-			}
-		};
-		
-		var keyPressEventHandler = function(e){
-			var key = (window.event) ? event.keyCode : e.keyCode; // MSIE or Firefox?
-			
-			//escape key closes
-			if(key==27) {
-				removePrompt();	
-			}
-			
-			//constrain tabs
-			if (key == 9){
-				var $inputels = $(':input:enabled:visible',$jqib);
-				var fwd = !e.shiftKey && e.target == $inputels[$inputels.length-1];
-				var back = e.shiftKey && e.target == $inputels[0];
-				if (fwd || back) {
-				setTimeout(function(){ 
-					if (!$inputels)
-						return;
-					var el = $inputels[back===true ? $inputels.length-1 : 0];
-
-					if (el)
-						el.focus();						
-				},10);
-				return false;
-				}
-			}
-		};
-		
-		var positionPrompt = function(){
-			$jqib.css({
-				position: (ie6) ? "absolute" : "fixed",
-				height: $window.height(),
-				width: "100%",
-				top: (ie6)? $window.scrollTop() : 0,
-				left: 0,
-				right: 0,
-				bottom: 0
-			});
-			$jqif.css({
-				position: "absolute",
-				height: $window.height(),
-				width: "100%",
-				top: 0,
-				left: 0,
-				right: 0,
-				bottom: 0
-			});
-			$jqi.css({
-				position: "absolute",
-				top: options.top,
-				left: "50%",
-				marginLeft: (($jqi.outerWidth()/2)*-1)
-			});
-		};
-
-		var stylePrompt = function(){
-			$jqif.css({
-				zIndex: options.zIndex,
-				display: "none",
-				opacity: options.opacity
-			});
-			$jqi.css({
-				zIndex: options.zIndex+1,
-				display: "none"
-			});
-			$jqib.css({
-				zIndex: options.zIndex
-			});
-		};
-
-		var removePrompt = function(callCallback, clicked, msg, formvals){
-			$jqi.remove();
-			//ie6, remove the scroll event
-			if(ie6) {
-				$body.unbind('scroll',ie6scroll);
-			}
-			$window.unbind('resize',positionPrompt);
-			$jqif.fadeOut(options.overlayspeed,function(){
-				$jqif.unbind('click',fadeClicked);
-				$jqif.remove();
-				if(callCallback) {
-					options.callback(clicked,msg,formvals);
-				}
-				$jqib.unbind('keypress',keyPressEventHandler);
-				$jqib.remove();
-				if(ie6 && !options.useiframe) {
-					$('select').css('visibility','visible');
-				}
-			});
-		};
-
-		positionPrompt();
-		stylePrompt();
-		
-		//ie6, add a scroll event to fix position:fixed
-		if(ie6) {
-			$window.scroll(ie6scroll);
-		}
-		$jqif.click(fadeClicked);
-		$window.resize(positionPrompt);
-		$jqib.bind("keydown keypress",keyPressEventHandler);
-		$jqi.find('.'+ options.prefix +'close').click(removePrompt);
-
-		//Show it
-		$jqif.fadeIn(options.overlayspeed);
-		$jqi[options.show](options.promptspeed,options.loaded);
-		$jqi.find('#'+ options.prefix +'states .'+ options.prefix +'_state:first .'+ options.prefix +'defaultbutton').focus();
-		
-		if(options.timeout > 0)
-			setTimeout($.prompt.close,options.timeout);
-
-		return $jqib;
-	};
-	
-	$.prompt.defaults = {
-		prefix:'jqi',
-		buttons: {
-			Ok: true
-		},
-	 	loaded: function(){
-
-	 	},
-	  	submit: function(){
-	  		return true;
-		},
-	 	callback: function(){
-
-	 	},
-		opacity: 0.6,
-	 	zIndex: 9999,
-	  	overlayspeed: 'slow',
-	   	promptspeed: 'fast',
-   		show: 'fadeIn',
-	   	focus: 0,
-	   	useiframe: false,
-	 	top: "15%",
-	  	persistent: true,
-	  	timeout: 0,
-	  	state: {
-			html: '',
-		 	buttons: {
-		 		Ok: true
-		 	},
-		  	focus: 0,
-		   	submit: function(){
-		   		return true;
-		   }
-	  	}
-	};
-	
-	$.prompt.currentPrefix = $.prompt.defaults.prefix;
-
-	$.prompt.setDefaults = function(o) {
-		$.prompt.defaults = $.extend({}, $.prompt.defaults, o);
-	};
-	
-	$.prompt.setStateDefaults = function(o) {
-		$.prompt.defaults.state = $.extend({}, $.prompt.defaults.state, o);
-	};
-	
-	$.prompt.getStateContent = function(state) {
-		return $('#'+ $.prompt.currentPrefix +'_state_'+ state);
-	};
-	
-	$.prompt.getCurrentState = function() {
-		return $('.'+ $.prompt.currentPrefix +'_state:visible');
-	};
-	
-	$.prompt.getCurrentStateName = function() {
-		var stateid = $.prompt.getCurrentState().attr('id');
-		
-		return stateid.replace($.prompt.currentPrefix +'_state_','');
-	};
-	
-	$.prompt.goToState = function(state) {
-		$('.'+ $.prompt.currentPrefix +'_state').slideUp('slow');
-		$('#'+ $.prompt.currentPrefix +'_state_'+ state).slideDown('slow',function(){
-			$(this).find('.'+ $.prompt.currentPrefix +'defaultbutton').focus();
-		});
-	};
-	
-	$.prompt.nextState = function() {
-		var $next = $('.'+ $.prompt.currentPrefix +'_state:visible').next();
-
-		$('.'+ $.prompt.currentPrefix +'_state').slideUp('slow');
-		
-		$next.slideDown('slow',function(){
-			$next.find('.'+ $.prompt.currentPrefix +'defaultbutton').focus();
-		});
-	};
-	
-	$.prompt.prevState = function() {
-		var $next = $('.'+ $.prompt.currentPrefix +'_state:visible').prev();
-
-		$('.'+ $.prompt.currentPrefix +'_state').slideUp('slow');
-		
-		$next.slideDown('slow',function(){
-			$next.find('.'+ $.prompt.currentPrefix +'defaultbutton').focus();
-		});
-	};
-	
-	$.prompt.close = function() {
-		$('#'+ $.prompt.currentPrefix +'box').fadeOut('fast',function(){
-        		$(this).remove();
-		});
-	};
-	
-})(jQuery);
-
-[impromptu.css|no log]
-/*
-------------------------------
-	Impromptu's
-------------------------------
-*/
-.jqifade{
-	position: absolute; 
-	background-color: #aaaaaa; 
-}
-div.jqi{ 
-	min-width: 300px; 
-	max-width: 600px; 
-	font-family: Verdana, Geneva, Arial, Helvetica, sans-serif; 
-	position: absolute; 
-	background-color: #ffffff; 
-	font-size: 11px; 
-	text-align: left; 
-	border: solid 1px #eeeeee;
-	-moz-border-radius: 10px;
-	-webkit-border-radius: 10px;
-	padding: 7px;
-}
-div.jqi .jqicontainer{ 
-	font-weight: bold; 
-}
-div.jqi .jqiclose{ 
-	position: absolute;
-	top: 4px; right: -2px; 
-	width: 18px; 
-	cursor: default; 
-	color: #bbbbbb; 
-	font-weight: bold; 
-}
-div.jqi .jqimessage{ 
-	padding: 10px; 
-	line-height: 20px; 
-	color: #444444; 
-}
-div.jqi .jqibuttons{ 
-	text-align: right; 
-	padding: 5px 0 5px 0; 
-	border: solid 1px #eeeeee; 
-	background-color: #f4f4f4;
-}
-div.jqi button{ 
-	padding: 3px 10px; 
-	margin: 0 10px; 
-	background-color: #2F6073; 
-	border: solid 1px #f4f4f4; 
-	color: #ffffff; 
-	font-weight: bold; 
-	font-size: 12px; 
-}
-div.jqi button:hover{ 
-	background-color: #728A8C;
-}
-div.jqi button.jqidefaultbutton{ 
-	/*background-color: #8DC05B;*/
-	background-color: #BF5E26;
-}
-.jqiwarning .jqi .jqibuttons{ 
-	background-color: #BF5E26;
+function objToArr(o, cb){
+    var ret = []
+	for (var k in o) {
+	    var v = o[k]
+		ret.push(cb(v,k))
+	}
+	return ret
 }
 
-/*
-------------------------------
-	impromptu
-------------------------------
-*/
-.impromptuwarning .impromptu{ background-color: #aaaaaa; }
-.impromptufade{
-	position: absolute;
-	background-color: #ffffff;
-}
-div.impromptu{
-    position: absolute;
-	background-color: #cccccc;
-	padding: 10px; 
-	width: 300px;
-	text-align: left;
-}
-div.impromptu .impromptuclose{
-    float: right;
-    margin: -35px -10px 0 0;
-    cursor: pointer;
-    color: #213e80;
-}
-div.impromptu .impromptucontainer{
-	background-color: #213e80;
-	padding: 5px; 
-	color: #ffffff;
-	font-weight: bold;
-}
-div.impromptu .impromptumessage{
-	background-color: #415ea0;
-	padding: 10px;
-}
-div.impromptu .impromptubuttons{
-	text-align: center;
-	padding: 5px 0 0 0;
-}
-div.impromptu button{
-	padding: 3px 10px 3px 10px;
-	margin: 0 10px;
+function sendFiles(files, done) {
+    var formData = new FormData()
+    for (var i = 0; i < files.length; i++)
+        formData.append('file', files[i])
+
+    $.ajax({
+        type: 'POST',
+        data: formData,
+        success: function(data) {
+            try {
+                data = JSON.parse(data)
+                data.forEach(function(r) {
+                    $('#upload-'+(r.err ? 'ko' : 'ok')).text(function(i, s) {
+                        return Number(s) + 1
+                    })
+                    $(r.err ? '<span title="'+r.err+'"><i class="fa fa-ban"></i> '+ r.name+'</span>' 
+						: '<a title="{.!Size.}: '+r.size+'&#013;{.!Speed.}: '+r.speed+'B/s" href="'+r.url+'"><i class="fa fa-'+(r.err ? 'ban' : 'check-circle')+'"></i> '+r.name+'</a>')
+						.appendTo('#upload-results');
+                })
+            }
+            catch(e){
+                console.error(e)
+                showError('Invalid server reply')
+            }
+        },
+        complete: done,
+        cache: false,
+        contentType: false,
+        processData: false,
+        xhr: function() {
+            var e = $('#upload-progress')
+            var prog = e.find('progress').prop('value', 0)
+            e.slideDown('fast')
+            var xhr = $.ajaxSettings.xhr()
+            var last = 0
+            var now = 0
+            xhr.upload.onprogress = function(ev){
+                prog.prop('value', (now = ev.loaded) / ev.total);
+            }
+            var h = setInterval(function() {
+                $('#progress-text').text(smartSize(now)+'B @ '+smartSize(now-last)+'/s')
+                last = now
+            },1000)
+            xhr.upload.onload = function(ev) {
+                e.slideUp('fast')
+                clearInterval(h)
+            }
+            return xhr
+        }
+    })
+}//sendFiles
+
+function smartSize(n, options) {
+    options = options||{}
+	var orders = ['','K','M','G','T','P']
+	var order = options.order||1024
+	var max = options.maxOrder||orders.length-1
+	var i = 0
+	while (n >= order && i<max) {
+		n /= order
+		++i
+	}
+	if (options.decimals===undefined)
+		options.decimals = n<5 ? 1 : 0
+	return round(n, options.decimals)
+		+orders[i]
+}//smartSize
+
+function round(v, digits) {
+	return !digits ? Math.round(v) : Math.round(v*Math.pow(10,digits)) / Math.pow(10,digits)
+}//round
+
+function log(){
+	console.log.apply(console,arguments)
+	return arguments[arguments.length-1]
 }
 
-/*
-------------------------------
-	columns ex
-------------------------------
-*/
-.colsJqifadewarning .colsJqi{ background-color: #b0be96; }
-.colsJqifade{
-	position: absolute;
-	background-color: #ffffff;
-}
-div.colsJqi{
-    position: absolute;
-	background-color: #d0dEb6;
-	padding: 10px; 
-	width: 400px;
-	text-align: left;
-}
-div.colsJqi .colsJqiclose{
-    float: right;
-    margin: -35px -10px 0 0;
-    cursor: pointer;
-    color: #bbbbbb;
-}
-div.colsJqi .colsJqicontainer{
-	background-color: #e0eEc6;
-	padding: 5px; 
-	color: #ffffff;
-	font-weight: bold;
-	height: 160px;
-}
-div.colsJqi .colsJqimessage{
-	background-color: #c0cEa6;
-	padding: 10px;
-	width: 280px;
-	height: 140px;
-	float: left;
-}
-div.colsJqi .jqibuttons{
-	text-align: center;
-	padding: 5px 0 0 0;
-}
-div.colsJqi button{
-	background: url(../images/button_bg.jpg) top left repeat-x #ffffff;
-	border: solid #777777 1px;
-	font-size: 12px;
-	padding: 3px 10px 3px 10px;
-	margin: 5px 5px 5px 10px;
-	width: 75px;
-}
-div.colsJqi button:hover{
-	border: solid #aaaaaa 1px;
+function toggleTs(){
+    var k = 'hideTs'
+    $('#files').toggleClass(k)
+    setCookie('ts', Number(!$('#files').hasClass(k)));
 }
 
-/*
-------------------------------
-	brown theme
-------------------------------
-*/
-.brownJqiwarning .brownJqi{ background-color: #cccccc; }
-.brownJqifade{
-	position: absolute;
-	background-color: #ffffff;
-}
-div.brownJqi{
-	position: absolute;
-	background-color: transparent;
-	padding: 10px;
-	width: 300px;
-	text-align: left;
-}
-div.brownJqi .brownJqiclose{
-    float: right;
-    margin: -20px 0 0 0;
-    cursor: pointer;
-    color: #777777;
-    font-size: 11px;
-}
-div.brownJqi .brownJqicontainer{
-	position: relative;
-	background-color: transparent;
-	border: solid 1px #5F5D5A;
-	color: #ffffff;
-	font-weight: bold;
-}
-div.brownJqi .brownJqimessage{
-	position: relative;
-	background-color: #F7F6F2;
-	border-top: solid 1px #C6B8AE;
-	border-bottom: solid 1px #C6B8AE;
-}
-div.brownJqi .brownJqimessage h3{
-	background: url(../images/brown_theme_gradient.jpg) top left repeat-x #ffffff;
-	margin: 0;
-	padding: 7px 0 7px 15px;
-	color: #4D4A47;
-}
-div.brownJqi .brownJqimessage p{
-	padding: 10px;
-	color: #777777;
-}
-div.brownJqi .brownJqimessage img.helpImg{
-	position: absolute;
-	bottom: -25px;
-	left: 10px;
-}
-div.brownJqi .brownJqibuttons{
-	text-align: right;
-}
-div.brownJqi button{
-	background: url(../images/brown_theme_gradient.jpg) top left repeat-x #ffffff;
-	border: solid #777777 1px;
-	font-size: 12px;
-	padding: 3px 10px 3px 10px;
-	margin: 5px 5px 5px 10px;
-}
-div.brownJqi button:hover{
-	border: solid #aaaaaa 1px;
+function decodeURL(urlData) {
+	var ret = {}
+    urlData.split('&').forEach(function(x){
+        if (!x) return
+        x = x.split("=").map(decodeURIComponent)
+		ret[x[0]] = x.length===1 ? true : x[1]
+    })
+	return ret
+}//decodeURL
+
+function encodeURL(obj) {
+    var ret = []
+	for (var k in obj) {
+	    var v = obj[k]
+		if (v===undefined) continue
+		k = encodeURIComponent(k)
+	    if (v !== true)
+	        k += '='+encodeURIComponent(v)
+		ret.push(k)
+	}
+	return ret.join('&')
+}//encodeURL
+
+urlParams = decodeURL(location.search.substring(1))
+sortOptions = {
+	n: "{.!Name.}",
+	e: "{.!Extension.}",
+	s: "{.!Size.}",
+	t: "{.!Timestamp.}",
+	d: "{.!Hits.}",
+	'': '{.!Default.}'
 }
 
-/*
-*------------------------
-*   clean blue ex
-*------------------------
-*/
-.cleanbluewarning .cleanblue{ background-color: #acb4c4; }
-.cleanbluefade{ position: absolute; background-color: #aaaaaa; }
-div.cleanblue{ font-family: Verdana, Geneva, Arial, Helvetica, sans-serif; position: absolute; background-color: #ffffff; width: 300px; font-size: 11px; text-align: left; border: solid 1px #213e80; }
-div.cleanblue .cleanbluecontainer{ background-color: #ffffff; border-top: solid 14px #213e80; padding: 5px; font-weight: bold; }
-div.cleanblue .cleanblueclose{ float: right; width: 18px; cursor: default; margin: -19px -12px 0 0; color: #ffffff; font-weight: bold; }
-div.cleanblue .cleanbluemessage{ padding: 10px; line-height: 20px; font-size: 11px; color: #333333; }
-div.cleanblue .cleanbluebuttons{ text-align: right; padding: 5px 0 5px 0; border: solid 1px #eeeeee; background-color: #f4f4f4; }
-div.cleanblue button{ padding: 3px 10px; margin: 0 10px; background-color: #314e90; border: solid 1px #f4f4f4; color: #ffffff; font-weight: bold; font-size: 12px; }
-div.cleanblue button:hover{ border: solid 1px #d4d4d4; }
+$(function(){
+    $('.trash-me').detach(); // this was hiding things for those w/o js capabilities
+    if (Number(getCookie('ts')))
+        toggleTs()
 
-/*
-*------------------------
-*   Ext Blue Ex
-*------------------------
-*/
-.extbluewarning .extblue{ border:1px red solid; }
-.extbluefade{ position: absolute; background-color: #ffffff; }
-div.extblue{ border:1px #6289B6 solid; position: absolute; background-color: #CAD8EA; padding: 0; width: 300px; text-align: left; }
-div.extblue .extblueclose{ background-color: #CAD8EA; margin:2px -2px 0 0; cursor: pointer; color: red; text-align: right; }
-div.extblue .extbluecontainer{ background-color: #CAD8EA; padding: 0 5px 5px 5px; color: #000000; font:normal 11px Verdana; }
-div.extblue .extbluemessage{ background-color: #CAD8EA; padding: 0; margin:0 15px 15px 15px; }
-div.extblue .extbluebuttons{ text-align: center; padding: 0px 0 0 0; }
-div.extblue button{ padding: 1px 4px; margin: 0 10px; background-color:#cccccc; font-weight:normal; font-family:Verdana; font-size:10px; }
+    $('body').on('click','.item-menu', function(ev){
+        var it = $(ev.target).closest('.item')
+        var acc = it.hasClass('can-access')
+        var name = getItemName(ev.target)
+        dialog([
+            $('<h3>').text(name),
+            it.find('.item-ts').clone(),
+            $('<div class="buttons">').html([
+                it.closest('.can-delete').length > 0
+				&& $('<button class="pure-button"><i class="fa fa-trash"></i> {.!Delete.}</button>')
+					.click(function() { deleteFiles([name]) }),
+                it.closest('.can-rename').length > 0
+				&& $('<button class="pure-button"><i class="fa fa-edit"></i> {.!Rename.}</button>').click(renameItem),
+                it.closest('.can-comment').length > 0
+				&& $('<button class="pure-button"><i class="fa fa-quote-left"></i> {.!Comment.}</button>').click(setComment),
+                it.closest('.can-move').length > 0
+				&& $('<button class="pure-button"><i class="fa fa-truck"></i> {.!Move.}</button>')
+					.click(function(){  moveFiles([name]) })
+            ])
+        ]).addClass('item-menu-dialog')
 
+        //{.if|{.and|{.!option.move.}|{.can move.}.}| <button id='moveBtn' onclick='moveFiles()'>{.!Move.}</button> .}
+
+        function setComment() {
+            var value = it.find('.comment-text').text() || '';
+            ask(this.innerHTML, { type: 'textarea', value: value }, function(s){
+                if (s !== value)
+                    ajax('comment', { text: s, files: name })
+            })
+        }//setComment
+
+        function renameItem() {
+            ask(this.innerHTML+ ' '+name, { type: 'text', value: name }, function(to){
+                ajax("rename", { from: name, to: to });
+            })
+        }
+    })
+
+    $('#select-invert').click(function(ev) {
+        $('#files .selector').prop('checked', function(i,v){ return !v })
+        selectionChanged()
+    })
+    $('#select-mask').click(selectionMask)
+    $('#move-selection').click(function(ev) { moveFiles(getSelectedItemsName()) })
+		.toggle($('.can-delete').length > 0)
+    $('#delete-selection').click(function(ev) { deleteFiles(getSelectedItemsName()) })
+        .toggle($('.can-delete').length > 0)
+
+    $('#files .cannot-access .item-link img').after('<i class="fa fa-lock" title="{.!No access.}"></i>')
+	$('#files.can-delete .item:not(.cannot-access), #files .item.can-archive').addClass('item-selectable')
+    if (! $('.item-selectable').length)
+        $('#multiselection').hide()
+
+    $('.additional-panel.closeable').prepend(
+        $('<i class="fa fa-times-circle close">').click(function(ev){
+            $(ev.target).closest('.closeable').fadeOut('fast').trigger('closed')
+        }))
+
+    $('#upload-panel').on('closed', function(ev){
+        $('#upload-ok,#upload-ko').text('0')
+        $('#upload-results').html('')
+    })
+
+	$('#sort span').text(sortOptions[urlParams.sort]||'{.!Sort.}')
+
+    /* experiment
+    $('.additional-panel.closeable').each(function(i, e) {
+        swipable(e, 'right')
+    })
+
+    function swipable(e, dir) {
+        e = $(e)
+        e.mousedown(function(ev) {
+            e.css('position','relative')
+            var o = { x:ev.pageX, y:ev.pageY }
+            console.warn(o)
+            e.mouseup(function(ev) {
+                e.css({ left: 0, top: 0 })
+                e.off('mousemove.dragging')
+            })
+            e.on('mousemove.dragging', function(ev) { return e.css({ left:ev.pageX-o.x, top:ev.pageY-o.y }) })
+        })
+    }
+    */
+
+    selectionChanged()
+})//onload

@@ -83,7 +83,8 @@ type
   PtplSection = ^TtplSection;
   TtplSection = record
     name, txt: string;
-    nolog, nourl: boolean;
+    nolog, nourl, cache: boolean;
+    ts: Tdatetime;
     end;
 
   Ttpl = class
@@ -681,17 +682,22 @@ var
   cur_section:=chop('|', s);
   base.nolog:=ansiPos('no log', s) > 0;
   base.nourl:=ansiPos('private', s) > 0;
+  base.cache:=ansiPos('cache', s) > 0;
+  base.ts:=now();
+
+  s:=cur_section;
+  append:=ansiStartsStr('+', s);
+  if append then
+    delete(s,1,1);
+
   // there may be several section names separated by =
-  ss:=split('=', cur_section);
+  ss:=split('=', s);
   // handle the main section specific case
   if ss = NIL then addString('', ss);
   // assign to every name the same txt
   for i:=0 to length(ss)-1 do
     begin
     s:=trim(ss[i]);
-    append:=ansiStartsStr('+', s);
-    if append then
-      delete(s,1,1);
     si:=getIdx(s);
     from:=NIL;
     if si < 0 then // not found

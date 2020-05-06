@@ -34,7 +34,7 @@ uses
   hfsGlobal;
 
 const
-  VERSION = '2.10.0';
+  VERSION = '2.10.1';
 
 type
   ThttpSrv=class;
@@ -957,9 +957,7 @@ sock.LineMode:=FALSE;
 
 request.headers:=ThashedStringList.create;
 request.headers.nameValueSeparator:=':';
-request.cookies:=ThashedStringList.create;
-request.cookies.delimiter:=';';
-request.cookies.QuoteChar:=#0;
+request.cookies := NIL;
 limiters:=TObjectList.create;
 limiters.ownsObjects:=FALSE;
 P_address:=sock.GetPeerAddr();
@@ -1043,7 +1041,14 @@ function ThttpConn.getCookie(k:string):string;
 begin
 result:='';
 if request.method = HM_UNK then exit;
-result:=trim(request.cookies.values[k]);
+if request.cookies = NIL then
+  begin
+  request.cookies:=ThashedStringList.create;
+  request.cookies.delimiter:=';';
+  request.cookies.QuoteChar:=#0;
+  request.cookies.delimitedText:=getHeader('cookie');
+  end;
+result:=decodeURL(trim(request.cookies.values[k]));
 end; // getCookie
 
 procedure ThttpConn.setCookie(k, v:string; pairs:array of string; extra:string='');
@@ -1068,7 +1073,7 @@ request.url:='';
 request.firstByte:=-1;
 request.lastByte:=-1;
 request.headers.clear();
-request.cookies.clear();
+freeAndNIL(request.cookies);
 request.user:='';
 request.pwd:='';
 end; // clearRequest
@@ -1101,7 +1106,7 @@ procedure ThttpConn.processInputBuffer();
   post.header:='';
   post.mode:=PM_NONE;
 
-  s:=uppercase(chop(i, r));
+  s:=uppercase(chop(i, 1, r));
   if s='GET' then request.method:=HM_GET else
   if s='POST' then request.method:=HM_POST else
   if s='HEAD' then request.method:=HM_HEAD else;
@@ -1113,13 +1118,6 @@ procedure ThttpConn.processInputBuffer();
   if chop('HTTP/',s) = '' then request.ver:=s;
 
   request.headers.text:=r;
-
-  with request.cookies do
-    begin
-    delimitedText:=getHeader('cookie');
-    for i:=0 to count-1 do
-      valueFromIndex[i]:=decodeURL(valueFromIndex[i]);
-    end;
 
   s:=getHeader('Range');
   if ansiStartsText('bytes=',s) then
@@ -1221,6 +1219,7 @@ procedure ThttpConn.processInputBuffer();
       chop(RawByteString('--'+CRLFA), buffer);
       tryNotify(HE_POST_END);
       state:=HCS_REPLYING;
+      post.filename:='';
       break;
       end;
     // we wait for the header to be complete
