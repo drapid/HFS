@@ -24,6 +24,7 @@ interface
 
 uses
   iniFiles, types, strUtils, sysUtils, classes, math,
+  system.Generics.Collections,
   hslib, hfsGlobal;
 
 type
@@ -164,6 +165,38 @@ type
     function getTheRest():RawByteString;
     end;
 
+  TSessionId = String;
+  Tsession = class
+    vars: THashedStringList;
+    created, ttl, expires: Tdatetime;
+    procedure setVar(k, v:string);
+    function getVar(k: String):string;
+    class function getNewSID():string;
+  public
+    id: string;
+    constructor create(const sid: TSessionId='');
+    destructor Destroy; override;
+    procedure keepAlive();
+    property v[k: TSessionId]: String read getVar write setVar;
+   end;
+
+  Tsessions = class
+   fS: Tdictionary<TSessionId,Tsession>;
+  public
+    constructor create;
+    destructor Destroy; override;
+    procedure clearSession(sId: TSessionId);
+    function  getSession: Tsession; OverLoad;
+    function  initNewSession: TSessionId;
+    function  getSession(sId: TSessionId): Tsession; OverLoad;
+    function  noSession(sId: TSessionId): Boolean;
+    procedure keepAlive(sId: TSessionId);
+    procedure checkExpired;
+    property ss[sId: TSessionId]: Tsession read getSession;
+  end;
+
+  ThashFunc = function(s:string):string;
+
   TconnDataMain = class  // data associated to a client connection
   public
     address: string;   // this is address shown in the log, and it is not necessarily the same as the socket address
@@ -178,7 +211,7 @@ type
     acceptedCredentials: boolean;
     usr, pwd: string;
     account: Paccount;
-    session,
+    sessionID: TsessionId;
     vars, // defined by {.set.}
     urlvars,  // as $_GET in php
     postVars  // as $_POST in php
@@ -189,6 +222,9 @@ type
     disconnectReason: string;
     uploadFailed: string; // reason (empty on success)
     lastActivityTime: Tdatetime;
+    function goodPassword(s:string; func:ThashFunc):boolean;
+    procedure setSessionVar(k, v: String);
+    procedure logout();
   end;
 
 implementation
@@ -854,5 +890,149 @@ begin result:=(cur+8 > bound) end;
 
 function Ttlv.getTheRest(): RawByteString;
 begin result:=substr(whole, cur, bound) end;
+
+class function Tsession.getNewSID():string;
+begin result:=floatToStr(random()) end;
+
+constructor Tsession.create(const sid:string='');
+begin
+id:=sid;
+if id = '' then
+  id:=getNewSID();
+//sessions.Add(id, self);
+created:=now();
+ttl:=1; // days
+keepAlive();
+end;
+
+destructor Tsession.Destroy;
+var
+  o: Tobject;
+  cd: TconnDataMain;
+begin
+for o in srv.conns do
+  begin
+  cd:=ThttpConn(o).data;
+  if cd.sessionID = self.id then
+    cd.sessionID := '';
+  end;
+//sessions.remove(id);
+freeAndNIL(vars);
+end;
+
+procedure Tsession.keepAlive();
+begin expires:=now() + ttl end;
+
+function Tsession.getVar(k:string):string;
+begin
+  if vars = NIL then
+    Result := ''
+   else
+try result:=vars.values[k];
+except result:=''
+  end;
+end; // sessionGet
+
+procedure Tsession.setVar(k, v:string);
+begin
+if vars= NIL then
+  vars:=THashedStringList.create;
+vars.addPair(k,v);
+end;
+
+constructor Tsessions.create;
+begin
+  fS := Tdictionary<TSessionId,Tsession>.Create();
+end;
+
+destructor Tsessions.Destroy;
+begin
+  FreeAndNil(fS);
+end;
+
+function Tsessions.getSession(sId: String): Tsession;
+begin
+  Result := fS.Items[sId];
+end;
+
+function Tsessions.getSession: Tsession;
+begin
+  result := Tsession.create;
+  fS.Add(result.id, result);
+end;
+
+function Tsessions.initNewSession: TSessionId;
+var
+  s: Tsession;
+begin
+  s := getSession;
+  Result := s.id;
+end;
+
+procedure Tsessions.clearSession(sId: TSessionId);
+begin
+  fS.Remove(sId);
+end;
+
+function Tsessions.noSession(sId: TSessionId): Boolean;
+var
+  s: TSession;
+begin
+  Result := (sID = '') or not fS.ContainsKey(sId);
+  if not Result then
+   // Check if session was expired
+    begin
+      s := fS.Items[sId];
+      Result := s.expires < now;
+    end;
+end;
+
+procedure Tsessions.keepAlive(sId: TSessionId);
+var
+  s: Tsession;
+begin
+  s := ss[sId];
+  if Assigned(s) then
+    s.keepAlive;
+end;
+
+procedure Tsessions.checkExpired;
+var
+  sess: Tsession;
+  now_: TDateTime;
+  sId: TSessionId;
+begin
+  now_ := now();
+  for sess in self.fS.Values do
+   begin
+    sId := sess.id;
+    if now_ > sess.expires then
+      sess.free;
+    self.fS.Items[sId] := NIL;
+    self.fS.Remove(sId);
+   end;
+end;
+function TconnDataMain.goodPassword(s:string; func:ThashFunc):boolean;
+begin
+  s := postVars.values[s];
+  result:=(s > '') and (s = func(func(account.pwd)+ sessionId))
+end;
+
+procedure TconnDataMain.setSessionVar(k, v: String);
+var
+  s: TSession;
+begin
+  s := sessions.getSession(sessionId);
+  s.v[k] := v;
+end;
+
+procedure TconnDataMain.logout();
+begin
+  sessions.clearSession(sessionID);
+  usr:='';
+  pwd:='';
+  conn.delCookie(SESSION_COOKIE);
+end; // logout
+
 
 end.

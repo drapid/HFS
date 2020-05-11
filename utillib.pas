@@ -43,7 +43,6 @@ var
   inputQueryLongdlg: TlonginputFrm;
   winVersion: (WV_LOWER, WV_2000, WV_VISTA, WV_SEVEN, WV_HIGHER);
 type
-  TcharSet = TSysCharSet; //set of char;
   TreCB = procedure(re:TregExpr; var res:string; data:pointer);
   PstringDynArray = ^TstringDynArray;
   TnameExistsFun = function(user:string):boolean;
@@ -151,7 +150,7 @@ function copyFile(src, dst:string):boolean;
 function resolveLnk(const fn: String): String;
 function validFilename(s:string):boolean;
 function validFilepath(fn:string; acceptUnits:boolean=TRUE):boolean;
-function match(mask, txt:pchar; fullMatch:boolean=TRUE; charsNotWildcard:Tcharset=[]):integer;
+function match(mask, txt:pchar; fullMatch:boolean=TRUE; charsNotWildcard:TcharsetW=[]):integer;
 function filematch(mask, fn:string):boolean;
 function appendFileU(fn:string; data:string):boolean;
 function appendFileA(fn:string; data:RawByteString):boolean;
@@ -193,7 +192,7 @@ function arrayToList(a:TStringDynArray; list:TstringList=NIL):TstringList;
 procedure sortArray(var a:TStringDynArray);
 // convert
 function boolToPtr(b:boolean):pointer;
-function strToCharset(s:string):Tcharset;
+function strToCharset(s:string):TcharsetW;
 function ipToInt(ip:string):dword;
 function rectToStr(r:Trect):string;
 function strToRect(s:string):Trect;
@@ -226,7 +225,7 @@ function xtpl(src:string; table:array of string):string; OverLoad;
 function xtpl(src: RawByteString; table:array of RawByteString): RawByteString; OverLoad;
 function validUsername(s:string; acceptEmpty:boolean=FALSE):boolean;
 function anycharIn(chars, s:string):boolean; overload;
-function anycharIn(chars:Tcharset; s:string):boolean; overload;
+function anycharIn(chars:TcharsetW; s:string):boolean; overload;
 function int0(i,digits:integer):string;
 function addressmatch(mask, address:string):boolean;
 function getTill(const ss, s:string; included:boolean=FALSE):string; overload;
@@ -234,7 +233,7 @@ function getTill(i:integer; const s:string):string; overload;
 function getTill(const ss, s: RawByteString; included:boolean=FALSE): RawByteString; OverLoad;
 function getTill(i:integer; const s: RawByteString): RawByteString; OverLoad;
 function singleLine(s:string):boolean;
-function poss(chars:TcharSet; s:string; ofs:integer=1):integer;
+function poss(chars:TcharSetW; s:string; ofs:integer=1):integer;
 //function optUTF8(bool:boolean; s:string):string; overload;
 //function optUTF8(tpl:Ttpl; s:string):string; overload;
 function optAnsi(bool:boolean; s:string):string;
@@ -247,15 +246,15 @@ function first(a,b:double):double; overload;
 function first(a,b:pointer):pointer; overload;
 function first(const a,b:string):string; overload;
 function first(a:array of string):string; overload;
-function stripChars(s:string; cs:Tcharset; invert:boolean=FALSE):string;
+function stripChars(s:string; cs:TcharsetW; invert:boolean=FALSE):string;
 function strAt(const s, ss:string; at:integer):boolean; inline;
 function substr(const s: RawByteString; start:integer; upTo:integer=0): RawByteString; inline; OverLoad;
 function substr(const s:string; start:integer; upTo:integer=0):string; inline; overload;
 function substr(const s:string; const after:string):string; overload;
-function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSet=[]):string;
+function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSetW=[]):string;
 function replace(var s:string; const ss:string; start,upTo:integer):integer;
 function countSubstr(const ss:string; const s:string):integer;
-function trim2(const s:string; chars:Tcharset):string;
+function trim2(const s:string; chars:TcharsetW):string;
 procedure urlToStrings(const s:string; sl:Tstrings); OverLoad;
 procedure urlToStrings(const s: RawByteString; sl:Tstrings); OverLoad;
 function reCB(const expr, subj:string; cb:TreCB; data:pointer=NIL):string;
@@ -264,7 +263,7 @@ function reReplace(subj, exp, repl:string; mods:string='m'):string;
 function reGet(const s, exp:string; subexpIdx:integer=1; mods:string='!mi'; ofs:integer=1):string;
 function getSectionAt(p:pchar; out name:string):boolean;
 function isSectionAt(p:pChar):boolean;
-function dequote(const s:string; quoteChars:TcharSet=['"']):string;
+function dequote(const s:string; quoteChars:TcharSetW=['"']):string;
 function quoteIfAnyChar(badChars, s:string; const quote:string='"'; const unquote:string='"'):string;
 function getKeyFromString(const s:string; key:string; const def:string=''):string;
 function setKeyInString(s:string; key:string; val:string=''):string;
@@ -277,10 +276,13 @@ procedure enforceNUL(var s: RawbyteString); OverLoad;
 function bmp2ico32(bitmap: Tbitmap): HICON;
 function bmp2ico24(bitmap: Tbitmap): HICON;
 
+function strSHA256(s:string):string;
+function strMD5(s:string):string;
+
 implementation
 
 uses
-  clipbrd, CommCtrl,
+  clipbrd, CommCtrl, //System.Hash,
   AnsiClasses, ansiStrings,
   {$IFDEF HAS_FASTMM}
   fastmm4,
@@ -1229,7 +1231,7 @@ result:=fn;
   end;
 end; // resolveLnk
 
-function anycharIn(chars:Tcharset; s:string):boolean;
+function anycharIn(chars:TcharsetW; s:string):boolean;
 begin result:=poss(chars, s) > 0 end;
 
 function anycharIn(chars, s:string):boolean;
@@ -1383,7 +1385,7 @@ begin if v then result:=v1 else result:=v2 end;
 function if_(v:boolean; v1, v2:Tobject):Tobject;
 begin if v then result:=v1 else result:=v2 end;
 
-function match(mask, txt:pchar; fullMatch:boolean; charsNotWildcard:Tcharset):integer;
+function match(mask, txt:pchar; fullMatch:boolean; charsNotWildcard:TcharsetW):integer;
 // charsNotWildcard is for chars that are not allowed to be matched by wildcards, like CR/LF
 var
   i: integer;
@@ -2227,7 +2229,7 @@ setLength(result, l);
 if l > 0 then strLcopy(@result[1], from, l);
 end; // getStr
 
-function poss(chars:TcharSet; s:string; ofs:integer=1):integer;
+function poss(chars:TcharSetW; s:string; ofs:integer=1):integer;
 begin
 for result:=ofs to length(s) do
   if s[result] in chars then exit;
@@ -2454,7 +2456,7 @@ try
 finally closeHandle(h) end;
 end; // pid2file
 
-function stripChars(s:string; cs:Tcharset; invert:boolean=FALSE):string;
+function stripChars(s:string; cs:TcharsetW; invert:boolean=FALSE):string;
 var
   i, l, ofs: integer;
   b: boolean;
@@ -2596,7 +2598,7 @@ end;
 function isLocalIP(const ip:string):boolean;
 begin result:=checkAddressSyntax(ip, FALSE) and HSlib.isLocalIP(ip) end;
 
-function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSet=[]):string;
+function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSetW=[]):string;
 var
   i, c, l: integer;
 begin
@@ -2640,7 +2642,7 @@ i:=1;
   until false;
 end; // countSubstr
 
-function trim2(const s:string; chars:Tcharset):string;
+function trim2(const s:string; chars:TcharsetW):string;
 var
   b, e: integer;
 begin
@@ -2913,7 +2915,7 @@ for i:=0 to length(a)-1 do
 result:=a;
 end; // onlyExistentAccounts
 
-function strToCharset(s:string):Tcharset;
+function strToCharset(s:string):TcharsetW;
 var
   i: integer;
 begin
@@ -2954,7 +2956,7 @@ if result then
   previous:=d;
 end; // newMtime
 
-function dequote(const s:string; quoteChars:TcharSet=['"']):string;
+function dequote(const s:string; quoteChars:TcharSetW=['"']):string;
 begin
 if (s > '') and (s[1] = s[length(s)]) and (s[1] in quoteChars) then
   result:=copy(s, 2, length(s)-2)
@@ -3551,6 +3553,17 @@ begin
     Result := 0;
   ImageList_Destroy(il);
 end;
+
+function strSHA256(s:string):string;
+//begin result:=THashSHA2.GetHashString(s) end;
+begin result:= SHA256PassHS(UTF8Encode(s)) end;
+
+//function strMD5(s:string):string;
+//begin result:=THashMD5.GetHashString(s) end;
+
+function strMD5(s:string):string;
+begin Result := MD5PassHS(UTF8Encode(s)); end;
+
 
 var
   TZinfo:TTimeZoneInformation;

@@ -2,7 +2,7 @@ unit hfsGlobal;
 
 interface
 uses
-  graphics, Types;
+  graphics, Types, SysUtils;
 
 const
 {$I RnQBuiltTime.inc}
@@ -131,6 +131,9 @@ resourcestring
 
 
 type
+  TcharSetA = TSysCharSet; //set of char;
+  TcharSetW = set of Char; //set of char;
+
 //  Pboolean = ^boolean;
 
   Paccount = ^Taccount;

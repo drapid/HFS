@@ -7,6 +7,23 @@ LEGEND
 -   bug fix
 AV  access violation
 
+VER 2.4
+propaganda
+  New mobile-friendly template
+/propaganda
++ new default template
++ {.set item|name.}
++ {.get item|icon.}
++ {.set cfg.}
++ cache for jquery and template sections
++ new template commands: base64, base64decode, md5, sha1
+- fixed template handling of section names with both '+' and '=' present
+- fixed LNK files to deleted items
+- fixed comments files were not updated upon deletion of files
+- fixed "requesting" forever with empty cookies http://rejetto.com/forum/index.php?topic=13112.0
+- fixed double "Content-Length" header on compressed pages
+- fixed log text base color not matching system settings http://rejetto.com/forum/index.php?topic=13233.0 
+
 VER 2.3m
 propaganda
   Bug fixes
@@ -388,7 +405,7 @@ propaganda
 * non-ascii option applied also inside pages
 * file menu: now hidden in easy mode: comment, icon, switch to, new link, browse it
 * file menu: rearranged and renamed some items to improve usability (let download > no download, new folder > new empty folder, copy URL > copy URL address, let browse > browsable) 
-* address bar redesigned  
+* address bar redesigned
 * "HFS last update check.tmp" is now created as hidden, less intrusive
 * now some special files are protected with same access rights as the root folder: /~img*, /~progress, /favicon.ico
 - fixed UTF-8 support 
@@ -487,7 +504,7 @@ propaganda
 + improved file/folder hints
 + improved drag&drop scrolling on VFS
 + when no port is specified and port 80 is busy, port 8080, 280, 10080 are probed (then dynamic port is used)
-+ Log menu: clicking "Address 2 name" automatically fills the IP field 
++ Log menu: clicking "Address 2 name" automatically fills the IP field
 + total download counter works now also for real-folders 
 + symbol ~nodefault to skip the default file 
 + command line: -a <FILENAME> (load additional ini file)

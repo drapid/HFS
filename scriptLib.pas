@@ -652,7 +652,7 @@ var
     end;
   end; // infixOperators
 
-  procedure call(code:string; ofs:integer);
+  procedure call(code:string; ofs:integer=0);
   var
     i: integer;
   begin
@@ -733,7 +733,7 @@ var
   procedure encodeuri();
   var
     i: integer;
-    cs: Tcharset;
+    cs: TcharsetW;
   begin
   result:='';
   try cs:=[#0..#255]-strToCharset(parEx('only'));
@@ -1903,7 +1903,7 @@ try
         begin
         if not ansiStartsStr(MARKER_OPEN, s) then
           s:=MARKER_OPEN+s+MARKER_CLOSE;
-        call(s, 0);
+        call(s);
         exit;
         end;
       end;

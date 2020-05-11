@@ -9,7 +9,7 @@ var
   srv: ThttpSrv;
   globalLimiter: TspeedLimiter;
   ip2obj: THashedStringList;
-  sessions: THashedStringList;
+  sessions: Tsessions;
   etags: THashedStringList;
   addToFolder: string; // default folder where to add items from the command line
   lastDialogFolder: string;  // stores last for open dialog, to make it persistent

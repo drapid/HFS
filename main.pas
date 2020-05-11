@@ -28,7 +28,7 @@ uses
   // delphi libs
   Windows, Messages, SysUtils, Forms, Menus, Graphics, Controls, ComCtrls, Dialogs, math,
   Buttons, ImgList, StdCtrls, ExtCtrls, ToolWin, ImageList, strutils, AppEvnts, types,
-  iniFiles, Classes,
+  iniFiles, Classes, System.Contnrs,
   // 3rd part libs. ensure you have all of these, the same version reported in dev-notes.txt
   OverbyteIcsWSocket, OverbyteIcsHttpProt,
    //RegularExpressions,
@@ -76,7 +76,6 @@ type
       bytes: integer;
       since: Tdatetime;
       end;
-    sessionID: string;
     workaroundForIEutf8: (toDetect, yes, no);
     { here we put just a pointer because the file type would triplicate
     { the size of this record, while it is NIL for most connections }
@@ -85,8 +84,6 @@ type
     property lastFile:Tfile read FlastFile write setLastFile;
     constructor create(conn:ThttpConn);
     destructor Destroy; override;
-    function sessionGet(const k: string): string;
-    procedure sessionSet(const k, v: string);
     procedure disconnect(const reason: string);
     function accessFor(f: TFile): Boolean;
     end; // Tconndata
@@ -731,6 +728,7 @@ type
     function  getTrayTipMsg(tpl:string=''):string;
     procedure menuDraw(sender:Tobject; cnv: Tcanvas; r:Trect; selected:boolean);
     procedure menuMeasure(sender:Tobject; cnv: Tcanvas; var w:integer; var h:integer);
+    procedure wrapInputQuery(sender:Tobject);
   end; // Tmainfrm
 
   TFileHlp = class helper for Tfile
@@ -1215,28 +1213,6 @@ begin
 disconnectReason:=reason;
 conn.disconnect();
 end; // disconnect
-
-function Tconndata.sessionGet(const k: string): string;
-begin
-  if Assigned(session) then
-    try
-      result := session.values[k];
-     except
-      result := ''
-    end
-   else
-    result := ''
-end; // sessionGet
-
-procedure Tconndata.sessionSet(const k, v: string);
-begin
-  if session = NIL then
-    begin
-    session := THashedStringList.create;
-    sessions.addObject(sessionID, session);
-    end;
-  session.values[k] := v;
-end; // sessionSet
 
 // we'll automatically free and previous temporary object
 procedure TconnData.setLastFile(f:Tfile);
@@ -2677,9 +2653,6 @@ else if tplLast <> 0 then
   end;
 end; // keepTplUpdated
 
-function getNewSID():string;
-begin result:=floatToStr(random()) end;
-
 procedure setNewTplFile(fn:string);
 begin
 tplFilename:=fn;
@@ -3027,26 +3000,34 @@ var
   begin
 //  conn.addHeader( 'Content-Disposition: '+if_(attach, 'attachment; ')+'filename*=UTF-8''"'+UTF8encode(data.lastFN)+'";');
 //  conn.addHeader('Content-Disposition', RawByteString('attachment; filename="')+encodeURL(data.lastFN)+'";');
-  conn.addHeader('Content-Disposition', if_(attach, RawByteString('attachment; ')) + RawByteString('filename*=UTF-8''"')+encodeURL(UTF8encode(fn))+'";');
+//  conn.addHeader('Content-Disposition', if_(attach, RawByteString('attachment; ')) + RawByteString('filename*=UTF-8''"')+encodeURL(UTF8encode(fn))+'";');
+  conn.addHeader('Content-Disposition', if_(attach, RawByteString('attachment; ')) + RawByteString('filename="')+encodeURL(data.lastFN)+'";');
   end;
 
   procedure sessionSetup();
+  var
+    idx: Integer;
+    s: Tsession;
   begin
-  if (data = NIL) or assigned(data.session) then exit;
-  data.sessionID:=conn.getCookie(SESSION_COOKIE);
-  if data.sessionID = '' then
-    begin
-    data.sessionID:=getNewSID();
-    conn.setCookie(SESSION_COOKIE, data.sessionID, ['path','/'], 'HttpOnly'); // the session is site-wide, even if this request was related to a folder
-    end
-  else
-    try data.session:=sessions.objects[sessions.indexOf(data.sessionID)] as ThashedStringList
-    except end;
-  if data.usr = '' then
-    begin
-    data.usr:=data.sessionGet('user');
-    data.pwd:=data.sessionGet('password');
-    end;
+    if data = NIL then
+      Exit;
+    if (data.sessionID = '') then
+       data.sessionID:=conn.getCookie(SESSION_COOKIE);
+    if sessions.noSession(data.sessionID) then
+      begin
+      data.sessionID:= sessions.initNewSession();
+      conn.setCookie(SESSION_COOKIE, data.sessionID, ['path','/'], 'HttpOnly'); // the session is site-wide, even if this request was related to a folder
+      end;
+    s := sessions.ss[data.sessionID];
+    if Assigned(s) then
+     begin
+      s.keepAlive();
+      if data.usr = '' then
+        begin
+        data.usr := s.v['user'];
+        data.pwd := s.v['password'];
+        end;
+     end;
   if (data.usr = '') and (conn.request.user > '') then
     begin
     data.usr:=conn.request.user;
@@ -3472,8 +3453,7 @@ var
       if s = '' then // logout
         begin
         s:='ok';
-        data.usr:='';
-        data.pwd:='';
+        data.logout();
         end
       else
         s:='username not found'
@@ -3484,18 +3464,18 @@ var
         future we may make this work even if we store hashed password on the server.
         In such case we would not be able to calculate pwd+sessionID because we'd had no clear pwd.
         By relying on md5(pwd) instead of pwd, we will avoid such problem. }
-      s:=data.postVars.values['__PASSWORD_MD5'];
-      if (s > '') and (s = MD5PassHS(MD5PassH(data.account.pwd)+RawByteString(data.sessionID)))
-          or (data.postVars.values['__PASSWORD'] = data.account.pwd) then
+      if data.goodPassword('__PASSWORD_SHA256', strSHA256)
+      or data.goodPassword('__PASSWORD_MD5', strMD5)
+      or (data.postVars.values['__PASSWORD'] = data.account.pwd) then
         begin
         s:='ok';
         data.pwd:=data.account.pwd;
-        data.sessionSet('user', data.usr);
-        data.sessionSet('password', data.pwd);
+        data.setSessionVar('user', data.usr);
+        data.setSessionVar('password', data.pwd);
         end
       else
         begin
-        s:='bad password';
+        s:='bad password'; //TODO shouldn't this change http code?
         data.account:=NIL;
         data.usr:='';
         end;
@@ -4617,6 +4597,13 @@ port:=was;
 if act then startServer();
 end; // changePort
 
+function b64utf8(const s:string): RawByteString;
+begin result:=Base64EncodeString(UTF8encode(s)); end;
+
+function decodeB64utf8(const s: RawByteString):string;
+begin result:=UnUTF(Base64DecodeString(s)); end;
+
+
 function TmainFrm.getCfg(exclude:string=''):string;
 type
   Tencoding=(E_PLAIN, E_B64, E_ZIP);
@@ -4625,7 +4612,7 @@ type
   begin
   case encoding of
     E_PLAIN: result:=s;
-    E_B64: result:= Base64EncodeString(s);
+    E_B64: result:=b64utf8(s);
     E_ZIP:
       begin
       result := zCompressStr(s);
@@ -4755,7 +4742,7 @@ result:='HFS '+ hfsGlobal.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'custom-ip='+join(';',customIPs)+CRLF
 +'listen-on='+listenOn+CRLF
 +'external-ip-server='+customIPservice+CRLF
-+'dynamic-dns-updater='+Base64EncodeString(dyndns.url)+CRLF
++'dynamic-dns-updater='+b64utf8(dyndns.url)+CRLF
 +'dynamic-dns-user='+dyndns.user+CRLF
 +'dynamic-dns-host='+dyndns.host+CRLF
 +'search-better-ip='+yesno[searchbetteripChk.checked]+CRLF
@@ -4904,7 +4891,7 @@ currentCFGhashed.text:=s; // re-parse
 end; // updateCurrentCFG
 
 function TmainFrm.setCfg(cfg:string; alreadyStarted:boolean):boolean;
-const
+resourcestring
   MSG_BAN = 'Your ban configuration may have been screwed up.'
     +#13'Please verify it.';
 var
@@ -4993,7 +4980,7 @@ var
       if p = 'login' then
       	begin
         if not anycharIn(':', t) then
-  	      t:= Base64DecodeString(t);
+  	      t:=decodeB64utf8(t);
   	    a.user:=chop(':',t);
 	      a.pwd:=t;
         end;
@@ -5109,7 +5096,7 @@ while cfg > '' do
     if h = 'ip' then savedip:=l;
     if h = 'custom-ip' then customIPs:=split(';',l);
     if h = 'listen-on' then listenOn:=l;
-    if h = 'dynamic-dns-updater' then dyndns.url := UnUTF( Base64DecodeString(l));
+    if h = 'dynamic-dns-updater' then dyndns.url:=decodeB64utf8(l);
     if h = 'dynamic-dns-user' then dyndns.user:=l;
     if h = 'dynamic-dns-host' then dyndns.host:=l;
     if h = 'login-realm' then loginRealm:=l;
@@ -6000,6 +5987,7 @@ var
 
   procedure everyMinute();
   begin
+    sessions.checkExpired;
   if updateDailyChk.Checked then
     autoCheckUpdates();
   // purge icons older than 5 minutes, because sometimes icons change
@@ -7525,7 +7513,7 @@ commonFields:=TLV(FK_FLAGS, str_(f.flags))
     +TLV_NOT_EMPTY(FK_RESOURCE, f.resource)
     +TLV_NOT_EMPTY(FK_COMMENT, f.comment)
     +if_(f.user>'', TLV(FK_USERPWD, Base64EncodeString(f.user+':'+f.pwd)))
-    +if_(f.user>'', TLV(FK_USERPWD_UTF8, Base64EncodeString(UTF8Encode((f.user+':'+f.pwd)))))
+    +if_(f.user>'', TLV(FK_USERPWD_UTF8, b64utf8(f.user+':'+f.pwd)))
     +TLV_NOT_EMPTY(FK_ACCOUNTS, join(';',f.accounts[FA_ACCESS]) )
     +TLV_NOT_EMPTY(FK_UPLOADACCOUNTS, join(';',f.accounts[FA_UPLOAD]))
     +TLV_NOT_EMPTY(FK_DELETEACCOUNTS, join(';',f.accounts[FA_DELETE]))
@@ -7827,7 +7815,7 @@ var
 
   function getColor(idx:integer; def:Tcolor):Tcolor;
   begin
-  if (length(colors) <= idx) or (colors[idx] = graphics.clDefault) then result:=def
+  if (length(colors) <= idx) or (colors[idx] = Graphics.clDefault) then result:=def
   else result:=colors[idx]
   end; // getColor
 
@@ -8002,17 +7990,17 @@ var
 begin
 if speedLimit < 0 then s:=''
 else s:=floatToStr(speedLimit);
-if inputquery(LIMIT, MSG_MAX_BW+#13+MSG_EMPTY_NO_LIMIT, s) then
-	try
-  	s:=trim(s);
-  	if s = '' then setSpeedLimit(-1)
-    else setSpeedLimit(strToFloat(s));
-    if speedLimit = 0 then
-      msgDlg(ZEROMSG, MB_ICONWARNING);
-    // a manual set of speedlimit voids the pause command
-    Pausestreaming1.Checked:=FALSE;
-  except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
-  end;
+if not inputquery(LIMIT, MSG_MAX_BW+#13+MSG_EMPTY_NO_LIMIT+#13, s) then
+  exit;
+try
+  s:=trim(s);
+  if s = '' then setSpeedLimit(-1)
+  else setSpeedLimit(strToFloat(s));
+  if speedLimit = 0 then
+    msgDlg(ZEROMSG, MB_ICONWARNING);
+  // a manual set of speedlimit voids the pause command
+  Pausestreaming1.Checked:=FALSE;
+except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR) end;
 end;
 
 procedure TmainFrm.Speedlimitforsingleaddress1Click(Sender: TObject);
@@ -9387,7 +9375,7 @@ result:=inputQuery('Enter user', 'Enter user', dyndns.user)
   and inputQuery('Enter password', 'Enter password', dyndns.pwd)
   and (dyndns.pwd > '');
 dyndns.user:=trim(dyndns.user);
-dyndns.pwd:=trim(dyndns.pwd);
+dyndns.pwd:=ifThen(dyndns.user='', '', trim(dyndns.pwd));
 end; // dynDNSinputUserPwd
 
 function dynDNSinputHost():boolean;
@@ -9411,7 +9399,7 @@ end; // dynDNSinputHost
 
 procedure finalizeDynDNS();
 begin
-addString(dyndns.host, customIPs);
+addUniqueString(dyndns.host, customIPs);
 setDefaultIP(dyndns.host);
 end; // finalizeDynDNS
 
@@ -10469,7 +10457,7 @@ while current > '' do
   if defV = v then continue;
   if k = 'dynamic-dns-updater' then
     begin // remove login data
-    v:=Base64DecodeString(v);
+    v:=decodeB64utf8(v);
     chop('//',v);
     v:=chop('/',v);
     if ansiContainsStr(v, '@') then chop('@',v);
@@ -10711,6 +10699,44 @@ if mi.Checked then
   end;
 end;
 
+procedure TmainFrm.wrapInputQuery(sender:Tobject);
+var
+  Form: TCustomForm;
+  Prompt: TLabel;
+  Edit: TEdit;
+  Ctrl: TControl;
+  I, J, ButtonTop: Integer;
+begin
+Form := Screen.ActiveCustomForm;
+if (Form=NIL) or (Form.ClassName<>'TInputQueryForm') then
+  Exit;
+
+for I := 0 to Form.ControlCount-1 do
+  begin
+  Ctrl := Form.Controls[i];
+  if Ctrl is TLabel then
+    Prompt := TLabel(Ctrl)
+  else if Ctrl is TEdit then
+    Edit := TEdit(Ctrl);
+  end;
+
+Edit.SetBounds(Prompt.Left, Prompt.Top + Prompt.Height + 5, max(200, Prompt.Width), Edit.Height);
+Form.ClientWidth := (Edit.Left * 2) + Edit.Width;
+ButtonTop := Edit.Top + Edit.Height + 15;
+
+J := 0;
+for I := 0 to Form.ControlCount-1 do
+  begin
+  Ctrl := Form.Controls[i];
+  if Ctrl is TButton then
+    begin
+    Ctrl.SetBounds(Form.ClientWidth - ((Ctrl.Width + 15) * (2-J)), ButtonTop, Ctrl.Width, Ctrl.Height);
+    Form.ClientHeight := Ctrl.Top + Ctrl.Height + 13;
+    Inc(J);
+    end;
+  end;
+end;
+
 
 function TFileHlp.pathTill(root:Tfile=NIL; delim:char='\'):string;
 var
@@ -10839,7 +10865,7 @@ filelistTpl:=Ttpl.create(getRes('filelistTpl'));
 globalLimiter:=TspeedLimiter.create();
 ip2obj:=THashedStringList.create();
 etags:=THashedStringList.create();
-sessions:=THashedStringList.create();
+sessions:=Tsessions.create();
 ipsEverConnected:=THashedStringList.create();
 ipsEverConnected.sorted:=TRUE;
 ipsEverConnected.duplicates:=dupIgnore;
