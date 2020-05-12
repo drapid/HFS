@@ -117,9 +117,9 @@ type
     IsGZiped: Boolean; // Is body GZiped
     isBodyUTF8: Boolean;   // Is body UTF8 string
     firstByte, lastByte: int64;  // body interval for partial replies (206)
-    realm: string;   // this will appear in the authentication dialog
+    realm,           // this will appear in the authentication dialog
+    reason,          // customized reason phrase
     url: string;     // used for redirections
-    reason: string;  // customized reason phrase
     resumeForbidden: boolean;
     procedure headerAdd(const h: String); OverLoad;
     procedure headerAdd(const h: RawByteString); OverLoad;
@@ -322,7 +322,7 @@ const
 function decodeURL(const url:string; utf8:boolean=TRUE):string; OverLoad;
 function decodeURL(const url: RawByteString):string; OverLoad;
 function encodeURL(const url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
-  unicode:boolean=FALSE):string; OverLoad;
+  htmlEncoding:boolean=FALSE):string; OverLoad;
 function encodeURL(const url: RawByteString; nonascii:boolean=TRUE; spaces:boolean=TRUE;
   unicode: boolean=FALSE): RawByteString; OverLoad;
 // returns true if address is not suitable for the internet
@@ -524,28 +524,38 @@ end; // decodeURL
 
 
 function encodeURL(const url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
-  unicode:boolean=FALSE):string;
+  htmlEncoding:boolean=FALSE):string;
 var
   i: integer;
-  encodePerc, encodeUni: TcharSetW;
+  encodePerc, encodeHTML: TcharSetW;
+  a: RawByteString;
 begin
 result:='';
 if url = '' then
   exit;
-encodeUni:=[];
-if nonascii then encodeUni:=[#128..#255];
+encodeHTML:=[];
+//if nonascii then
+//  encodeHTML:=[#128..#255];
 encodePerc:=[#0..#31,'#','%','?','"','''','&','<','>',':'];
 // actually ':' needs encoding only in relative url
 if spaces then include(encodePerc,' ');
-if not unicode then
+if not htmlEncoding then
   begin
-  encodePerc:=encodePerc+encodeUni;
-  encodeUni:=[];
+  encodePerc:=encodePerc+encodeHTML;
+  encodeHTML:=[];
   end;
+{if nonascii then
+  begin
+  a:=UTF8encode(url); // couldn't find a better way to force url to have the UTF8 encoding
+  i:=length(a);
+  setLength(url, i);
+  for i := 1 to i do
+    url[i]:=char(a[i]);
+  end;}
 for i:=1 to length(url) do
 	if url[i] in encodePerc then
     result:=result+'%'+intToHex(ord(url[i]),2)
-  else if url[i] in encodeUni then
+  else if url[i] in encodeHTML then
     result:=result+'&#'+intToStr(charToUnicode(url[i]))+';'
   else
     result:=result+url[i];

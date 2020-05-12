@@ -1729,7 +1729,7 @@ try
     diffTpl.fullTextS := folder.getRecursiveDiffTplAsStr();
 
   isDMbrowser:= otpl = dmBrowserTpl;
-  fullEncode:=not isDMbrowser;
+  fullEncode:=FALSE;
   ofsRelUrl:=length(folder.url(fullEncode))+1;
   ofsRelItemUrl:=length(folder.pathTill())+1;
   // pathTill() is '/' for root, and 'just/folder', so we must accordingly consider a starting and trailing '/' for the latter case (bugfix by mars)
@@ -1781,6 +1781,13 @@ try
       else
         inc(numberFiles);
       end;
+    {TODO this symbols will be available when executing macros in handleItem. Having
+      them at this stage is useful only in case immediate calculations are required.
+      This may happen seldom, but maybe some template is using it since we got this here.
+      Each symbols is an extra iteration on the template piece and we may be tempted
+      to consider for optimizations. To not risk legacy problems we should consider
+      treating table symbols with a regular expression and a Tdictionary instead.
+    }
     table:=toSA([
       '%upload-link%', if_(accountAllowed(FA_UPLOAD, cd, folder), diffTpl['upload-link']),
       '%files%', diffTpl[if_(n>0, 'files','nofiles')],
@@ -2580,7 +2587,7 @@ try
       lastPath:=path;
       end;
     end;
-  trancheEnd:=length(files)-1; // after the for-loop, the variable seems to not be trustable
+  trancheEnd:=length(files)-1; // after the for-loop, the variable seems to not be reliable
   doTheTranche();
 finally ss.free end;
 end; // removeFilesFromComments
@@ -3049,7 +3056,6 @@ var
       fi: Tfile;
       fIsTemp: boolean;
       s: string;
-
     begin
     if not f.accessFor(data) then exit;
     listing:=TfileListing.create();
@@ -3460,10 +3466,10 @@ var
     else
       begin
       data.usr:=s;
-      { I opted to use double md5 for this authentication method so that in the
-        future we may make this work even if we store hashed password on the server.
-        In such case we would not be able to calculate pwd+sessionID because we'd had no clear pwd.
-        By relying on md5(pwd) instead of pwd, we will avoid such problem. }
+      { I opted to use double hashing for this authentication method so that in the
+        future this may work even if we stored hashed password on the server,
+        thus being unable to calculate hash(pwd+sessionID).
+        By relying on hash(pwd) instead of pwd we avoid such problem. }
       if data.goodPassword('__PASSWORD_SHA256', strSHA256)
       or data.goodPassword('__PASSWORD_MD5', strMD5)
       or (data.postVars.values['__PASSWORD'] = data.account.pwd) then
@@ -3590,7 +3596,8 @@ var
     if conn.request.user = '' then
       begin // issue a login dialog
       getPage('unauthorized', data);
-      if loginRealm > '' then conn.reply.realm:=loginRealm;
+      if loginRealm > '' then
+        conn.reply.realm:=loginRealm;
       exit;
       end
     else
@@ -3840,7 +3847,8 @@ if assigned(conn) and (conn.getLockCount <> 1) then
 
 f:=NIL;
 data:=NIL;
-if assigned(conn) then data:=conn.data;
+if assigned(conn) then
+  data:=conn.data;
 if assigned(data) then
   data.lastActivityTime:=now();
 
@@ -3978,7 +3986,7 @@ case event of
     data.fileXferStart:=now();
     f:=findFileByURL(decodeURL(conn.request.url));
     data.lastFile:=f; // auto-freeing
-    data.uploadSrc:=optAnsi(tpl.utf8, conn.post.filename);
+    data.uploadSrc:=conn.post.filename;
     data.uploadFailed:='';
     if (f = NIL) or not accountAllowed(FA_UPLOAD, data, f) or not f.accessFor(data) then
       data.uploadFailed:=if_(f=NIL, 'Folder not found.', 'Not allowed.')
@@ -4976,19 +4984,26 @@ var
       // account properties are separated by pipes
       t:=chop('|',s);
       p:=chop(':',t); // get property name
-      if p = '' then continue;
+      if p = '' then
+        continue;
       if p = 'login' then
       	begin
         if not anycharIn(':', t) then
   	      t:=decodeB64utf8(t);
   	    a.user:=chop(':',t);
 	      a.pwd:=t;
-        end;
-      if p = 'enabled' then a.enabled:=yes(t);
-      if p = 'no-limits' then a.noLimits:=yes(t);
-      if p = 'group' then a.group:=yes(t);
-      if p = 'redir' then a.redir:=t;
-      if p = 'link' then a.link:=split(':',t);
+        end
+       else
+      if p = 'enabled' then a.enabled:=yes(t)
+       else
+      if p = 'no-limits' then a.noLimits:=yes(t)
+       else
+      if p = 'group' then a.group:=yes(t)
+       else
+      if p = 'redir' then a.redir:=t
+       else
+      if p = 'link' then a.link:=split(':',t)
+       else
       if p = 'notes' then a.notes := unzipS(t);
       end;
     end;
@@ -10903,7 +10918,7 @@ MIMEtypes:=toSA([
 
 systemimages:=getSystemimages();
 saveMode:=SM_USER;
-lastDialogFolder:=getCurrentDir();;
+lastDialogFolder:=getCurrentDir();
 autoupdatedFiles:=TstringToIntHash.create();
 iconsCache:=TiconsCache.create();
 dyndns.active:=TRUE;

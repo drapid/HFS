@@ -62,7 +62,6 @@ const
 var
   stopOnMacroRename: boolean; // this ugly global var is used to avoid endless recursion on a renaming rename event. this method won't work on a multithreaded system, but i opted for it because otherwise the changes would have been big.
   cachedTpls: TcachedTpls;
-  flog: ^file;
 
 function macrosLog(textIn, textOut:string; ts:boolean=FALSE):boolean;
 var
@@ -72,26 +71,12 @@ s:='';
 if ts then
     s:='<hr>'+dateTimeToStr(now())+CRLF;
 s:=s+#13'<dt>'+htmlEncode(textIn)+'</dt><dd>'+htmlEncode(textOut)+'</dd>';
-if flog = NIL then
-  begin
-  new(flog);
-  assignFile(flog^, MACROS_LOG_FILE);
-  reset(flog^, 1);
-  if IOresult() <> 0 then rewrite(flog^,1)
-  else seek(flog^,fileSize(flog^));
-  end;
-result := saveFileA(flog^, UTF8Encode(s))
+//result := appendFile(MACROS_LOG_FILE, UTF8Encode(s))
+result:=saveFileU(MACROS_LOG_FILE, s, True);
 end; // macrosLog
 
 procedure resetLog();
-begin
-try
-  closeFile(flog^);
-  dispose(flog);
-  flog:=NIL;
-except end;
-deleteFile(MACROS_LOG_FILE);
-end; // resetLog
+begin deleteFile(MACROS_LOG_FILE) end;
 
 function expandLinkedAccounts(account:Paccount):TStringDynArray;
 var
@@ -1167,7 +1152,7 @@ var
     if not satisfied(space) then exit;
 
     i:=space.indexOfName(s);
-    if i < 0 then exit; // this var doesn't exit. won't write.
+    if i < 0 then exit; // this var doesn't exit. don't write.
     encode:=FALSE;
     // if this is used as table, and has newlines, we must encode it to preserve associations
     h:=space.objects[i] as THashedStringList;
@@ -1278,7 +1263,7 @@ var
       a.user:=s;
   except end;
 
-  try a.redir := parEx('redirect') except end;
+  try a.redir:=parEx('redirect') except end;
   try a.noLimits:=isTrue(parEx('no limits')) except end;
   try a.enabled:=isTrue(parEx('enabled')) except end;
   try a.group:=isTrue(parEx('is group')) except end;
@@ -1837,9 +1822,9 @@ var
   begin
   srcReal:=uri2diskMaybe(src,NIL,FALSE);
   dstReal:=uri2diskMaybeFolder(dst);
-  if isExtension(srcReal, '.lnk') 
+  if isExtension(srcReal, '.lnk')
   and not isExtension(src, '.lnk') then
-    dstReal := dstReal + '.lnk';
+    dstReal:=dstReal+'.lnk';
   if extractFilePath(dstReal)='' then
     dstReal:=extractFilePath(srcReal)+dstReal;
   result:=renameFile(srcReal, dstReal)
@@ -2665,10 +2650,5 @@ freeAndNIL(eventScripts);
 freeAndNIL(defaultAlias);
 freeAndNIL(currentCFGhashed);
 staticVars.free;
-if assigned(flog) then
-  begin
-  closeFile(flog^);
-  dispose(flog);
-  end;
 
 end.
