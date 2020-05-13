@@ -345,6 +345,18 @@ end; // hasRightAttributes
 function hasRightAttributes(lp: TLoadPrefs; const fn: string):boolean; overload;
 begin result:=hasRightAttributes(lp, GetFileAttributes(pChar(fn))) end;
 
+function getFiles(mask:string):TstringList;
+var
+  sr: TSearchRec;
+begin
+result:=TstringList.create;
+result.CaseSensitive:=FALSE;
+if findFirst(mask, faAnyFile, sr) = 0 then
+  try
+    repeat result.add(sr.name)
+    until findNext(sr) <> 0;
+  finally findClose(sr) end;
+end; // getFiles
 
 // returns number of skipped files
 function TfileListing.fromFolder(loadPrefs: TLoadPrefs; folder: Tfile; cd: TconnDataMain;
@@ -1134,6 +1146,20 @@ var
   result:=TRUE;
   end; // add2diff
 
+  procedure loadStar();
+  var
+    list: TstringList;
+    s: string;
+  begin
+  list:=getFiles(exePath+'*.diff.tpl');
+  try
+    list.sort();
+    for s in list do
+      add2diff(s);
+  finally list.free
+    end;
+  end;
+
 begin
 result:='';
 diff:='';
@@ -1180,6 +1206,7 @@ while assigned(f) do
   f:=f.parent;
   first:=FALSE;
   end;
+loadStar();
 result:=diff;
 end; // getRecursiveDiffTplAsStr
 
@@ -1427,5 +1454,6 @@ end; // getFiltersRecursively
 
 function nodeToFile(n:TtreeNode):Tfile; inline;
 begin if n = NIL then result:=NIL else result:=Tfile(n.data) end;
+
 
 end.

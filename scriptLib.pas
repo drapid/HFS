@@ -2638,7 +2638,7 @@ cachedTpls:=TcachedTpls.create();
 eventScripts:=Ttpl.create();
 defaultAlias:=THashedStringList.create();
 defaultAlias.caseSensitive:=FALSE;
-defaultAlias.text:=getRes('alias');
+defaultAlias.text:=UnUTF(getRes('alias'));
 staticVars:=THashedStringList.create;
 currentCFGhashed:=THashedStringList.create();
 with staticVars do

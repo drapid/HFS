@@ -333,7 +333,8 @@ function getIP():string;
 procedure includeTrailingString(var s:string; const ss:string); OverLoad;
 procedure includeTrailingString(var s: RawByteString; const ss: RawByteString); OverLoad;
 // gets unicode code for specified character
-function charToUnicode(c:char):dword;
+function charToUnicode(c:char):dword; OverLoad;
+function charToUnicode(c:AnsiChar):dword; OverLoad;
 // this version of pos() is able to skip the pattern if inside quotes
 function nonQuotedPos(ss, s:string; ofs:integer=1; quote:string='"'; unquote:string='"'):integer; OverLoad;
 function nonQuotedPos(ss, s: RawByteString; ofs: integer=1; quote: RawByteString='"'; unquote: RawByteString='"'):integer; OverLoad;
@@ -386,6 +387,9 @@ begin
 end;
 
 function charToUnicode(c:char):dword;
+begin stringToWideChar(c,@result,4) end;
+
+function charToUnicode(c:AnsiChar):dword;
 begin stringToWideChar(c,@result,4) end;
 
 function isLocalIP(const ip:string):boolean;
@@ -528,14 +532,16 @@ function encodeURL(const url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
 var
   i: integer;
   encodePerc, encodeHTML: TcharSetW;
+  encodePercA: TcharSetA;
   a: RawByteString;
 begin
 result:='';
 if url = '' then
   exit;
 encodeHTML:=[];
-//if nonascii then
-//  encodeHTML:=[#128..#255];
+encodePercA := [];
+if nonascii then
+  encodePercA:=[#0..#31,'#','%','?','"','''','&','<','>',':'] + [#128..#255];
 encodePerc:=[#0..#31,'#','%','?','"','''','&','<','>',':'];
 // actually ':' needs encoding only in relative url
 if spaces then include(encodePerc,' ');
@@ -544,14 +550,18 @@ if not htmlEncoding then
   encodePerc:=encodePerc+encodeHTML;
   encodeHTML:=[];
   end;
-{if nonascii then
+if nonascii then
   begin
   a:=UTF8encode(url); // couldn't find a better way to force url to have the UTF8 encoding
-  i:=length(a);
-  setLength(url, i);
-  for i := 1 to i do
-    url[i]:=char(a[i]);
-  end;}
+  for i:=1 to length(a) do
+    if a[i] in encodePercA then
+      result:=result+'%'+intToHex(ord(a[i]),2)
+    else if a[i] in encodeHTML then
+      result:=result+'&#'+intToStr(charToUnicode(a[i]))+';'
+    else
+      result:=result+a[i];
+  end
+ else
 for i:=1 to length(url) do
 	if url[i] in encodePerc then
     result:=result+'%'+intToHex(ord(url[i]),2)

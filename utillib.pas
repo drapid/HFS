@@ -2769,7 +2769,7 @@ begin
     ch:=s[i];
     v:=0;
     case ch of
-      '*','/','%': v:=5+ofsImp;
+      '*','/','%','[',']': v:=5+ofsImp;
       '+','-': v:=3+ofsImp;
       '(': inc(ofsImp, PAR_VAL);
       ')': dec(ofsImp, PAR_VAL);
@@ -2806,6 +2806,8 @@ begin
     '%':
       if right <> 0 then result:=trunc(left) mod trunc(right)
       else raise Exception.create('division by zero');
+    '[': result:=round(left) shl round(right);
+    ']': result:=round(left) shr round(right);
     else raise Exception.create('operator not supported: '+ch);
     end;
   // replace sub-expression with result
@@ -3363,6 +3365,8 @@ var
   i: integer;
 begin
 result:=NIL;
+if user = '' then
+  exit;
 for i:=0 to length(accounts)-1 do
   if sameText(user, accounts[i].user) then
     begin
@@ -3556,13 +3560,13 @@ end;
 
 function strSHA256(s:string):string;
 //begin result:=THashSHA2.GetHashString(s) end;
-begin result:= SHA256PassHS(UTF8Encode(s)) end;
+begin result:= SHA256PassLS(UTF8Encode(s)) end;
 
 //function strMD5(s:string):string;
 //begin result:=THashMD5.GetHashString(s) end;
 
 function strMD5(s:string):string;
-begin Result := MD5PassHS(UTF8Encode(s)); end;
+begin Result := LowerCase(MD5PassHS(UTF8Encode(s))); end;
 
 
 var

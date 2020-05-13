@@ -169,6 +169,7 @@ type
   Tsession = class
     vars: THashedStringList;
     created, ttl, expires: Tdatetime;
+    user: String;
     procedure setVar(k, v:string);
     function getVar(k: String):string;
     class function getNewSID():string;
@@ -222,7 +223,8 @@ type
     disconnectReason: string;
     uploadFailed: string; // reason (empty on success)
     lastActivityTime: Tdatetime;
-    function goodPassword(s:string; func:ThashFunc):boolean;
+    function goodPassword(const pwd: String; s:string; func:ThashFunc):boolean;
+    function passwordValidation(const pwd: String):boolean;
     procedure setSessionVar(k, v: String);
     procedure logout();
   end;
@@ -1012,10 +1014,25 @@ begin
     self.fS.Remove(sId);
    end;
 end;
-function TconnDataMain.goodPassword(s:string; func:ThashFunc):boolean;
+
+function TconnDataMain.goodPassword(const pwd: String; s:string; func:ThashFunc):boolean;
+var
+  a: String;
 begin
   s := postVars.values[s];
-  result:=(s > '') and (s = func(func(account.pwd)+ sessionId))
+  Result := s > '';
+  if Result then
+   begin
+    a := func(func(pwd)+ sessionId);
+    result:= s = a
+   end;
+end;
+
+function TconnDataMain.passwordValidation(const pwd: String):boolean;
+begin
+  Result := (postVars.values['password'] = pwd)
+         or goodPassword(pwd, 'passwordSHA256', strSHA256)
+         or goodPassword(pwd, 'passwordMD5', strMD5)
 end;
 
 procedure TconnDataMain.setSessionVar(k, v: String);
@@ -1031,6 +1048,7 @@ begin
   sessions.clearSession(sessionID);
   usr:='';
   pwd:='';
+  account := NIL;
   conn.delCookie(SESSION_COOKIE);
 end; // logout
 

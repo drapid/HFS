@@ -825,10 +825,10 @@ uses
 var
   progFrm: TprogressForm;
   autosaveVFS: Tautosave;
-  lastDiffTpl: record
-    f: Tfile;
-    ofs: integer;
-    end;
+//  lastDiffTpl: record
+//    f: Tfile;
+//    ofs: integer;
+//    end;
 
 function deleteAccount(name:string):boolean;
 var
@@ -1229,6 +1229,21 @@ begin
 end;
 
 function encodeURL(s:string; fullEncode:boolean=FALSE):RawByteString;
+var
+  r: RawByteString;
+begin
+  if fullEncode or mainFrm.encodenonasciiChk.checked then
+    begin
+      r := ansiToUTF8(s);
+      result := HSlib.encodeURL(r, mainFrm.encodeNonasciiChk.checked,
+        fullEncode or mainFrm.encodeSpacesChk.checked)
+    end
+   else
+    result:=HSlib.encodeURL(s, mainFrm.encodeNonasciiChk.checked,
+        fullEncode or mainFrm.encodeSpacesChk.checked)
+end; // encodeURL
+
+function encodeURLW(s:string; fullEncode:boolean=FALSE):String;
 var
   r: RawByteString;
 begin
@@ -2283,10 +2298,9 @@ else
 addr:='';
 if assigned(cd) and assigned(cd.conn) then
   begin
-  addr:=cd.address+':'+cd.conn.port
-    +nonEmptyConcat(' {', localDNSget(cd.address), '}');
-  if freeLoginChk.checked or cd.acceptedCredentials then
-    addr:=nonEmptyConcat('', cd.usr, '@')+addr;
+    addr:=nonEmptyConcat('', cd.usr, '@')
+      +cd.address+':'+cd.conn.port
+      +nonEmptyConcat(' {', localDNSget(cd.address), '}');
   end;
 
 if (logFile.filename > '') and (logFile.apacheFormat = '') then
@@ -3029,19 +3043,23 @@ var
     if Assigned(s) then
      begin
       s.keepAlive();
-      if data.usr = '' then
-        begin
-        data.usr := s.v['user'];
-        data.pwd := s.v['password'];
-        end;
      end;
-  if (data.usr = '') and (conn.request.user > '') then
+  if (conn.request.user > '') then
     begin
     data.usr:=conn.request.user;
     data.pwd:=conn.request.pwd;
+    data.account:=NIL;
+    exit;
     end;
-  if (data.usr = '') <> (data.account = NIL) then
-    data.account:=getAccount(data.usr);
+    if Assigned(s) then
+     begin
+      data.account:=getAccount(s.user);
+     end;
+    if data.account <> NIL then
+      begin
+       data.usr:=data.account.user;
+       data.pwd:=data.account.pwd;
+      end;
   end; // sessionSetup
 
   procedure serveTar();
@@ -3186,6 +3204,7 @@ var
   var
     dlForbiddenForWholeFolder, specialGrant: boolean;
     urlCmd: string;
+    acc: Paccount;
 
     function accessGranted(forceFile:Tfile=NIL):boolean;
     resourcestring
@@ -3214,6 +3233,12 @@ var
       freeIfTemp(Ftemp);
       end;
     if result then exit;
+    if f.isFolder() then
+      begin
+      conn.reply.mode:=HRM_REPLY;
+      getPage('login', data, f);
+      exit;
+      end;
     conn.reply.realm:=f.getShownRealm();
     runEventScript('unauthorized');
     getPage('unauthorized', data);
@@ -3365,7 +3390,7 @@ var
 
   var
     b: boolean;
-    s: string;
+    s, mode: string;
     i: integer;
     section: PtplSection;
   begin
@@ -3440,6 +3465,7 @@ var
   url := conn.request.url;
   extractParams();
   url := decodeURL(url, True);
+  mode:= data.urlvars.values['mode'];
 
   data.lastFN:=extractFileName( xtpl(url,['/','\']) );
   data.agent:=getAgentID(conn);
@@ -3451,46 +3477,30 @@ var
     end;
 
   sessionSetup();
-  if data.postVars.indexOfName('__USER') >= 0 then
+  if mode = 'logout' then
     begin
-    s:=data.postVars.values['__USER'];
-    data.account:=getAccount(s);
-    if data.account = NIL then
-      if s = '' then // logout
-        begin
-        s:='ok';
-        data.logout();
-        end
-      else
-        s:='username not found'
+    data.logout();
+    replyWithString('ok');
+    exit;
+    end;
+  if mode = 'login' then
+    begin
+    acc:=getAccount(data.postVars.values['user']);
+    if acc = NIL then
+      s:='username not found'
     else
-      begin
-      data.usr:=s;
-      { I opted to use double hashing for this authentication method so that in the
-        future this may work even if we stored hashed password on the server,
-        thus being unable to calculate hash(pwd+sessionID).
-        By relying on hash(pwd) instead of pwd we avoid such problem. }
-      if data.goodPassword('__PASSWORD_SHA256', strSHA256)
-      or data.goodPassword('__PASSWORD_MD5', strMD5)
-      or (data.postVars.values['__PASSWORD'] = data.account.pwd) then
+      if data.passwordValidation(acc.pwd) then
         begin
         s:='ok';
-        data.pwd:=data.account.pwd;
-        data.setSessionVar('user', data.usr);
-        data.setSessionVar('password', data.pwd);
+        sessions.getSession(data.sessionID).user:=acc.user;
         end
       else
         begin
         s:='bad password'; //TODO shouldn't this change http code?
-        data.account:=NIL;
-        data.usr:='';
         end;
-      end;
-    if data.postVars.values['__AJAX'] = '1' then
-      begin
+
       replyWithString(s);
       exit;
-      end;
     end;
 
   // this is better to be refresh, because a user may be deleted meantime
@@ -3519,7 +3529,7 @@ var
       getPage('not found', data);
     exit;
     end;
-  if data.urlvars.values['mode'] = 'jquery' then
+  if mode = 'jquery' then
     begin
       if notModified(conn,'jquery'+FloatToStr(uptime), '') then
         exit;
@@ -3570,7 +3580,7 @@ var
     conn.reply.url:=f.url(); // we use f.url() instead of just appending a "/" to url because of problems with non-ansi chars http://www.rejetto.com/forum/?topic=7837
     exit;
     end;
-  if f.isFolder() and (urlCmd = '') and (data.urlvars.indexOfName('mode')<0) then
+  if f.isFolder() and (urlCmd = '') and (mode='') then
     switchToDefaultFile();
   if enableNoDefaultChk.checked and (urlCmd = '~nodefault') then
     urlCmd:='';
@@ -3634,7 +3644,7 @@ var
     end;
 
   // provide access to any [section] in the tpl, included [progress]
-  if data.urlvars.values['mode'] = 'section' then
+  if mode = 'section' then
     s:=first(data.urlvars.values['id'], 'no-id') // no way, you must specify the id
   else if (f = rootFile) and (urlCmd > '') then
     s:=substr(urlCmd,2)
@@ -3669,7 +3679,7 @@ var
     end;
 
   if (urlCmd = '~folder.tar')
-  or (data.urlvars.values['mode'] = 'archive') then
+  or (mode = 'archive') then
     begin
     serveTar();
     exit;
@@ -9162,11 +9172,15 @@ const
   BAD_IE_THRESHOLD = 2000; // under this size (few bytes less, really) old IE versions will go nuts with UTF-8 pages
 var
   s: RawByteString;
-  lToGZip: Boolean;
+  lToGZip: Boolean; // GZip
+  lToBr: Boolean;   // Brotli
 begin
   lToGZip := compressedbrowsingChk.checked;
 //  if not compressedbrowsingChk.checked then
 //    exit;
+  lToBr := lToBr and (ipos('Br', cd.conn.getHeader('Accept-Encoding')) <> 0);
+
+
   lToGZip := lToGZip and (cd.conn.reply.body <> '');
   lToGZip := lToGZip and (ipos('gzip', cd.conn.getHeader('Accept-Encoding')) <> 0);
   if not lToGZip and not cd.conn.reply.IsGZiped then
@@ -10734,10 +10748,12 @@ for I := 0 to Form.ControlCount-1 do
   else if Ctrl is TEdit then
     Edit := TEdit(Ctrl);
   end;
-
-Edit.SetBounds(Prompt.Left, Prompt.Top + Prompt.Height + 5, max(200, Prompt.Width), Edit.Height);
-Form.ClientWidth := (Edit.Left * 2) + Edit.Width;
-ButtonTop := Edit.Top + Edit.Height + 15;
+if Assigned(Edit) then
+  begin
+    Edit.SetBounds(Prompt.Left, Prompt.Top + Prompt.Height + 5, max(200, Prompt.Width), Edit.Height);
+    Form.ClientWidth := (Edit.Left * 2) + Edit.Width;
+    ButtonTop := Edit.Top + Edit.Height + 15;
+  end;
 
 J := 0;
 for I := 0 to Form.ControlCount-1 do
