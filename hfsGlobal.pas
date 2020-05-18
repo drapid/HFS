@@ -6,8 +6,8 @@ uses
 
 const
 {$I RnQBuiltTime.inc}
-  VERSION = '2.4rc5 RD';
-  VERSION_BUILD = '302';
+  VERSION = '2.4 beta1 RD';
+  VERSION_BUILD = '303';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
@@ -60,7 +60,7 @@ const
   BG_ERROR = $BBBBFF;
   ENCODED_TABLE_HEADER = 'this is an encoded table'+CRLF;
 
-  DEFAULT_MIME_TYPES: array [0..23] of string = (
+  DEFAULT_MIME_TYPES: array [0..25] of string = (
     '*.htm;*.html', 'text/html',
     '*.jpg;*.jpeg;*.jpe', 'image/jpeg',
     '*.gif', 'image/gif',
@@ -72,6 +72,7 @@ const
     '*.txt', 'text/plain',
     '*.css', 'text/css',
     '*.js',  'text/javascript',
+    '*.mkv', 'video/x-matroska',
     '*.webp', 'image/webp'
   );
 

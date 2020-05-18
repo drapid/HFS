@@ -1,4 +1,4 @@
-HFS - what's new
+ï»¿HFS - what's new
 
 LEGEND
 !   very important
@@ -9,20 +9,26 @@ AV  access violation
 
 VER 2.4
 propaganda
-  New mobile-friendly template
+  Mobile-friendly template
+  Unicode support
+  Encrypted login, and logout
 /propaganda
 + new default template
++ new login system, session based, with logout
 + {.set item|name.}
 + {.get item|icon.}
 + {.set cfg.}
 + cache for jquery and template sections
 + new template commands: base64, base64decode, md5, sha1
++ *.diff.tpl in exe's folder
++ default mime-type for mkv
 - fixed template handling of section names with both '+' and '=' present
 - fixed LNK files to deleted items
 - fixed comments files were not updated upon deletion of files
 - fixed "requesting" forever with empty cookies http://rejetto.com/forum/index.php?topic=13112.0
 - fixed double "Content-Length" header on compressed pages
-- fixed log text base color not matching system settings http://rejetto.com/forum/index.php?topic=13233.0 
+- fixed log text base color not matching system settings http://rejetto.com/forum/index.php?topic=13233.0
+- fixed while renaming a file in the GUI, CTRL+C/V didn't work on the text
 
 VER 2.3m
 propaganda
@@ -849,7 +855,7 @@ ver: 1.5 rc5
 + support for persistent connections (HTTP 1.1)
 * moved many options to Menu -> "Other options"
 * when drag&dropping a folder, the dialog for autoupdate is set foreground
-- problems with url-encoding for … Š  • — (IE, Opera)
+- problems with url-encoding for ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ (IE, Opera)
 - problems saving a template to registry
 - sometimes "check for update" was not working after a failure
 - CRITICAL: directory crossing was possible on autoupdating folders
@@ -902,7 +908,7 @@ ver: 1.3 beta6
 ver: 1.3 beta5
 + "Custom ip", now you can use yourowndomain.com
 - autoupdate folders was not applying the "Folders before" setting
-- there were problems with url-encoding for blank-space, ø and "
+- there were problems with url-encoding for blank-space, ï¿½ and "
 - some crashes may have been fixed
 
 ver: 1.3 beta4

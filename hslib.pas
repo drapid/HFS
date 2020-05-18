@@ -999,6 +999,8 @@ sock.onSendData:=senddata;
 sock.onDataSent:=datasent;
 sock.LineMode:=FALSE;
 
+srv:=server;
+
 request.headers:=ThashedStringList.create;
 request.headers.nameValueSeparator:=':';
 limiters:=TObjectList.create;
@@ -1006,7 +1008,6 @@ limiters.ownsObjects:=FALSE;
 P_address:=sock.GetPeerAddr();
 P_port:=sock.GetPeerPort();
 state:=HCS_IDLE;
-srv:=server;
 srv.conns.add(self);
 clearRequest();
 clearReply();

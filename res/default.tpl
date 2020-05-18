@@ -27,7 +27,7 @@ COMMENT with the ones above you can disable some features of the template. They 
 	<link rel="shortcut icon" href="/favicon.ico">
 	<link rel="stylesheet" href="/?mode=section&id=style.css" type="text/css">
     <script type="text/javascript" src="/?mode=jquery"></script>
-    <script>HFS = { user:'%user%', folder:'{.js encode|%folder%.}', sid:"{.cookie|HFS_SID_.}" }</script>
+    <script>HFS = { user:'{.js encode|%user%.}', folder:'{.js encode|%folder%.}', sid:"{.cookie|HFS_SID_.}" }</script>
 	<script type="text/javascript" src="/?mode=section&id=lib.js"></script>
 
 []
@@ -85,13 +85,13 @@ COMMENT with the ones above you can disable some features of the template. They 
             data = {};
         data.token = "{.cookie|HFS_SID_.}";
 		showLoading()
-        return $.post("?mode=section&id=ajax."+method, data, function(){ 
+        return $.post("?mode=section&id=ajax."+method, data).then(function(){ 
 			if (cb)
 				showLoading(false)
 			;(cb||getStdAjaxCB()).apply(this,arguments)
-		});
+		}, ajaxError);
     }//ajax
-
+	
 </script>
 
 <div id='menu-panel'>
@@ -100,43 +100,43 @@ COMMENT with the ones above you can disable some features of the template. They 
 	</div>
 	<div id="menu-bar">
 		{.if| {.length|%user%.}
-		| <button class='pure-button' onclick='showAccount()'><i class='fa fa-user-circle'></i><span>%user%</span></button>
-		| <button class='pure-button' title="{.!Login.}" onclick='showLogin()'><i class='fa fa-user'></i><span>{.!Login.}</span></button>
+		| <button onclick='showAccount()'><i class='fa fa-user-circle'></i><span>%user%</span></button>
+		| <button title="{.!Login.}" onclick='showLogin()'><i class='fa fa-user'></i><span>{.!Login.}</span></button>
 		.}
 		{.if| {.get|can recur.} |
-		<button class='pure-button' onclick="{.if|{.length|{.?search.}.}| location = '.'| $('#search-panel').toggle().find(':input:first').focus().}">
+		<button onclick="{.if|{.length|{.?search.}.}| location = '.'| $('#search-panel').toggle().find(':input:first').focus().}">
 			<i class='fa fa-search'></i><span>{.!Search.}</span>
 		</button>
 		/if.}
-		<button id="multiselection" class='pure-button' title="{.!Enable multi-selection.}"  onclick='toggleSelection()'>
+		<button id="multiselection" title="{.!Enable multi-selection.}"  onclick='toggleSelection()'>
 			<i class='fa fa-check'></i>
 			<span>{.!Selection.}</span>
 		</button>
 		{.if|{.can mkdir.}|
-			<button title="{.!New folder.}" class='pure-button' id='newfolderBtn' onclick='ask(this.innerHTML, "text", name=> ajax("mkdir", { name:name }))'>
+			<button title="{.!New folder.}" id='newfolderBtn' onclick='ask(this.innerHTML, "text", name=> ajax("mkdir", { name:name }))'>
 				<i class="fa fa-folder"></i>
 				<span>{.!New folder.}</span>
 			</button>
 		.}
-		<button id="toggleTs" class='pure-button' title="{.!Display timestamps.}"  onclick="toggleTs()">
-			<i class='fa fa-clock-o'></i>
+		<button id="toggleTs" title="{.!Display timestamps.}"  onclick="toggleTs()">
+			<i class='fa fa-clock'></i>
 			<span>{.!Toggle timestamp.}</span>
 		</button>
 
 		{.if|{.get|can archive.}|
-		<button id='archiveBtn' class='pure-button' onclick='ask("{.!Download these files as a single archive?.}", function() { submit({ selection: getSelectedItemsName() }, "{.get|url|mode=archive|recursive.}") })'>
+		<button id='archiveBtn' onclick='ask("{.!Download these files as a single archive?.}", function() { submit({ selection: getSelectedItemsName() }, "{.get|url|mode=archive|recursive.}") })'>
 			<i class="fa fa-file-archive"></i>
 			<span>{.!Archive.}</span>
 		</button>
 		.}
 		{.if| {.get|can upload.} |{:
-			<button id="upload" onclick="upload()" class='pure-button' title="{.!Upload.}">
+			<button id="upload" onclick="upload()" title="{.!Upload.}">
 				<i class='fa fa-upload'></i>
 				<span>{.!Upload.}</span>
 			</button>
 		:}.}
 
-		<button id="sort" onclick="changeSort()" class='pure-button'>
+		<button id="sort" onclick="changeSort()">
 			<i class='fa fa-sort'></i>
 			<span></span>
 		</button>
@@ -148,10 +148,10 @@ COMMENT with the ones above you can disable some features of the template. They 
 		<div id="selection-panel" class="additional-panel" style="display:none">
 			<label><span id="selected-counter">0</span> {.!selected.}</label>
 			<span class="buttons">
-				<button id="select-mask" class="pure-button"><i class="fa fa-asterisk"></i><span>{.!Mask.}</span></button>
-				<button id="select-invert" class="pure-button"><i class="fa fa-retweet"></i><span>{.!Invert.}</span></button>
-				<button id="delete-selection" class="pure-button"><i class="fa fa-trash"></i><span>{.!Delete.}</span></button>
-				<button id="move-selection" class="pure-button"><i class="fa fa-truck"></i><span>{.!Move.}</span></button>
+				<button id="select-mask"><i class="fa fa-asterisk"></i><span>{.!Mask.}</span></button>
+				<button id="select-invert"><i class="fa fa-retweet"></i><span>{.!Invert.}</span></button>
+				<button id="delete-selection"><i class="fa fa-trash"></i><span>{.!Delete.}</span></button>
+				<button id="move-selection"><i class="fa fa-truck"></i><span>{.!Move.}</span></button>
 			</span>
 		</div>
     </div>
@@ -191,7 +191,7 @@ $(function(){
 
 [folder panel]
 <div id='folder-path'>
-	{.breadcrumbs|{:<a class='pure-button' href="%bread-url%"/> {.if|{.length|%bread-name%.}|/ %bread-name%|<i class='fa fa-home'></i>.}</a>:} .}
+	{.breadcrumbs|{:<button onclick="location.href='%bread-url%' "> {.if|{.length|%bread-name%.}|/ %bread-name%|<i class='fa fa-home'></i>.}</button>:} .}
 </div>
 {.if|%number%|
 <div id='folder-stats'>
@@ -210,7 +210,7 @@ $(function(){
 		{.!Uploading....} <span id="progress-text"></span>
 		<progress max="1"></progress>
 	</div>
-	<button class="pure-button" onclick="reload()"><i class="fa fa-refresh"></i> {.!Reload page.}</button>
+	<button onclick="reload()"><i class="fa fa-refresh"></i> {.!Reload page.}</button>
 </div>
 
 [search panel]
@@ -220,7 +220,8 @@ $(function(){
 		<br><input type='radio' name='where' value='fromhere' checked='true' />  {.!this folder and sub-folders.}
 		<br><input type='radio' name='where' value='here' />  {.!this folder only.}
 		<br><input type='radio' name='where' value='anywhere' />  {.!entire server.}
-		<button type="submit" class="pure-button">{.!Go.}</button>
+		<button type="submit">{.!Go.}</button>
+		<button onclick="return!(location='.')" style="margin-right: 0.3em;">Clear</button>
 	</form>
 </div>
 <style>
@@ -300,15 +301,12 @@ confirm=Are you sure?
 
 {.$icons.css.}
 
-.pure-button {
-	background-color: #cde; padding: .5em 1em; color: #444; color: rgba(0,0,0,.8); border: 1px solid #999; border: transparent; text-decoration: none; box-sizing: border-box;
-	border-radius: 2px; display: inline-block; zoom: 1; white-space: nowrap; vertical-align: middle; text-align: center; cursor: pointer; user-select: none;
-}
+button { background-color: #cde; color: #444; padding: .5em 1em; border: transparent; text-decoration: none; border-radius: .3em; vertical-align: middle; cursor:pointer; }
 body { font-family:tahoma, verdana, arial, helvetica, sans; transition:background-color 1s ease; }
 a { text-decoration:none; color:#26c; border:1px solid transparent; padding:0 0.1em; }
 #folder-path { float:left; margin-bottom: 0.2em; }
-#folder-path a { padding: .5em; }
-#folder-path a:first-child { padding:.28em } #folder-path i.fa { font-size:135% }
+#folder-path button { padding: .4em; }
+#folder-path button:first-child { padding: .2em .4em;} #folder-path i.fa { font-size:135% }
 button i.fa { font-size:110% }
 .item { margin-bottom:.3em; padding:.3em  .8em; border-top:1px solid #ddd;  }
 .item:hover { background:#f8f8f8; }
@@ -366,9 +364,8 @@ button i.fa { font-size:110% }
 body.dark-theme { background:#222; color:#aaa; }
 body.dark-theme #title-bar { color:#bbb }
 body.dark-theme a { color:#79b }
-body.dark-theme a.pure-button { color:#444 }
 body.dark-theme .item:hover { background:#111; }
-body.dark-theme .pure-button { background:#89a; }
+body.dark-theme button { background:#89a; }
 body.dark-theme .item .comment { background-color:#444; color:#888; }
 body.dark-theme #foldercomment { background-color:#333; color:#999; }
 body.dark-theme .dialog-overlay { background:rgba(100,100,100,.5) }
@@ -422,13 +419,13 @@ z-index:1; /* without this .item-menu will be over*/ }
 		</a>
 	</div>
 	<div class='item-props'>
-		<span class="item-ts"><i class='fa fa-clock-o'></i> {.cut||-3|%item-modified%.}</span>
+		<span class="item-ts"><i class='fa fa-clock'></i> {.cut||-3|%item-modified%.}</span>
 [+file]
 		<span class="item-size"><i class='fa fa-download' title="{.!Download counter:.} %item-dl-count%"></i> %item-size%B</span>
 [+file=folder=link]
 		{.if|{.get|is new.}|<i class='fa fa-star' title="{.!NEW.}"></i>.}
 [+file=folder]
-        <button class='item-menu pure-button' title="{.!More options.}"><i class="fa fa-menu"></i></button>
+        <button class='item-menu' title="{.!More options.}"><i class="fa fa-menu"></i></button>
 [+file=folder=link]
  	</div>
 	<div class='clearer'></div>
@@ -437,23 +434,8 @@ z-index:1; /* without this .item-menu will be over*/ }
 	{.123 if 2|<div class='comment'><i class="fa fa-quote-left"></i><span class="comment-text">|{.commentNL|%item-comment%.}|</span></div>.}
 </div>
 
-[login]
-{.$common-head.}
-	<title>{.!HFS.} %folder%</title>
-</head>
-<body onload="showLogin({ closable:false })">
-</body>
-</html>
-
 [error-page]
-<!DOCTYPE html>
-<html>
-<head>
-	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style type="text/css">
-  {.$style.css.}
-  </style>
+{.$common-head.}
   </head>
 <body>
 %content%
@@ -463,6 +445,10 @@ z-index:1; /* without this .item-menu will be over*/ }
 </div>
 </body>
 </html>
+
+[login]
+<h1>{.!Login required.}</h1>
+<script>showLogin({ closable:false })</script>
 
 [not found]
 <h1>{.!Not found.}</h1>
@@ -726,7 +712,7 @@ function showMsg(content, options) {
 		.append(
 			bs===false ? null 
 			: $('<div class="buttons">').html(bs ||
-				$('<button class="pure-button">').text("{.!Ok.}")	
+				$('<button>').text("{.!Ok.}")	
 					.click(ev=> ret.close() ) ) )
 	return ret
 }//showMsg
@@ -749,9 +735,9 @@ function ask(msg, options, cb) {
     msg += '<br />';
     var v = options.type
 	if (!v)
-	    msg += '<br><button class="pure-button">{.!Ok.}</button>'
+	    msg += '<br><button>{.!Ok.}</button>'
 	else if (v == 'textarea')
-		msg += '<textarea name="txt" cols="30" rows="8">'+options.value+'</textarea><br><button type="submit" class="pure-button">Ok</button>';
+		msg += '<textarea name="txt" cols="30" rows="8">'+options.value+'</textarea><br><button type="submit">Ok</button>';
 	else
 		msg += '<input name="txt" type="'+v+'" value="'+(options.value||'')+'" />';
 	var ret = dialog($('<form class="ask">')
@@ -774,11 +760,10 @@ function ask(msg, options, cb) {
 function getStdAjaxCB(what2do) {
     return function(res){
         res = $.trim(res)
-
         if (res === "ok")
 			return (typeof what2do==='function') ? what2do() : location.reload()
 		showLoading(false)
-		showError("{.!"+res+".}", function(){
+		showError(res, function(){
 			if (res === 'bad session')
 				location.reload()
 		})
@@ -861,13 +846,15 @@ function selectionMask() {
 }//selectionMask
 
 function showLogin(options) {
+	if (!HFS.sid) // the session was just deleted
+		return location.reload() // but it's necessary for login
 	var d = dialog('\
 		<form style="line-height:1.9em">\
 			Username\
 			<br><input name=usr />\
 			<br>Password\
 			<br><input name=pwd type=password />\
-			<br><br><input type=submit value="Login" class="pure-button" />\
+			<br><br><button type=submit>Login</button>\
 		</form>', options)
 	
 	d.find('form').submit(function(){
@@ -876,13 +863,13 @@ function showLogin(options) {
 			user: vals[0],
 			passwordSHA256: sha256(sha256(vals[1])+HFS.sid)  // hash must be lowercase. Double-hashing is causing case sensitiv
 		}  
-		$.post("?mode=login", data, function(res){
+		$.post("?mode=login", data).then(function(res){
 			if (res !== 'ok')
 				return showError(res)
 			d.close()
 			showLoading()
 			location.reload()
-		});
+		}, ajaxError);
 		return false
 	})
 } // showLogin
@@ -900,16 +887,16 @@ function showAccount() {
 	dialog('<div style="line-height:3em">\
 			<h1>{.!Account panel.}</h1>\
 			<span>{.!User.}: '+HFS.user+'</span>\
-			<br><button class="pure-button" onclick="changePwd()"><i class="fa fa-key"></i> {.!Change password.}</button>\
-			<br><button class="pure-button" onclick="logout()"><i class="fa fa-logout"></i> {.!Logout.}</button>\
+			<br><button onclick="changePwd()"><i class="fa fa-key"></i> {.!Change password.}</button>\
+			<br><button onclick="logout()"><i class="fa fa-logout"></i> {.!Logout.}</button>\
         </div>')
 } // showAccount
 
 function logout(){
 	showLoading()
-	$.post('?mode=logout', function(){
+	$.post('?mode=logout').then(function(){
 		location.reload()
-	});
+	}, ajaxError);
 }
 
 function setCookie(name,value,days) {
@@ -989,7 +976,7 @@ function changeSort(){
     dialog([
         $('<h3>').text('{.!Sort by.}'),
         $('<div class="buttons">').html(objToArr(sortOptions, function(label,code){
-            return $('<button class="pure-button">')
+            return $('<button>')
 				.text(label)
 				.prepend(urlParams.sort===code ? '<i class="fa fa-sort-alt-'+(urlParams.rev?'down':'up')+'"></i> ' : '')
                 .click(function(){
@@ -1116,6 +1103,10 @@ function encodeURL(obj) {
 	return ret.join('&')
 }//encodeURL
 
+function ajaxError(x){
+	showError(x.status || 'communication error')
+}
+
 // from https://github.com/AndersLindman/SHA256
 SHA256={K:[1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298],Uint8Array:function(r){return new("undefined"!=typeof Uint8Array?Uint8Array:Array)(r)},Int32Array:function(r){return new("undefined"!=typeof Int32Array?Int32Array:Array)(r)},setArray:function(r,n){if("undefined"!=typeof Uint8Array)r.set(n);else{for(var t=0;t<n.length;t++)r[t]=n[t];for(t=n.length;t<r.length;t++)r[t]=0}},digest:function(r){var n=1779033703,t=3144134277,e=1013904242,a=2773480762,i=1359893119,o=2600822924,A=528734635,f=1541459225,y=SHA256.K;if("string"==typeof r){var v=unescape(encodeURIComponent(r));r=SHA256.Uint8Array(v.length);for(var g=0;g<v.length;g++)r[g]=255&v.charCodeAt(g)}var u=r.length,h=64*Math.floor((u+72)/64),l=h/4,s=8*u,d=SHA256.Uint8Array(h);SHA256.setArray(d,r),d[u]=128,d[h-4]=s>>>24,d[h-3]=s>>>16&255,d[h-2]=s>>>8&255,d[h-1]=255&s;var S=SHA256.Int32Array(l),H=0;for(g=0;g<S.length;g++){var c=d[H]<<24;c|=d[H+1]<<16,c|=d[H+2]<<8,c|=d[H+3],S[g]=c,H+=4}for(var U=SHA256.Int32Array(64),p=0;p<l;p+=16){for(g=0;g<16;g++)U[g]=S[p+g];for(g=16;g<64;g++){var I=U[g-15],w=I>>>7|I<<25;w^=I>>>18|I<<14,w^=I>>>3;var C=(I=U[g-2])>>>17|I<<15;C^=I>>>19|I<<13,C^=I>>>10,U[g]=U[g-16]+w+U[g-7]+C&4294967295}for(var K=n,b=t,m=e,M=a,R=i,j=o,k=A,q=f,g=0;g<64;g++){C=R>>>6|R<<26,C^=R>>>11|R<<21;var x=q+(C^=R>>>25|R<<7)+(R&j^~R&k)+y[g]+U[g]&4294967295,w=K>>>2|K<<30;w^=K>>>13|K<<19;var z=K&b^K&m^b&m,q=k,k=j,j=R,R=M+x&4294967295,M=m,m=b,b=K,K=x+((w^=K>>>22|K<<10)+z&4294967295)&4294967295}n=n+K&4294967295,t=t+b&4294967295,e=e+m&4294967295,a=a+M&4294967295,i=i+R&4294967295,o=o+j&4294967295,A=A+k&4294967295,f=f+q&4294967295}var B=SHA256.Uint8Array(32);for(g=0;g<4;g++)B[g]=n>>>8*(3-g)&255,B[g+4]=t>>>8*(3-g)&255,B[g+8]=e>>>8*(3-g)&255,B[g+12]=a>>>8*(3-g)&255,B[g+16]=i>>>8*(3-g)&255,B[g+20]=o>>>8*(3-g)&255,B[g+24]=A>>>8*(3-g)&255,B[g+28]=f>>>8*(3-g)&255;return B},hash:function(r){var n=SHA256.digest(r),t="";for(i=0;i<n.length;i++){var e="0"+n[i].toString(16);t+=2<e.length?e.substring(1):e}return t}};
 
@@ -1145,14 +1136,14 @@ $(function(){
             it.find('.item-ts').clone(),
             $('<div class="buttons">').html([
                 it.closest('.can-delete').length > 0
-				&& $('<button class="pure-button"><i class="fa fa-trash"></i> {.!Delete.}</button>')
+				&& $('<button><i class="fa fa-trash"></i> {.!Delete.}</button>')
 					.click(function() { deleteFiles([name]) }),
                 it.closest('.can-rename').length > 0
-				&& $('<button class="pure-button"><i class="fa fa-edit"></i> {.!Rename.}</button>').click(renameItem),
+				&& $('<button><i class="fa fa-edit"></i> {.!Rename.}</button>').click(renameItem),
                 it.closest('.can-comment').length > 0
-				&& $('<button class="pure-button"><i class="fa fa-quote-left"></i> {.!Comment.}</button>').click(setComment),
+				&& $('<button><i class="fa fa-quote-left"></i> {.!Comment.}</button>').click(setComment),
                 it.closest('.can-move').length > 0
-				&& $('<button class="pure-button"><i class="fa fa-truck"></i> {.!Move.}</button>')
+				&& $('<button><i class="fa fa-truck"></i> {.!Move.}</button>')
 					.click(function(){  moveFiles([name]) })
             ])
         ]).addClass('item-menu-dialog')

@@ -59,6 +59,7 @@ function hostFromURL(s:string):string;
 function hostToIP(name: string):string;
 function allocatedMemory():int64;
 function stringToGif(s: RawByteString; gif:TgifImage=NIL):TgifImage;
+function gif2str(gif:TgifImage): RawByteString;
 function bmp2str(bmp:Tbitmap): RawByteString;
 function pic2str(idx:integer): RawByteString;
 function str2pic(s: RawByteString):integer;
@@ -170,6 +171,7 @@ function deleteRegistry(const key, value: string; root: HKEY=0): boolean; overlo
 function deleteRegistry(key: String; root:HKEY=0): boolean; overload;
 // strings array
 function split(const separator, s:string; nonQuoted:boolean=FALSE):TStringDynArray;
+function splitU(const s, separator: RawByteString; nonQuoted:boolean=FALSE):TStringDynArray;
 function join(const separator: String; ss:TstringDynArray):string;
 function addUniqueString(const s: String; var ss: TStringDynArray): boolean;
 function addString(const s: String; var ss: TStringDynArray): integer;
@@ -218,6 +220,7 @@ function getStr(from,to_: pAnsichar): RawByteString; OverLoad;
 function getStr(from,to_: pchar): String; OverLoad;
 function TLV(t:integer; const data: RawByteString): RawByteString;
 function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
+function TLVS_NOT_EMPTY(t:integer; const data: String): RawByteString;
 function popTLV(var s,data: RawByteString):integer;
 function getCRC(const data: RawByteString):integer;
 function dotted(i:int64):string;
@@ -645,6 +648,32 @@ n:=0;
 setLength(result, n);
 end; // split
 
+function splitU(const s, separator: RawByteString; nonQuoted:boolean=FALSE):TStringDynArray;
+var
+  i, j, n, l: integer;
+begin
+l:=length(s);
+result:=NIL;
+if l = 0 then exit;
+i:=1;
+n:=0;
+  repeat
+  if length(result) = n then
+    setLength(result, n+50);
+  if nonQuoted then
+    j:=nonQuotedPos(separator, s, i)
+  else
+    j:=posEx(separator, s, i);
+  if j = 0 then
+    j:=l+1;
+  if i < j then
+    result[n]:= UnUTF(substr(s, i, j-1));
+  i:=j+length(separator);
+  inc(n);
+  until j > l;
+setLength(result, n);
+end; // splitU
+
 function join(const separator: String; ss:TstringDynArray):string;
 var
   i:integer;
@@ -842,6 +871,9 @@ begin result:=str_(t)+str_(length(data))+data end;
 
 function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
 begin if data > '' then result:=TLV(t,data) else result:='' end;
+
+function TLVS_NOT_EMPTY(t:integer; const data: String): RawByteString;
+begin if data > '' then result:=TLV(t, StrToUTF8(data)) else result:='' end;
 
 // for heavy jobs you are supposed to use class Ttlv
 function popTLV(var s,data: RawByteString):integer;
@@ -1981,7 +2013,8 @@ bi.pszDisplayName:=@buff;
 bi.lpszTitle:=pchar(caption);
 bi.ulFlags:=BIF_RETURNONLYFSDIRS+BIF_NEWDIALOGSTYLE+BIF_SHAREABLE+BIF_UAHINT+BIF_EDITBOX+flags;
 bi.lpfn:=@cbSelectFolder;
-bi.lParam:= INT_PTR(@from[1]);
+if from > '' then
+  bi.lParam:= INT_PTR(@from[1]);
 bi.iImage:=0;
 res:=SHBrowseForFolder(bi);
 if res = NIL then exit;
@@ -2739,7 +2772,7 @@ var
   left, right: real;
   leftS, rightS: string;
 
-  function getOperate(dir:integer):string;
+  function getOperand(dir:integer):string;
   var
     j: integer;
   begin
@@ -2755,7 +2788,7 @@ var
   swapMem(i, j, sizeOf(i), dir > 0);
   j:=j-i+1;
   result:=copy(s, i, j);
-  end; // getOperate
+  end; // getOperand
 
 begin
   repeat
@@ -2790,8 +2823,8 @@ begin
     exit;
     end;
   // determine operates
-  leftS:=getOperate(-1);
-  rightS:=getOperate(+1);
+  leftS:=getOperand(-1);
+  rightS:=getOperand(+1);
   left:=StrToFloatDef(trim(leftS), 0);
   right:=strToFloat(trim(rightS));
   // calculate
@@ -3117,59 +3150,54 @@ try
 finally ss.free end;
 end; // stringToGif
 
+function gif2str(gif:TgifImage): RawByteString;
+var
+  stream: Tbytesstream;
+begin
+stream:=Tbytesstream.create();
+gif.SaveToStream(stream);
+setLength(result, stream.size);
+move(stream.bytes[0], result[1], stream.size);
+stream.free;
+end; // gif2str
+
 function bmp2str(bmp:Tbitmap): RawByteString;
 var
-//  stream: Tstringstream;
-  str: TMemorystream;
 	gif: TGIFImage;
 begin
-{ the gif component has a GDI object leak while reducing colors of
-{ transparent images. this seems to be not a big problem since the
-{ icon cache system was introduced, but a real fix would be nice. }
-//stream:=Tstringstream.create('');
-  str := TMemorystream.Create;
-  gif := TGIFImage.Create();
-
-  gif.ColorReduction := rmQuantize;
-  //gif.Compression := gcLZW;
+gif:=TGIFImage.Create();
+try
+  gif.ColorReduction:=rmQuantize;
   gif.Assign(bmp);
-  gif.SaveToStream(str);
-  gif.free;
-  SetLength(Result, str.Size);
-  str.Position := 0;
-  CopyMemory(@result[1], str.Memory, Length(Result));
-//result:=stream.DataString;
-
-  str.free;
+  result:=gif2str(gif);
+finally gif.free;
+  end;
 end; // bmp2str
 
 function pic2str(idx:integer): RawByteString;
 var
-  pic, pic2: Tbitmap;
+  ico: Ticon;
+  gif: TgifImage;
 begin
 result:='';
 if idx < 0 then exit;
 idx:=idx_ico2img(idx);
-if length(imagescache) < idx+1 then setlength(imagescache, idx+1);
+if length(imagescache) <= idx then
+  setlength(imagescache, idx+1);
 result:=imagescache[idx];
 if result > '' then exit;
-pic:=Tbitmap.create();
-mainfrm.images.getBitmap(idx,pic);
-// pic2 is the transparent version of pic
-pic2:=Tbitmap.create();
-pic2.Width:=mainfrm.images.Width;
-pic2.height:=mainfrm.images.height;
-pic2.TransparentMode:=tmFixed;
 
-pic2.TransparentColor:=$2FFFFFF;
-pic2.Transparent:=TRUE;
-BitBlt(pic2.Canvas.Handle, 0,0,16,16, pic.Canvas.Handle, 0,0, SRCAND);
-BitBlt(pic2.Canvas.Handle, 0,0,16,16, pic.Canvas.Handle, 0,0, SRCPAINT);
-
-result:=bmp2str(pic2);
-pic2.free;
-pic.free;
-imagescache[idx]:=result;
+ico:=Ticon.Create;
+gif:=TGifImage.Create;
+try
+  mainfrm.images.getIcon(idx, ico);
+  gif.Assign(ico);
+  result:=gif2str(gif);
+  imagescache[idx]:=result;
+finally
+  gif.Free;
+  ico.free;
+  end;
 end; // pic2str
 
 function str2pic(s: RawByteString):integer;

@@ -17,6 +17,7 @@ object mainFrm: TmainFrm
   Position = poDesigned
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
+  OnCreate = FormCreate
   OnKeyDown = FormKeyDown
   OnKeyUp = FormKeyUp
   OnResize = FormResize
@@ -76,21 +77,21 @@ object mainFrm: TmainFrm
       ShowHint = True
       OnClick = menuBtnClick
     end
-    object ToolButton4: TToolButton
-      Left = 57
-      Top = 0
-      Width = 9
-      Caption = 'ToolButton4'
-      ImageIndex = 15
-      Style = tbsSeparator
-    end
     object portBtn: TToolButton
-      Left = 66
+      Left = 57
       Top = 0
       AutoSize = True
       Caption = 'Port: any'
       ImageIndex = 38
       OnClick = portBtnClick
+    end
+    object ToolButton4: TToolButton
+      Left = 133
+      Top = 0
+      Width = 9
+      Caption = 'ToolButton4'
+      ImageIndex = 15
+      Style = tbsSeparator
     end
     object ToolButton2: TToolButton
       Left = 142
@@ -2906,11 +2907,6 @@ object mainFrm: TmainFrm
       object encodenonasciiChk: TMenuItem
         AutoCheck = True
         Caption = 'Encode non-ASCII characters'
-        Checked = True
-      end
-      object encodePwdUrlChk: TMenuItem
-        AutoCheck = True
-        Caption = 'Unreadable passwords in URLs'
         Checked = True
       end
       object pwdInPagesChk: TMenuItem

@@ -76,7 +76,7 @@ type
       bytes: integer;
       since: Tdatetime;
       end;
-    workaroundForIEutf8: (toDetect, yes, no);
+    workaroundForIEutf8: (WI_toDetect, WI_yes, WI_no);
     { here we put just a pointer because the file type would triplicate
     { the size of this record, while it is NIL for most connections }
     f: ^file; // uploading file handle
@@ -333,7 +333,6 @@ type
     Fingerprints1: TMenuItem;
     saveNewFingerprintsChk: TMenuItem;
     Createfingerprintonaddition1: TMenuItem;
-    encodePwdUrlChk: TMenuItem;
     pwdInPagesChk: TMenuItem;
     deleteDontAskChk: TMenuItem;
     Updates1: TMenuItem;
@@ -648,6 +647,7 @@ type
       Stage: TCustomDrawStage; var DefaultDraw: Boolean);
     procedure Reverttopreviousversion1Click(Sender: TObject);
     procedure updateBtnClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
   private
     function searchLog(dir:integer):boolean;
     function  getGraphPic(cd:TconnData=NIL): RawByteString;
@@ -680,7 +680,7 @@ type
     procedure setTrayShows(s:string);
     procedure addTray();
     procedure refreshConn(conn:TconnData);
-    function  getVFS(node:Ttreenode=NIL):string;
+    function  getVFS(node:Ttreenode=NIL): RawByteString;
     procedure setVFS2(vfs: RawByteString; node: Ttreenode=NIL); OverLoad;
     procedure setnoDownloadTimeout(v:integer);
 		procedure addDropFiles(hnd:Thandle; under:Ttreenode);
@@ -732,9 +732,13 @@ type
   end; // Tmainfrm
 
   TFileHlp = class helper for Tfile
+    class var userPwdHashCache:Tstr2str;
+    public
      function pathTill(root:Tfile=NIL; delim:char='\'):string;
      function url(fullEncode:boolean=FALSE):string;
-     function fullURL(userpwd:string=''; ip:string=''):string;
+//     function fullURL(userpwd:string=''; ip:string=''):string;
+     function  fullURL(ip, user, pwd:string):string; overload;
+     function  fullURL(ip:string=''):string; overload;
      function getShownRealm():string;
      function getSystemIcon(): integer;
      function parentURL():string;
@@ -791,7 +795,6 @@ function idx_label(i:integer):string;
 function conn2data(i:integer):TconnData; inline; overload;
 function uptimestr():string;
 function countIPs(onlyDownloading:boolean=FALSE; usersInsteadOfIps:boolean=FALSE):integer;
-function getSafeHost(cd:TconnDataMain):string;
 function localDNSget(ip:string):string;
 function countDownloads(ip:string=''; user:string=''; f:Tfile=NIL):integer;
 function getAccountList(users:boolean=TRUE; groups:boolean=TRUE):TstringDynArray;
@@ -814,9 +817,10 @@ uses
   clipbrd, dateutils, shlobj, shellapi, winsock,
 //  registry, activex, FileCtrl,
   OverbyteIcsZLibHigh, OverbyteIcsUtils,
-  Base64, gifImg,
+  Base64,
   RDFileUtil, RDUtils,
   RnQzip, RnQCrypt, RnQNet.Uploads, RnQLangs,
+  langLib,
 //  RnQGraphics32,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib, hfsVars;
@@ -1199,7 +1203,7 @@ freeAndNIL(postVars);
 freeAndNIL(urlvars);
 freeAndNIL(tplCounters);
 freeAndNIL(limiter);
-// do NOT free "tpl". It is just a reference to cached tpl. It will be freed only at quit time. 
+// do NOT free "tpl". It is just a reference to cached tpl. It will be freed only at quit time.
 if assigned(f) then
   begin
   closeFile(f^);
@@ -1265,15 +1269,6 @@ begin
 result:=LUT[mainFrm.httpsUrlsChk.checked];
 end; // protoColon
 
-function totallyEncoded(s:string):string;
-var
-  i: integer;
-begin
-result:='';
-for i:=1 to length(s) do
-  result:=result+'%'+intToHex(ord(s[i]),2)
-end; // totallyEncoded
-
 procedure kickByIP(ip:string);
 var
   i: integer;
@@ -1288,17 +1283,6 @@ while i < srv.conns.count do
   inc(i);
   end;
 end; // kickByIP
-
-function getSafeHost(cd:TconnDataMain):string;
-begin
-result:='';
-if cd = NIL then exit;
-if addressmatch(forwardedMask, cd.conn.address) then
-  result:=cd.conn.getHeader('x-forwarded-host');
-if result = '' then
-  result:=cd.conn.getHeader('host');
-result:=stripChars(result, ['0'..'9','a'..'z','A'..'Z',':','.','-','_'], TRUE);
-end; // getSafeHost
 
 function nodeIsLocked(n:Ttreenode):boolean;
 begin
@@ -1331,16 +1315,17 @@ function Tmainfrm.findFilebyURL(url:string; parent:Tfile=NIL; allowTemp:boolean=
   if dirCrossing(s) then exit;
 
   s:=includeTrailingPathDelimiter(f.resource)+s; // we made the ".." test before, so relative paths are allowed in the VFS
-  if not fileOrDirExists(s) then
-    if fileOrDirExists(s+'.lnk') then s:=s+'.lnk'
-//    else s:=UTF8ToAnsi(s) // these may actually be two distinct files, but it's very unlikely to be, and pratically we workaround big problem
-    ;
-  if not fileOrDirExists(s) or not hasRightAttributes(getLP, s) then exit;
+  if not fileOrDirExists(s) and fileOrDirExists(s+'.lnk') then
+    s:=s+'.lnk';
+  if not fileOrDirExists(s) or not hasRightAttributes(getLP, s) then
+    exit;
   // found on disk, we need to build a temporary Tfile to return it
   result:=Tfile.createTemp(s, f); // temp nodes are bound to parent's node
   // the temp file inherits flags from the real folder
-  if FA_DONT_LOG in f.flags then include(result.flags, FA_DONT_LOG);
-  if not (FA_BROWSABLE in f.flags) then exclude(result.flags, FA_BROWSABLE);
+  if FA_DONT_LOG in f.flags then
+    include(result.flags, FA_DONT_LOG);
+  if not (FA_BROWSABLE in f.flags) then
+    exclude(result.flags, FA_BROWSABLE);
   end; // workTheRestByReal
 
 var
@@ -1468,6 +1453,7 @@ resourcestring
   MSG = 'There are %d open connections from this address.'#13+
         'Do you want to kick them all now?';
   MSG2 = 'You can edit the address.'#13'Masks and ranges are allowed.';
+  MSG_IP_BANNED = 'This IP address is already banned';
 var
   i: integer;
   comm: string;
@@ -1479,7 +1465,7 @@ if not InputQuery('IP mask',MSG2,ip) then exit;
 for i:=0 to length(banlist)-1 do
   if banlist[i].ip = ip then
     begin
-    msgDlg('This IP address is already banned', MB_ICONWARNING);
+    msgDlg(MSG_IP_BANNED, MB_ICONWARNING);
     exit;
     end;
 
@@ -1569,7 +1555,6 @@ var
   buildTime: Tdatetime;
   listing: TfileListing;
   diffTpl: Ttpl;
-  isDMbrowser: boolean;
   hasher: Thasher;
   fullEncode, recur, oneAccessible: boolean;
   md: TmacroData;
@@ -1617,7 +1602,7 @@ var
       addArray(nonPerc, ['~img_file', '~img'+intToStr(f.getSystemIcon())]);
 
   if recur or (itemFolder = '') then
-    itemFolder:= f.getFolder();
+    itemFolder:=f.getFolder();
   if recur then
     url:=substr(itemFolder, ofsRelItemUrl)
   else
@@ -1657,9 +1642,7 @@ var
   else
     if pwdInPagesChk.Checked and (cd.usr > '') then
       begin
-      if encodePwdUrlChk.checked then s:=totallyEncoded(cd.pwd)
-      else s:=encodeURL(cd.pwd);
-      s:=f.fullURL( encodeURL(cd.usr)+':'+s, getSafeHost(cd) )+fingerprint;
+      s:=f.fullURL(cd.getSafeHost(cd), cd.usr, cd.pwd )+fingerprint;
       url:=s
       end
     else
@@ -1730,7 +1713,7 @@ try
   buildTime := now();
   cd.conn.addHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=-1');
   recur := shouldRecur(cd);
-  baseurl := protoColon()+getSafeHost(cd)+folder.url(TRUE);
+  baseurl := protoColon()+cd.getSafeHost(cd)+folder.url(TRUE);
 
   if cd.tpl = NIL then
     diffTpl.over := otpl as Ttpl
@@ -1743,7 +1726,6 @@ try
   if otpl <> filelistTpl then
     diffTpl.fullTextS := folder.getRecursiveDiffTplAsStr();
 
-  isDMbrowser:= otpl = dmBrowserTpl;
   fullEncode:=FALSE;
   ofsRelUrl:=length(folder.url(fullEncode))+1;
   ofsRelItemUrl:=length(folder.pathTill())+1;
@@ -1937,7 +1919,7 @@ var
       begin
       if d.conn.reply.bodymode <> RBM_FILE then continue;
       t:=tpl2use['progress-download-file'];
-      fn:= d.lastFN;
+      fn:=d.lastFN;
       bytes:=d.conn.bytesSentLastItem;
       total:=d.conn.bytesPartial;
       end;
@@ -2040,6 +2022,7 @@ try
   data.conn.reply.contentType:=name2mimetype(sectionName, 'text/html');
   if sectionName = 'ban' then data.conn.reply.mode:=HRM_DENY;
   if sectionName = 'deny' then data.conn.reply.mode:=HRM_DENY;
+  if sectionName = 'login' then data.conn.reply.mode:=HRM_DENY;
   if sectionName = 'not found' then data.conn.reply.mode:=HRM_NOT_FOUND;
   if sectionName = 'unauthorized' then data.conn.reply.mode:=HRM_UNAUTHORIZED;
   if sectionName = 'overload' then data.conn.reply.mode:=HRM_OVERLOAD;
@@ -3025,32 +3008,43 @@ var
   conn.addHeader('Content-Disposition', if_(attach, RawByteString('attachment; ')) + RawByteString('filename="')+encodeURL(data.lastFN)+'";');
   end;
 
-  procedure sessionSetup();
+  function sessionSetup():boolean;
   var
-    idx: Integer;
+//    idx: Integer;
     s: Tsession;
   begin
+    result:=TRUE;
     if data = NIL then
       Exit;
+    data.usr:='';
+    data.pwd:='';
     if (data.sessionID = '') then
        data.sessionID:=conn.getCookie(SESSION_COOKIE);
+    if (data.sessionID = '') then
+       data.sessionID:=data.urlvars.Values[SESSION_COOKIE];
     if sessions.noSession(data.sessionID) then
       begin
-      data.sessionID:= sessions.initNewSession();
+      data.sessionID:= sessions.initNewSession(conn.address);
       conn.setCookie(SESSION_COOKIE, data.sessionID, ['path','/'], 'HttpOnly'); // the session is site-wide, even if this request was related to a folder
       end;
     s := sessions.ss[data.sessionID];
     if Assigned(s) then
      begin
+        if s.ip <> conn.address then
+          begin
+          conn.reply.mode:=HRM_DENY;
+          result:=FALSE;
+          exit;
+          end;
       s.keepAlive();
      end;
-  if (conn.request.user > '') then
-    begin
-    data.usr:=conn.request.user;
-    data.pwd:=conn.request.pwd;
-    data.account:=NIL;
-    exit;
-    end;
+    if (conn.request.user > '') then
+      begin
+      data.usr:=conn.request.user;
+      data.pwd:=conn.request.pwd;
+      data.account:=NIL;
+      exit;
+      end;
     if Assigned(s) then
      begin
       data.account:=getAccount(s.user);
@@ -3060,6 +3054,13 @@ var
        data.usr:=data.account.user;
        data.pwd:=data.account.pwd;
       end;
+   if Assigned(s) and (s.redirect > '') then
+    begin
+    conn.reply.mode:=HRM_REDIRECT;
+    conn.reply.url:= s.redirect;
+    s.redirect:=''; // only once
+    result:=FALSE;
+    end;
   end; // sessionSetup
 
   procedure serveTar();
@@ -3122,7 +3123,8 @@ var
         if ft = NIL then continue;
 
         try
-          if not ft.accessFor(data) then continue;
+          if not ft.accessFor(data) then
+            continue;
           // case folder
           if ft.isFolder() then
             begin
@@ -3130,7 +3132,8 @@ var
             continue;
             end;
           // case file
-          if not fileExists(ft.resource) then continue;
+          if not fileExists(ft.resource) then
+            continue;
           if noFolders then
             s:=substr(s, lastDelimiter('\/', s)+1);
           tar.addFile(ft.resource, s);
@@ -3203,7 +3206,7 @@ var
   procedure handleRequest();
   var
     dlForbiddenForWholeFolder, specialGrant: boolean;
-    urlCmd: string;
+    mode, urlCmd: string;
     acc: Paccount;
 
     function accessGranted(forceFile:Tfile=NIL):boolean;
@@ -3224,24 +3227,17 @@ var
     result:=f.accessFor(data);
     // ok, you are referring a section of the template, which virtually resides in the root because of the url starting with /~
     // but you don't have access rights to the root. We'll let you pass if it's actually a section and you are using it from a folder that you have access to.
-    if not result and (f = rootFile) and ansiStartsStr('~', urlCmd) and tpl.sectionExist(copy(urlCmd,2,MAXINT))
-    and (0 < reMatch(conn.getHeader('Referer'), '://([^@]*@)?'+getSafeHost(data)+'(/.*)', 'i', 1, @m)) then
+    if not result and (f = rootFile)
+    and ((mode='section') or ansiStartsStr('~', urlCmd) and tpl.sectionExist(copy(urlCmd,2,MAXINT)))
+    and (0 < reMatch(conn.getHeader('Referer'), '://([^@]*@)?'+data.getSafeHost(data)+'(/.*)', 'i', 1, @m)) then
       begin
-      fTemp:=findFileByUrl(m[2]);
-      result:=assigned(fTemp) and fTemp.accessFor(data);
+      result:=true;
       specialGrant:=result;
-      freeIfTemp(Ftemp);
       end;
     if result then exit;
-    if f.isFolder() then
-      begin
-      conn.reply.mode:=HRM_REPLY;
-      getPage('login', data, f);
-      exit;
-      end;
     conn.reply.realm:=f.getShownRealm();
     runEventScript('unauthorized');
-    getPage('unauthorized', data);
+    getPage('login', data, f);
     // log anyone trying to guess the password
     if (forceFile = NIL) and stringExists(data.usr, getAccountList(TRUE, FALSE))
     and logOtherEventsChk.checked then
@@ -3255,7 +3251,7 @@ var
     result:=TRUE;
     if allowedReferer = '' then exit;
     r:=hostFromURL(conn.getHeader('Referer'));
-    if (r = '') or (r = getSafeHost(data)) then exit;
+    if (r = '') or (r = data.getSafeHost(data)) then exit;
     result:=fileMatch(allowedReferer, r);
     end; // isAllowedReferer
 
@@ -3367,12 +3363,12 @@ var
       add2log('Failed deletion in '+url+CRLF+join(CRLF, errors), data);
     end; // deletion
 
-    function getAccountRedirect():string;
-    var
-      acc: Paccount;
+    function getAccountRedirect(acc:Paccount=NIL):string;
     begin
     result:='';
-    acc:=accountRecursion(data.account, ARSC_REDIR);
+    if acc = NIL then
+      acc:=data.account;
+    acc:=accountRecursion(acc, ARSC_REDIR);
     if acc = NIL then exit;
     result:=acc.redir;
     if (result = '') or ansiContainsStr(result, '://') then exit;
@@ -3388,9 +3384,40 @@ var
     ipsEverConnected.add(data.address);
     end; // addNewAddress
 
+    // parameters: u(username), e(?expiration_UTC), s2(sha256(rest+pwd))
+    function urlAuth():string;
+    var
+      s, sign: string;
+      ss: Tsession;
+    begin
+    result:='';
+    if mode <> 'auth' then
+      exit;
+    acc:=getAccount(data.urlVars.values['u']);
+    if acc = NIL then
+      exit('username not found');
+    sign:=conn.request.url;
+    chop('?',sign);
+    s:=chop('&s2=',sign);
+    if strSHA256(s+acc.pwd)<>sign then
+      exit('bad sign');
+    ss := sessions.ss[data.sessionID];
+    if Assigned(ss) then
+      begin
+        try ss.setTTL(TTimeZone.Local.ToLocalTime(StrToFloat(data.urlvars.Values['e'])) - now() )
+        except end;
+
+        if ss.ttl < 0 then
+          exit('expired');
+        ss.user:=acc.user;
+        ss.redirect:=getAccountRedirect(acc);
+      end;
+    data.account:=acc;
+    end; //urlAuth
+
   var
     b: boolean;
-    s, mode: string;
+    s: string;
     i: integer;
     section: PtplSection;
   begin
@@ -3476,7 +3503,8 @@ var
     exit;
     end;
 
-  sessionSetup();
+  if not sessionSetup() then
+    exit;
   if mode = 'logout' then
     begin
     data.logout();
@@ -3487,12 +3515,13 @@ var
     begin
     acc:=getAccount(data.postVars.values['user']);
     if acc = NIL then
-      s:='username not found'
+      s:='bad password' // Should be the same error message as if bad password
     else
       if data.passwordValidation(acc.pwd) then
         begin
         s:='ok';
         sessions.getSession(data.sessionID).user:=acc.user;
+        sessions.getSession(data.sessionID).redirect:=getAccountRedirect(acc);
         end
       else
         begin
@@ -3503,8 +3532,14 @@ var
       exit;
     end;
 
-  // this is better to be refresh, because a user may be deleted meantime
-  data.account := getAccount(data.usr);
+  s:=urlAuth();
+  if s > '' then
+    begin
+    conn.reply.mode:=HRM_DENY;
+    replyWithString(s);
+    exit;
+    end;
+
   conn.ignoreSpeedLimit := noLimitsFor(data.account);
 
   // all URIs must begin with /
@@ -3602,9 +3637,9 @@ var
     exit;
     end;
 
-  if urlCmd = '~login' then
+  if urlCmd = '~login' then // legacy method for login dialog
     if conn.request.user = '' then
-      begin // issue a login dialog
+      begin
       getPage('unauthorized', data);
       if loginRealm > '' then
         conn.reply.realm:=loginRealm;
@@ -4046,6 +4081,8 @@ case event of
   // default case
   else refreshConn(data);
   end;//case
+ if Assigned(data) then
+   sessions.keepAlive(data.sessionID);
 if event in [HE_CONNECTED, HE_DISCONNECTED, HE_OPEN, HE_CLOSE, HE_REQUESTED, HE_POST_END, HE_LAST_BYTE_DONE] then
   begin
   repaintTray();
@@ -4341,6 +4378,7 @@ if node = NIL then exit;
 { disable shortcuts, to be used in editbox. Shortcuts need to be re-activated,
 { but when the node text is left unchanged, no event is notified, so we got to
 { use timerEvent to do the work. }
+copyURL1.ShortCut:=0;
 remove1.ShortCut:=0;
 Paste1.ShortCut:=0;
 
@@ -4793,7 +4831,6 @@ result:='HFS '+ hfsGlobal.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'enable-fingerprints='+yesno[fingerprintsChk.checked]+CRLF
 +'save-fingerprints='+yesno[saveNewFingerprintsChk.checked]+CRLF
 +'auto-fingerprint='+intToStr(autoFingerprint)+CRLF
-+'encode-pwd-url='+yesno[encodePwdUrlChk.checked]+CRLF
 +'stop-spiders='+yesno[stopSpidersChk.checked]+CRLF
 +'backup-saving='+yesno[backupSavingChk.checked]+CRLF
 +'recursive-listing='+yesno[recursiveListingChk.checked]+CRLF
@@ -5196,7 +5233,6 @@ while cfg > '' do
     if h = 'enable-fingerprints' then fingerprintsChk.checked:=yes;
     if h = 'save-fingerprints' then saveNewFingerprintsChk.checked:=yes;
     if h = 'auto-fingerprint' then setAutoFingerprint(int);
-    if h = 'encode-pwd-url' then encodePwdUrlChk.checked:=yes;
     if h = 'log-toolbar-expanded' then setLogToolbar(yes);
     if h = 'last-update-check' then lastUpdateCheck:=real;
     if h = 'recursive-listing' then recursiveListingChk.checked:=yes;
@@ -5342,7 +5378,7 @@ function loadCfg(var ini,tpl:string):boolean;
 
 begin
 result:=TRUE;
-ipsEverConnected.text:=loadfile(IPS_FILE);
+ipsEverConnected.text:=UnUTF(loadfile(IPS_FILE));
 ini:=loadFile(cfgPath+CFG_FILE);
 if ini > '' then
   begin
@@ -5630,7 +5666,13 @@ if saveCFG() then
 end;
 
 procedure TmainFrm.About1Click(Sender: TObject);
-begin msgDlg(format(getRes('copyright'), [hfsGlobal.VERSION,VERSION_BUILD + ' ' + DateTimeToStr(BuiltTime)])) end;
+resourcestring
+  copyright = 'HFS version %s'
+  +#13'Copyright (C) 2002-2020  Massimo Melina (www.rejetto.com)'
+  +#13#13'HFS comes with ABSOLUTELY NO WARRANTY under the license GNU GPL 3.0. For details click Menu -> Web links -> License'
+  +#13'This is FREE software, and you are welcome to redistribute it under certain conditions.'
+  +#13#13'Build #%s';
+begin msgDlg(format(copyright, [hfsGlobal.VERSION,VERSION_BUILD + ' ' + DateTimeToStr(BuiltTime)])) end;
 
 procedure Tmainfrm.purgeConnections();
 var
@@ -5816,7 +5858,7 @@ resourcestring
     +#13'To resume normal operation of the updater, delete the file '
       +ON_DISK+' from the HFS program folder.';
 var
-  s: string;
+  s: RawByteString;
 begin
 lastUpdateCheck:=now();
 saveFileA(lastUpdateCheckFN, '');
@@ -5835,9 +5877,8 @@ try
     msgDlg(MSG_FROMDISK, MB_ICONWARNING);
     end;
 finally progFrm.hide() end;
-if pos('[EOF]', s) = 0 then exit;
-result:=Ttpl.create();
-result.fullText:=s;
+if pos(RawByteString('[EOF]'), s) = 0 then exit;
+result:=Ttpl.create(s);
 end; // downloadUpdateInfo
 
 procedure Tmainfrm.autoCheckUpdates();
@@ -6170,6 +6211,7 @@ var
     begin
     remove1.ShortCut:=TextToShortCut('Del');
     Paste1.ShortCut:=TextToShortCut('Ctrl+V');
+    copyURL1.ShortCut:=TextToShortCut('Ctrl+C');
     end;
 
   with optionsFrm do
@@ -7508,9 +7550,9 @@ const
   FK_UPLOADFILTER = 26;
   FK_DELETEACCOUNTS = 27;
 
-function Tmainfrm.getVFS(node:Ttreenode=NIL):string;
+function Tmainfrm.getVFS(node:Ttreenode=NIL): RawByteString;
 
-  function getAutoupdatedFiles():string;
+  function getAutoupdatedFiles():RawByteString;
   var
     i: integer;
     fn: string;
@@ -7520,7 +7562,7 @@ function Tmainfrm.getVFS(node:Ttreenode=NIL):string;
   while i < autoupdatedFiles.Count do
     begin
     fn:=autoupdatedFiles[i];
-    result:=result+TLV(FK_NODE, TLV(FK_NAME, fn)
+    result:=result+TLV(FK_NODE, TLV(FK_NAME, StrToUTF8(fn))
       + TLV(FK_DLCOUNT, str_(autoupdatedFiles.getInt(fn))) );
     inc(i);
     end;
@@ -7535,20 +7577,20 @@ if node = NIL then node:=rootNode;
 if node = NIL then exit;
 f:=nodeToFile(node);
 commonFields:=TLV(FK_FLAGS, str_(f.flags))
-    +TLV_NOT_EMPTY(FK_RESOURCE, f.resource)
-    +TLV_NOT_EMPTY(FK_COMMENT, f.comment)
-    +if_(f.user>'', TLV(FK_USERPWD, Base64EncodeString(f.user+':'+f.pwd)))
+    +TLVS_NOT_EMPTY(FK_RESOURCE, f.resource)
+    +TLVS_NOT_EMPTY(FK_COMMENT, f.comment)
+    +if_(f.user>'', TLV(FK_USERPWD, Base64EncodeString(AnsiString(f.user+':'+f.pwd))))
     +if_(f.user>'', TLV(FK_USERPWD_UTF8, b64utf8(f.user+':'+f.pwd)))
-    +TLV_NOT_EMPTY(FK_ACCOUNTS, join(';',f.accounts[FA_ACCESS]) )
-    +TLV_NOT_EMPTY(FK_UPLOADACCOUNTS, join(';',f.accounts[FA_UPLOAD]))
-    +TLV_NOT_EMPTY(FK_DELETEACCOUNTS, join(';',f.accounts[FA_DELETE]))
-    +TLV_NOT_EMPTY(FK_FILESFILTER, f.filesfilter)
-    +TLV_NOT_EMPTY(FK_FOLDERSFILTER, f.foldersfilter)
-    +TLV_NOT_EMPTY(FK_REALM, f.realm)
-    +TLV_NOT_EMPTY(FK_DEFAULTMASK, f.defaultFileMask)
-    +TLV_NOT_EMPTY(FK_UPLOADFILTER, f.uploadFilterMask)
-    +TLV_NOT_EMPTY(FK_DONTCOUNTASDOWNLOADMASK, f.dontCountAsDownloadMask)
-    +TLV_NOT_EMPTY(FK_DIFF_TPL, f.diffTpl);
+    +TLVS_NOT_EMPTY(FK_ACCOUNTS, join(';',f.accounts[FA_ACCESS]) )
+    +TLVS_NOT_EMPTY(FK_UPLOADACCOUNTS, join(';',f.accounts[FA_UPLOAD]))
+    +TLVS_NOT_EMPTY(FK_DELETEACCOUNTS, join(';',f.accounts[FA_DELETE]))
+    +TLVS_NOT_EMPTY(FK_FILESFILTER, f.filesfilter)
+    +TLVS_NOT_EMPTY(FK_FOLDERSFILTER, f.foldersfilter)
+    +TLVS_NOT_EMPTY(FK_REALM, f.realm)
+    +TLVS_NOT_EMPTY(FK_DEFAULTMASK, f.defaultFileMask)
+    +TLVS_NOT_EMPTY(FK_UPLOADFILTER, f.uploadFilterMask)
+    +TLVS_NOT_EMPTY(FK_DONTCOUNTASDOWNLOADMASK, f.dontCountAsDownloadMask)
+    +TLVS_NOT_EMPTY(FK_DIFF_TPL, f.diffTpl);
 
 result:='';
 if f.isRoot() then
@@ -7565,7 +7607,7 @@ else s:=TLV(FK_DLCOUNT, str_(f.DLcount)); // called on a folder would be recursi
 
 // for non-root nodes, subnodes must be calculated first, so to be encapsulated
 result:=TLV(FK_NODE, commonFields
-  +TLV_NOT_EMPTY(FK_NAME, f.name)
+  +TLVS_NOT_EMPTY(FK_NAME, f.name)
   +TLV(FK_ADDEDTIME, str_(f.atime))
   +TLV_NOT_EMPTY(FK_ICON_GIF, pic2str(f.icon))
   +s
@@ -7685,12 +7727,12 @@ while not tlv.isOver() do
     FK_RESOURCE: f.resource := UnUTF(data2);
     FK_NAME:
       begin
-      f.name:= data2;
-      node.text := data2;
+      f.name:= UnUTF(data2);
+      node.text := f.name;
       end;
     FK_FLAGS: move(data2[1], f.flags, min(length(data2), SizeOf(f.flags)));
   	FK_ADDEDTIME: f.atime:=dt_(data2);
-    FK_COMMENT: f.comment:=data2;
+    FK_COMMENT: f.comment:=UnUTF(data2);
     FK_USERPWD:
     	begin
       data2 := Base64DecodeString(data2);
@@ -7706,20 +7748,20 @@ while not tlv.isOver() do
       usersInVFS.track(f.user, f.pwd);
       end;
     FK_DLCOUNT: f.DLcount:=int_(data2);
-    FK_ACCOUNTS: f.accounts[FA_ACCESS]:= split(';', data2);
-    FK_UPLOADACCOUNTS: f.accounts[FA_UPLOAD]:=split(';',data2);
-    FK_DELETEACCOUNTS: f.accounts[FA_DELETE]:=split(';',data2);
-    FK_FILESFILTER: f.filesfilter:=data2;
-    FK_FOLDERSFILTER: f.foldersfilter:=data2;
-    FK_UPLOADFILTER: f.uploadFilterMask:=data2;
-    FK_REALM: f.realm:=data2;
-    FK_DEFAULTMASK: f.defaultFileMask:=data2;
-    FK_DIFF_TPL: f.diffTpl := data2;
-    FK_DONTCOUNTASDOWNLOADMASK: f.dontCountAsDownloadMask := data2;
+    FK_ACCOUNTS: f.accounts[FA_ACCESS]:= splitU(data2, ';');
+    FK_UPLOADACCOUNTS: f.accounts[FA_UPLOAD]:=splitU(data2, ';');
+    FK_DELETEACCOUNTS: f.accounts[FA_DELETE]:=splitU(data2, ';');
+    FK_FILESFILTER: f.filesfilter:=UnUTF(data2);
+    FK_FOLDERSFILTER: f.foldersfilter:=UnUTF(data2);
+    FK_UPLOADFILTER: f.uploadFilterMask:=UnUTF(data2);
+    FK_REALM: f.realm:=UnUTF(data2);
+    FK_DEFAULTMASK: f.defaultFileMask:=UnUTF(data2);
+    FK_DIFF_TPL: f.diffTpl := UnUTF(data2);
+    FK_DONTCOUNTASDOWNLOADMASK: f.dontCountAsDownloadMask := UnUTF(data2);
     FK_DONTCOUNTASDOWNLOAD: if boolean(data2[1]) then include(f.flags, FA_DONT_COUNT_AS_DL);  // legacy, now moved into flags
     FK_ICON_GIF: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2));
-    FK_AUTOUPDATED_FILES: parseAutoupdatedFiles(data2);
-    FK_HFS_BUILD: loadingVFS.build:= data2;
+    FK_AUTOUPDATED_FILES: parseAutoupdatedFiles(UnUTF(data2));
+    FK_HFS_BUILD: loadingVFS.build:= UnUTF(data2);
     FK_HEAD, FK_HFS_VER: ; // recognize these fields, but do nothing
     else loadingVFS.unkFK:=TRUE;
     end;
@@ -8164,7 +8206,7 @@ procedure TmainFrm.FAQ1Click(Sender: TObject);
 begin openURL('http://www.rejetto.com/sw/?faq=hfs') end;
 
 procedure TmainFrm.License1Click(Sender: TObject);
-begin openURL('http://www.rejetto.com/sw/license.txt') end;
+begin openURL('https://www.gnu.org/licenses/gpl-3.0.html') end;
 
 procedure Tmainfrm.pasteFiles();
 begin
@@ -8689,17 +8731,16 @@ f:=selectedFile;
 while assigned(f) and (f.accounts[FA_ACCESS] = NIL) and (f.user = '') do
   f:=f.parent;
 
-if f.user = user then pwd:=f.pwd
+if f.user = user then 
+  pwd:=f.pwd
 else
   begin
   a:=getAccount(user);
   if assigned(a) then pwd:=a.pwd
   else pwd:='';
   end;
-if encodePwdUrlChk.checked then pwd:=totallyEncoded(pwd)
-else pwd:=encodeURL(pwd);
 
-setClip( selectedFile.fullURL( encodeURL(user)+':'+pwd ) )
+setClip( selectedFile.fullURL('',user,pwd) )
 end; // copyURLwithPasswordMenuClick
 
 procedure Tmainfrm.copyURLwithAddressMenuClick(sender:Tobject);
@@ -8712,7 +8753,7 @@ delete(addr, pos('&',addr), 1);
 
 s:='';
 for i:=0 to filesBox.SelectionCount-1 do
-  s:=s+nodeTofile(filesBox.Selections[i]).fullURL('', addr)+CRLF;
+  s:=s+nodeTofile(filesBox.Selections[i]).fullURL(addr)+CRLF;
 setLength(s, length(s)-2);
 
 setClip(s);
@@ -8950,6 +8991,11 @@ try
 finally queryingClose:=FALSE end;
 end;
 
+procedure TmainFrm.FormCreate(Sender: TObject);
+begin
+screen.onActiveFormChange:=wrapInputQuery;
+end;
+
 procedure TmainFrm.Loginrealm1Click(Sender: TObject);
 resourcestring
   MSG = 'The realm string is shown on the user/pass dialog of the browser.'
@@ -9176,6 +9222,7 @@ var
   lToBr: Boolean;   // Brotli
 begin
   lToGZip := compressedbrowsingChk.checked;
+  lToBr := compressedbrowsingChk.checked;
 //  if not compressedbrowsingChk.checked then
 //    exit;
   lToBr := lToBr and (ipos('Br', cd.conn.getHeader('Accept-Encoding')) <> 0);
@@ -9191,16 +9238,16 @@ begin
 //  if ipos('gzip', cd.conn.getHeader('Accept-Encoding')) = 0 then
 //    exit;
 // workaround for IE6 pre-SP2 bug
-if (cd.workaroundForIEutf8  = toDetect) and (cd.agent > '') then
+if (cd.workaroundForIEutf8  = wi_toDetect) and (cd.agent > '') then
   if reMatch(cd.agent, '^MSIE [4-6]\.', '!') > 0 then // version 6 and before
-    cd.workaroundForIEutf8:=yes
+    cd.workaroundForIEutf8:=wi_yes
   else
-    cd.workaroundForIEutf8:=no;
+    cd.workaroundForIEutf8:=wi_no;
 //s:=ZcompressStr2(s, zcFastest, 31,8,zsDefault);
   if lToGZip and not cd.conn.reply.IsGZiped then
     s := ZcompressStr(s, clDefault, zsGZip);
 
-  if (cd.workaroundForIEutf8  = yes) and (length(s) < BAD_IE_THRESHOLD) then
+  if (cd.workaroundForIEutf8  = wi_yes) and (length(s) < BAD_IE_THRESHOLD) then
     lToGZip := false;
   if lToGZip then
     begin
@@ -10229,7 +10276,8 @@ if quitASAP then
   exit;
   end;
 
-  LoadSomeLanguage;
+  LoadSomeLanguage('HFS');
+  translateWindows;
 show();
 strToConnColumns(serializedConnColumns);
 if startminimizedChk.checked then application.Minimize();
@@ -10740,6 +10788,10 @@ Form := Screen.ActiveCustomForm;
 if (Form=NIL) or (Form.ClassName<>'TInputQueryForm') then
   Exit;
 
+  Edit := NIL;
+  Prompt := NIL;
+  Ctrl := NIL;
+
 for I := 0 to Form.ControlCount-1 do
   begin
   Ctrl := Form.Controls[i];
@@ -10800,15 +10852,34 @@ else result:='/'+encodeURL(pathTill(rootFile,'/'), fullEncode)
   +if_(isFolder() and not isRoot(), '/');
 end; // url
 
-function TFileHlp.fullURL(userpwd:string=''; ip:string=''):string;
+function TFileHlp.fullURL(ip, user, pwd:string):string;
+var s,k,base: string;
+begin
+if userPwdHashCache = NIL then
+  userPwdHashCache:=Tstr2str.Create();
+base:=fullURL(ip)+'?';
+k:=user+':'+pwd;
+try result:=base+userPwdHashCache[k]
+except
+  s:='mode=auth&u='+encodeURL(user);
+  s:=s+'&s2='+strSHA256(s+pwd); // sign with password
+  userPwdHashCache.add(k,s);
+  result:=base+s;
+  end;
+end; // fullURL
+
+function TFileHlp.fullURL(ip:string=''):string;
 begin
 result:=url();
-if isLink() then exit;
-if assigned(srv) and srv.active and (srv.port <> '80') and (pos(':',ip) = 0)
+if isLink() then
+  exit;
+if assigned(srv) and srv.active
+and (srv.port <> '80') and (pos(':',ip) = 0)
 and not mainfrm.noPortInUrlChk.checked then
   result:=':'+srv.port+result;
-if ip = '' then ip:=defaultIP;
-result:=protoColon()+nonEmptyConcat('',userpwd,'@')+ip+result
+if ip = '' then
+  ip:=defaultIP;
+result:=protoColon()+ip+result;
 end; // fullURL
 
 function TFileHlp.getShownRealm():string;
@@ -10929,6 +11000,7 @@ MIMEtypes:=toSA([
   '*.txt', 'text/plain',
   '*.css', 'text/css',
   '*.js',  'text/javascript',
+  '*.mkv', 'video/x-matroska',
   '*.webp', 'image/webp'
 ]);
 

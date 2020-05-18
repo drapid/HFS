@@ -1,0 +1,3235 @@
+﻿######## Перевод на Русский
+[]
+desc=Русский
+[Open in browser]
+Открыть в браузере
+[Menu]
+Меню
+[Self Test]
+Самодиагностика
+[Debug]
+Отладка
+[Add files...]
+Добавить файлы...
+[Save options]
+Сохранить настройки
+[Add folder from disk...]
+Добавить папку с диска...
+
+[You are in Expert mode]
+Вы в режиме Эксперт
+[Copy to clipboard]
+Копировать в буфер обмена
+
+resourcestrings:
+[Port: %s]
+Порт: %s
+[any]
+любой
+[The current template is using macros.\rDo you want to cancel this action?]
+Текущий шаблон использует макрос.\rВы хотите отменить это действие?
+[Remove from shell context menu]
+Удалится из контекстного меню оболочки
+[Switch OFF]
+ВЫКЛЮЧИТЬ
+[Switch ON]
+ВКЛЮЧИТЬ
+[Log]
+Журнал
+[You are invited to re-insert your No-IP configuration, otherwise the updater won't work as expected.]
+You are invited to re-insert your No-IP configuration, otherwise the updater won't work as expected.
+L"Max simultaneous addresses."
+L"In this moment there are %d different addresses"
+L"Max simultaneous addresses downloading."
+L"In this moment there are %d different addresses downloading"
+L"Max lines on screen"
+L"Here you can specify how to format the log file complying Apache standard.\rLeave blank to get bare copy of screen on file.\r\rExample:\r   %h %l %u %t \"%r\" %>s %b"
+L"This option creates an .md5 file for every new calculated fingerprint.\rUse with care to get not your disk invaded by these files."
+L"When you add files and no fingerprint is found, it is calculated.\rTo avoid long waitings, set a limit to file size (in KiloBytes).\rLeave empty to disable, and have no fingerprint created."
+L"This feature is INCOMPATIBLE with Internet Explorer."
+L"Specify your addresses, each per line"
+L"Can't find external address\r( %s )"
+
+
+[R&Q Language file info]
+Русский перевод.
+
+######## Users #########
+[Users]
+Пользователи
+[Delete account]
+Удалить пользователя
+[delete definitely your UIN from the server]
+Удалить UIN с сервера
+[Delete user]
+Удалить
+[delete your user from this PC]
+Удалить пользователя только локально
+[Are you sure you want to delete %s ?]
+Действительно удалить %s ?
+[The user you are trying to delete is the one in use right now.\nIt will be closed to be deleted. Continue?]
+Удаляемый пользователь в данный момент используется.\nДля удаления он будет отключен. Продолжить?
+[User deleted!]
+Пользователь удален!
+[Import]
+Импорт
+[New account]
+Получить UIN
+[Connection settings:]
+Настройки соединения:
+[Change]
+Изменить
+[Enter a password:]
+Введите пароль:
+[Enter password for %s]
+Ввести пароль для %s
+[No picture]
+Нет изображения
+[Picture too big]
+Картинка слишком большая
+[Enter a word:]
+Введите фразу:
+[Get Picture]
+Получить картинку
+[&Register UIN]
+Получить UIN
+[MISSING PASSWORD]
+Введите пароль
+
+[New user]
+Новый пользователь
+[Add user]
+Добавить акк.
+[Get new account]
+Регистрация
+
+[&Search]
+Поиск
+[S&top]
+Стоп
+[&Clear]
+Очистить
+[results: %d]
+Результат: %d
+
+[Save as txt]
+Сохранить как txt
+[Save as clb]
+Сохранить как clb
+
+[Send SMS]
+Послать СМС
+# Status
+[Online]
+В сети
+[Offline]
+Отключен
+
+
+########## Main Menu #############
+[Privacy && Security]
+Безопасность
+[Password]
+Пароль
+[Login password]
+Сетевой пароль
+[Set password]
+Ввести пароль
+[Clear password]
+Очистить пароль
+[in/visible list]
+Список не/видимых
+[Lock]
+Заблокировать
+[Special]
+Дополнительно
+[View info of...]
+Посмотреть про...
+[Open chat with...]
+Открыть чат с...
+[Contacts database]
+База данных контактов
+[Nickname]
+Ник
+[Show log window]
+Журнал событий
+[Copy to Clipboard]
+Копировать
+[Send an SMS]
+Отправить SMS
+[Reload current theme]
+Перезагрузить текущую тему
+[Import from ICQ contacts file]
+Импорт из ICQ контактов
+[Export to ICQ contacts file]
+Экспорт в ICQ контакты
+[Reload current lang]
+Перезагрузить язык
+[Load contact list from Server]
+Загрузить контакты с сервера
+[Load contact list to Server]
+Сохранить контакты на сервер
+[History synchronization]
+Синхронизация историй
+[Themes]
+Темы
+[Refresh theme-list]
+Обновить список тем
+[&Open contacts-theme]
+Открыть темы контактов
+[Open contacts-theme]
+Открыть темы контактов
+[Open contacts-theme in notepad]
+Редактировать персональные темы
+[Sounds]
+Звуки
+[No sounds]
+Без звуков
+[From theme]
+Из темы
+[Support]
+Поддержка
+[web]
+Интернет
+[R&&Q homepage]
+Домашняя страница R&&Q
+[R&&Q forum]
+Форум R&&Q
+[R&&Q what's new]
+Что нового в R&&Q
+[Check for updates]
+Проверить обновления
+[Check Invisibility list]
+Проверить список невидимых
+[Check-invisibility list]
+Список проверяемых на невидимость
+[Outbox]
+Исходящие
+[Get offline messages]
+Получить неполученные сообщения
+[Delete offline messages]
+Удалить неполученные сообщения на сервере
+[Users (change/add/remove)]
+Сменить пользователя
+[Preferences]
+Настройки
+[View my info]
+Мои личные данные
+[R&&Q Player]
+R&&Q проигрыватель
+[About program]
+О программе
+[Help]
+Помощь
+[Show]
+Показать
+[Hide]
+Свернуть
+[Exit]
+Выход
+[Really quit?]
+Выйти из программы?
+
+#### Contact Menu
+[Send message]
+Отправить сообщение
+[Send contacts]
+Отправить контакты
+[Send e-mail]
+Отправить e-mail
+[Send added-you]
+Сообщить <Я Вас добавил>
+[Request Authorization]
+Запрос авторизации
+[Enter reason to authorize]
+Ввод причины авторизации
+[Reason]
+Причина
+[Please authorize my request and add me to your Contact List.]
+Пожалуйста авторизуйте меня и добавьте в ваш контакт-лист.
+[Request avatar]
+Получить аватар
+[View info]
+Просмотреть личные данные
+[Read auto-message]
+Запросить автосообщение
+[Read XStatus]
+Запросить доп. статус
+[Add to server]
+Добавить на сервер
+[Open incoming folder]
+Открыть папку входящих файлов
+[Make local]
+Удалить с сервера (сделать локальным)
+[Remove me from his CL]
+Удалить себя из его контактов
+[Remove me from his Server-CL]
+Удалить себя из его СЕРВЕРНОГО КЛ
+[Grant Authorization]
+Авторизировать
+[Check invisibility]
+Проверить на невидимость
+[Add to contact list]
+Добавить в КЛ
+[Move to group]
+Переместить в группу
+[Rename]
+Переименовать
+[Delete]
+Удалить
+[Delete selected]
+Удалить выделенное
+[Delete only history]
+Удалить только историю
+[Delete with history]
+Удалить вместе с историей
+[temporary visible list]
+Временно видимый
+[Temporary visible list]
+Временная видимость
+[visible list]
+Видимость
+[invisible list]
+Невидимость
+[Visible list]
+Видимость
+[Invisible list]
+Невидимость
+[ignore list]
+Игнорировать
+[Ignore list]
+Чёрный список
+[Check-invis list]
+Список проверяемых на невидимость
+[%d (copy UIN)]
+%d (Копировать UIN)
+[if you click the UIN will be copied into clipboard]
+Копировать UIN в буфер обмена
+[%s (copy UIN)]
+%s (Копировать UIN)
+[%s (copy IP)]
+%s (Копировать IP)
+[if you click the IP address will be copied into clipboard]
+Копировать IP-адрес в буфер обмена
+[Out of groups]
+Вне групп
+[Move from %s to group]
+Переместить из %s в группу
+
+############# History &&&& Chat
+[The history is corrupted, some data is lost]
+История повреждена, некоторые данные утеряны
+[Close all]
+Закрыть все вкладки
+[Close all but this one]
+Закрыть все, кроме текущей
+[Close all OFFLINEs]
+Закрыть вкладки контактов <Не в сети>
+[Close and Add to Ignore list]
+Закрыть и добавить в игнор-лист
+[Close all NIL and Add to Ignore list]
+Закрыть и добавить в игнор, кто не в контактах
+[Move to ignorelist all "not in list"?]
+Добавить в список игнора все кто <не в КЛ>?
+[Multiple]
+Выбрать из списка
+[When i'm visible to him/her]
+Если виден
+[To all open chats]
+Всем открытым сейчас
+[Add link to favorites]
+Добавить в <Избранное>
+[Copy link]
+Копировать ссылку
+[Copy]
+Копировать
+[Select all]
+Выбрать все
+[Save pic]
+Сохранить картинку
+[View message in window]
+Просмотреть в отдельном окне
+[txt]
+Текст
+[html]
+HTML
+[Show graphic smiles]
+Показывать смайлы картинками
+[Show left scrollbar]
+Показывать левую полосу прокрутки
+[Popup left scrollbar]
+Всплывающая слева полоса прокрутки
+[Retrieves an address from your favorites]
+Получить адрес из закладок браузера
+[Auto-close chat with this contact after you send him a message.\nYou can choose a default setting from the "chat settings".]
+Закрыть чат с этим контактом после отправки сообщения.\nВы можете изменить это в <Настройках чата>. Функция <Одиночные сообщения>.
+[Quote previous received messages\nALT+Q]
+Процитировать предыдущие сообщения\nALT+Q
+[Info about this user\nALT+I]
+Личные данные пользователя\nALT+I
+[Scrolls history on a new message\nALT+A]
+Прокручивать окно при получении сообщения\nALT+A
+[Preferences for the chat window\nALT+P]
+Настройки окна чата\nALT+P
+[Find a word in the history\nALT+F]
+Найти слово в истории сообщений
+[Show the whole history, not only recent messages\nALT+H]
+Показать всю историю\nALT+H
+[&Close]
+Закрыть
+[&Send]
+Отправить
+[Chars]
+Символов
+[Chars:]
+Символов:
+[Chars left:]
+Символов осталось:
+[left:]
+осталось:
+[(multi-send)]
+(Отправлено списком)
+[%2:s %0:s, %1:s]
+%2:s %0:s, %1:s
+[%2:s %0:s, %1:s is online]
+%2:s %0:s, %1:s появился в сети
+[%2:s %0:s, %1:s is offline]
+%2:s %0:s, %1:s вышел из сети
+[%2:s %0:s, %1:s auto-message]
+%2:s %0:s, %1:s автосообщение
+[%2:s %0:s, %1:s requested your auto-message]
+%2:s %0:s, %1:s запросил автосообщение
+[%2:s %0:s, %1:s Request authorization]
+%2:s %0:s, %1:s запрос авторизации
+[%2:s %0:s, %1:s Authorized]
+%2:s %0:s, %1:s авторизован
+[%2:s %0:s, %1:s Denied authorization]
+%2:s %0:s, %1:s отказано в авторизации
+[%2:s %0:s, %1:s - status %3:s]
+%2:s %0:s, %1:s - статус %3:s
+[%2:s %0:s, %1:s  - status %3:s]
+%2:s %0:s, %1:s - статус %3:s
+[%2:s %0:s, %1:s Greeting Card]
+%2:s %0:s, %1:s открытка
+[%2:s %0:s, %1:s requested your XStatus]
+%2:s %0:s, %1:s запросил ваш Доп.статус
+[%2:s %0:s, %1:s - status %3:s]
+%2:s %0:s, %1:s - статус %3:s
+[Scrolls the message line by line\nCTRL+UP, CTRL+DOWN]
+Прокручивать сообщение построчно\nCTRL+ВВЕРХ, CTRL+ВНИЗ
+[Scrolls the message line by line]
+Прокручивает сообщение построчно
+[Chat window]
+Окно чата 
+
+######################## Other (Hint, Info)
+[Need authorization]
+Необходима авторизация
+[Is local]
+Локальный
+[Add]
+Добавить
+[Update]
+Обновить
+[UIN]
+UIN
+[Displayed]
+Показывать
+[Idle time]
+Недоступен
+[Nick]
+Ник
+[First name]
+Имя
+[Last name]
+Фамилия
+[Age/Gender]
+Пол/Возраст
+[Gender/Age]
+Пол/Возраст
+[Group]
+Группа
+[IP address]
+IP-адрес
+[Last time seen online]
+В сети был
+[Total]
+Всего
+[E-mail]
+E-mail
+[City]
+Город
+[Gender]
+Пол
+[State]
+Область
+[Language]
+Язык
+[Country]
+Страна
+[Zip]
+Индекс
+[GMT]
+GMT
+[Cellular]
+Мобильный
+[Marital status]
+Сем. полож.
+[Language 1]
+Язык №1
+[Language 2]
+Язык №2
+[Language 3]
+Язык №3
+[About]
+Информация
+[Homepage]
+Домашняя страница
+[Choose the xStatus...]
+Выберите доп. статус
+[Set]
+Выбрать
+[None]
+Нет
+[Angry]
+Злой
+[Duck]
+Моюсь
+[Tired]
+Устал
+[Party]
+Вечеринка
+[Beer]
+Пью пиво
+[Thinking]
+Думаю
+[Eating]
+Кушаю
+[TV]
+Смотрю телевизор
+[Friends]
+С друзьями
+[Coffee]
+Пью кофе/чай
+[Music]
+Слушаю музыку
+[Wrong number]
+Ошиблись номером
+[Squirrel]
+Белочка
+[Death]
+Помираю
+[Shrimp]
+Йа креведко
+[Thumbs up]
+Палец вверх
+[Thumbs down]
+Палец вниз
+[Fig]
+Фигушки
+[Leprechaun]
+Лепрекон
+[Basketball]
+Баскетбол
+[Dog]
+Гав
+[Pig]
+Свинтус
+[Sumo]
+Сумоист
+[Pacifier]
+Младенец
+[Black face]
+Чернее ночи
+[Cyclops]
+Одноглазый
+[Pink face]
+Розовощёкий
+[Balloons]
+Это просто праздник какой-то!
+[Riding]
+Двухколёсный
+[Monkey]
+Обезьянничаю
+[Angel]
+Я просто ангел
+[Groucho glasses]
+Изображаю комика
+[Moustache]
+Отращиваю усищи
+[Console games]
+Консольные игры
+[Dollar sign]
+Here comes the money!
+[Fist]
+В челюсть!
+[Cat]
+Мур
+[Rolls]
+Роллы
+[Ladybug]
+Полети на небо
+[Football]
+Футбол
+[Ice cream]
+Кушаю мороженку
+[Arrow heart]
+Влюблён
+[Strawberry]
+Клубничка
+[Donut]
+Кушаю пончик
+[Tongue]
+Язык :P
+[Broken heart]
+Разбитое сердце
+[Hipster]
+Хипстер
+[Pizza]
+Поглощаю пиццу
+[Lollipop]
+Сосу леденец
+[Candy]
+Хочу сладостей
+[Fuck you]
+Отвалите
+[Fuck you too]
+Пошли вы все
+[In the woods]
+Я потерялся
+[Overexcited]
+Схожу с ума
+[Alien]
+Я - инопланетный разум
+[With friends]
+С друзьями
+[Cool]
+Я крут
+[Chicken]
+Я цыпа
+[Burger]
+Жру
+[Business]
+Бизнес
+[Where am I?]
+Где я?
+[Cooking]
+Готовлю
+[Bathing]
+Купаюсь
+[Asleep]
+Засыпаю
+[Rocket]
+Ракета
+[Camera]
+В кино
+[Games]
+Играю
+[College]
+Учусь
+[Shopping]
+В магазине
+[Sick]
+Болею
+[Surfing]
+Отрываюсь
+[Internet]
+В интернете
+[Engineering]
+Работаю
+[Sleeping]
+Сплю
+[Funny]
+Веселый
+[Phone]
+Телефон
+[Typing]
+Печатаю
+[Smoking]
+Курю
+[Unk]
+Нет данных
+[unk]
+Нет данных
+[Barbecue]
+Барбекю
+[PPC]
+КПК
+[Mobile]
+Мобильный
+[Man]
+Засыпаю
+[WC]
+В туалете
+[Sex]
+Секс
+[Geometry]
+Геометрия
+[Love]
+Любовь
+[Quest]
+Вопрос
+[In search]
+В поиске
+[Diary]
+Дневник
+[Mb]
+Мб
+[Time]
+Время
+[save my info]
+Сохранить
+[retrieve info]
+Получить
+[delete from list]
+Удалить
+[&Main]
+Общее
+[&Work]
+Работа
+[Company]
+Компания
+[Department]
+Отдел
+[Position]
+Должность
+[Workpage]
+Рабочая страница
+[&Extra]
+Дополнительно
+[&Client]
+Клиент
+[&Notes]
+Заметки
+[Important]
+Важно
+[&Interests]
+Интересы
+[Interests]
+ Интересы 
+[Send translit message (for russian only)]
+Посылать сообщения транслитом
+[Avatar]
+Аватар
+[&Avatar]
+Аватар
+[Photo]
+Фото
+[Clear own avatar]
+Стереть свой аватар
+[Clear avatar]
+Стереть аватар
+[Change own avatar]
+Сменить свой аватар
+[Load avatar]
+Загрузить аватар
+[Load thumb]
+Загрузить эскиз
+[Load photo]
+Загрузить фото
+[Load photo 2]
+Загрузить фото [2]
+[Load photo 3]
+Загрузить фото [3]
+[Client]
+Клиент
+[Let people see my e-mail address]
+Показывать всем мой e-mail
+[Direct protocol]
+Протокол ICQ
+[Info updated to]
+Инф-я обновлялась 
+[Last message time]
+Последнее сообщение
+[Registered on]
+UIN зарегистрирован
+[Invalid]
+Ошибка
+[Online since]
+Вышел в сеть
+[Don't delete from database]
+Не удалять из базы данных
+[GO]
+Перейти
+[Open this address]
+Открыть адрес
+[UIN-lists]
+UIN-листы
+[Resolve]
+Получить
+[his time]
+Его время
+[SMS-able]
+Возможность отправки SMS
+[Send an e-mail]
+Отправить E-Mail
+[Unknown]
+Нет данных
+[Noone]
+Нет
+[add to list]
+Добавить
+[Today]
+Сегодня
+[Yesterday]
+Вчера
+[Save as]
+Сохранить как
+[contact %s deleted]
+Контакт %s удален
+[history %s deleted]
+История %s удалена
+[Need restart]
+Нужен перезапуск
+[Attached mail for login]
+Привязанный E-mail для логина
+
+# Zodiacs
+[Zodiac]
+Знак зодиака
+[Aries]
+Овен
+[Taurus]
+Телец
+[Gemini]
+Близнецы
+[Cancer]
+Рак
+[Leo]
+Лев
+[Virgo]
+Дева
+[Libra]
+Весы
+[Scorpio]
+Скорпион
+[Sagittarius]
+Стрелец
+[Capricorn]
+Козерог
+[Aquarius]
+Водолей
+[Pisces]
+Рыбы
+
+[Report]
+Отчёт
+[View report]
+Показать отчёт
+[disconnected]
+Отсоединен
+[%s already exists]
+%s уже существует
+[%s - %s is actually offline]
+%s - %s сейчас не в сети
+[Filename: %s\nCount: %d\nSize: %s\nMessage: %s]
+Имя файла: %s\nКол-во: %d\nРазмер: %s\nСообщение: %s
+[%s added you to his/her contact list.]
+%s добавил(а) Вас в контакты.
+[Added you to his/her contact list]
+Вы добавлены в его(ее) контакт-лист
+[%s added you to his/her contact list.\nDo you want to add him/her to your contact list?]
+%s добавил(а) Вас в контакты.\nДобавить его(её) в свой список?
+[%s was grant you an autorization]
+%s - дал(а) Вам авторизацию
+[%s was declined you an autorization]
+%s отказал(а) Вам в авторизации
+[You'll be soon disconnected cause the server is in pause.]
+Сейчас вы будете отключены от сервера, так как он будет приостановлен.
+[You''ll be soon disconnected cause the server is in pause.]
+Вы будете скоро отсоединены, т.к. сервер останавливается.
+[You must be online in order to use this feature]
+Для использования этой функции вы должны быть в сети
+[You mistyped the new password. Re-type it, please.]
+Пароли не совпали. Повторите ввод.
+[Please enter only first 8 symbols of your password]
+Пожалуйста, вводите только первые 8 символов вашего пароля.
+[Really want to change password on server?]
+Действительно хотите изменить пароль на сервере?
+[You are about to send a notification to %s.\nContinue?]
+Вы собираетесь отправить уведомление %s.\nПродолжить?
+[Do you want to remove %s from your contact list?]
+Удалить %s из контакт-листа?
+[Delete contacts with history]
+Удалить контакты с историей
+[SPAM FILTERED FROM %s]
+Отфильтрован спам от %s
+[SPAM FILTERED FROM %s \n BY WORD %s]
+Отфильтрован спам от %s\nпо слову "%s"
+
+[The contacts database is corrupted, some data is lost]
+База данных контактов повреждена, некоторые данные утеряны
+[Server says you're reconnecting too fastly, try later or change user.]
+Вы переподключаетесь к серверу слишком часто. Попробуйте позже или смените пользователя.
+[There is another instance with this user already running]
+Программа с этим пользователем уже запущена
+[You are invited to NOT use this function for now. It's still under test.\nContinue?]
+Рекомендуется не использовать эту функцию. Она еще тестируется.\nПродолжить?
+[You did not entered any password, so encryption will be disabled!]
+Вы не ввели пароль, поэтому шифрование не будет включено!
+[If you don't save your password, only who knows the password will be able to connect.\nPassword is asked all time you trying to connect.]
+Пароль запрашивается при каждом подключении к серверу.
+[If you don't save your password, only who knows the password will be able to connect.\nPassword is asked only once, so be sure that you lock or quit R&Q when you're off the screen.]
+Соединиться сможет только тот, кто знает пароль.
+[If you add someone to your list, he will receive a notification about it.]
+Если вы добавите кого-нибудь в контакты, он будет уведомлен.
+[for now you can only drag&drop your contacts from the contact-list, sorry]
+Перетащите пользователя из контакт-листа, или выберите в контекстном меню пункт "Игнор-лист"
+[Can't send an empty message]
+Нельзя послать пустое сообщение
+[Unsupported format of flash-avatar]
+Неподдерживаемый формат флеш-аватары
+[Bad address of flash-avatar.\n%s]
+Неправильный адрес аватары.\n%s
+[Connecting]
+Соединение
+[message from %s]
+Сообщение от %s
+[URL from %s]
+URL от %s
+[contacts from %s]
+контакты от %s
+[file]
+файл
+[%s requires authorization]
+%s просит авторизации
+[Requires authorization]
+Запрашивает авторизации
+[%s added you]
+%s добавил(а) вас
+[Added you]
+Добавил(а) Вас
+[%s is online]
+%s в сети
+[%s is offline]
+%s не в сети
+[%s authorized you]
+%s авторизовал(а) вас
+[Authorized you]
+Авторизировал(а) Вас
+[%s denied authorization]
+%s отказал в авторизации
+[%s changed status]
+%s сменил(а) статус
+[Changed status]
+Изменил(а) статус
+[auto-message requested by %s]
+%s запросил(а) автосообщение
+[greeting card from %s]
+открытка от %s
+[auto-message for %s]
+автосообщение от %s
+[Begun typing]
+Начал(а) печатать
+[Finished typing]
+Закончил(а) печатать
+[XStatus requested by %s]
+%s запросил(а) доп-статус
+[Auto message]
+Автосообщение
+[is online]
+в сети
+[is offline]
+не в сети
+[Clear]
+Очистить
+[predefined messages]
+Автосообщение:
+[pop up on status change]
+Открыть при изменении статуса
+[ok on double ENTER]
+ОК при двойном "Enter"
+[delete selected predefined message]
+Удалить выбранное автосообщение
+[add current message to predefined messages]
+Добавить текущее сообщение в список автосообщений
+[not in my list]
+нет в моем списке
+[Purge contacts]
+ Очистить контакты 
+[contacts in db: %d]
+Контактов в базе: %d
+[Remove histories for unexistant contacts]
+Удалить историю контактов, которых нет в моем КЛ
+[Done]
+Готово
+[&Purge]
+Очистить
+[Days to Bd]
+Дней до ДР
+[Avatar MD5]
+Хэш MD5 аватара
+
+[Normal list]
+Нормально
+[visibility to invisible]
+Невидимый
+[visibility to normal]
+Видимый
+[visibility to visible]
+Видимый всегда
+[Add contact]
+Добавить в контакты
+[Locally]
+Локально, не на сервер
+[Type the UIN number you want to add]
+Введите UIN, который Вы хотите добавить
+[This is gonna disconnect you. Proceed?]
+Произойдёт отсоединение. Продолжить?
+[R&Q LOCKED]
+R&Q заблокирован
+[This R&&Q has been locked. To unlock you need to type in your password.]
+R&&Q заблокирован. Для разблокирования введите Ваш пароль.
+[No password has been inserted, so you can't lock.]
+Не введён пароль, поэтому программа не может быть заблокирована.
+[The password you entered is incorrect]
+Вы ввели неверный пароль.
+\nЕсли Ваш пароль больше 8 символов,\nвводите только первые 8 символов (включительно).
+[All files]
+Все файлы
+[File]
+Файл
+[Total files]
+Всего файлов
+[Sending]
+Посылаем
+[File transfer to %s]
+Передача файла для %s
+[File transfer]
+Передача файла
+[Select file to transfer]
+Выберите файл для передачи
+[Through server]
+Через сервер
+[Progress]
+Прогресс
+[File already exists. Try to resume receive?]
+Файл уже существует. Попробовать продолжить закачку? Игнор=Докачать.
+[Close window after file received]
+Закрыть окно после передачи файла
+[Path]
+Путь
+[Open path]
+Открыть папку
+[Accept]
+Начать
+[Speed]
+Скорость
+[Time left]
+Осталось
+[Sender]
+Отправитель
+[Do you want to receive files through server?]
+Хотите получить файлы через сервер?
+[Do you want to send files through server?]
+Хотите передать файлы через сервер?
+####search history####
+[search history]
+Поиск в истории
+[Text to find]
+Искать текст:
+[from the beginning]
+С начала
+[from the end]
+С конца
+[backward]
+Назад
+[forward]
+Вперед
+[Search]
+Поиск
+[Case sensitive]
+Регистр
+[Reg.Exp.]
+Регул.выр.
+[To %s]
+Для %s
+[Search in all history files]
+Поиск во всех файлах истории
+[Only in contact-list]
+Только в истории контактов
+[Text to search]
+Текст для поиска
+[Type what you want to search...!]
+Введите, что вы хотите найти...
+[Found!]
+Найдено!
+[Nothing found, sorry]
+Сожалеем, ничего не найдено
+####SMS####
+[message]
+Сообщение
+[destination numbers]
+Номера получателей
+[delivery receipt]
+Отчет о доставке
+#####  OutBox #####
+
+[Send now]
+Отправить
+[Process messages when possible]
+Отправлять по возможности
+[%0:s%1:s for %2:s\nWrote: %3:s\nLast modify: %4:s]
+%0:s%1:s для %2:s\nНаписано: %3:s\nИсправлено: %4:s
+[Additional info]
+ Дополнительно 
+[Save changes]
+Сохр. изменения
+
+### MainUnit ###
+[Contacts]
+Контакты
+[User only accept urgent messages.\nSend urgent?\n\nAuto-message:\n%s]
+Пользователь принимает только важные сообщения.\nПродолжить?\n\nАвтосообщение:\n%s
+[Your password has been changed.]
+Ваш пароль изменен.
+[Your information has been saved.]
+Ваша информация сохранена.
+[End of search\nThere are %d more results but ICQ server shows only first ones, sorry.]
+Поиск закончен\nЕсть еще %d результатов, но сервер ICQ показывает только первые 20.
+[File transfer denied]
+В передаче файлов отказано
+[Your version is a "preview"!]
+Ваша версия предназначена только для тестирования!
+[There's a new version available! version %s%s\nDo you want to download the new version?]
+Доступна новая версия %s%s.\nСкачать? (Рекомендуется)
+[No new version available]
+У Вас самая последняя версия
+[Error checking for updates]
+Ошибка проверки новых версий
+[This version of R&&Q is DEPRECATED\nYou are invited to upgrade as soon as possible]
+Эта версия R&&Q устарела\nНастоятельно рекомендуется ее обновить
+[This version of R&&Q is BLOCKED\nYou SHOULD NOT use it, cause it has a serious bug\nPlease upgrade as soon as possible]
+Эта версия R&&Q заблокирована\nВы не должны ее использовать, в ней найдены серьезные ошибки\nОбновите ее!
+[%d - %s is actually offline]
+%d - %s сейчас не в сети
+[%d ? %s is actually online but invisible to you]
+%d - %s сейчас в сети, но невидим для Вас
+########Preferences#######################################
+[Preferences for %s]
+Настройки для %s
+
+####Butons####
+[Apply]
+Применить
+[Reset]
+Сбросить
+[Close]
+Закрыть
+[send]
+Отправить
+[&Ok]
+ОК
+[Ok]
+ОК
+[Cancel]
+Отмена
+[&Abort]
+&Прервать
+[&Ignore]
+&Игнор
+
+
+####Connection####
+[Connection]
+Соединение
+[Auto-reconnect (when connection is lost)]
+Восстанавливать соединение при разрывах
+[Connect on connection available]
+Соединяться при возможности
+[Stop reconnecting after login from another place]
+Не соединяться, если подключились в другом месте
+[Send keep-alive packets each]
+Посылать пакеты для поддержки сети, каждые
+[Show dialog box when disconnected]
+Показывать сообщение при отключении
+[Connection settings]
+Настройки соединения
+[Use proxy]
+Использовать прокси
+[Proxy settings]
+Настройки прокси 
+[Proxy]
+Прокси
+[Name]
+Название
+[Host]
+Адрес
+[Server]
+Сервер
+[authentication]
+Авторизация
+[User]
+Логин
+[Use NTLM autentication]
+Использовать NTLM-аутентификацию
+[Protocol]
+ Протокол 
+[Type]
+Тип
+[Port]
+Порт
+[Use ports for listening]
+Порты соединений
+[Resolve IP]
+Получать IP
+[Save IP]
+Сохранять IP
+####Auto-away####
+[Auto-away]
+Автостатус
+[If you don't use your mouse and your keyboard for a while, you can ask R&Q to set you as "away".]
+R&Q может устанавливать статус <Ушел>, если Вы какое-то время не пользуетесь клавиатурой и мышью.
+[Set me away after i'm not using the pc for]
+Установить статус <Ушел> через
+[Set me N/A after i'm not using the pc for]
+Установить статус <Недоступен> через
+[Auto-exit from auto-away (when i come back to the pc)]
+Статус <Онлайн> при моем возвращении
+[Set me N/A when screensaver started]
+Статус <Недоступен> при запуске заставки или блокировании компьютера
+[Set me N/A when boss-mode is on]
+Статус <Недоступен> в режиме анти-босс
+[Clear XStatus when auto-status is on]
+Убирать Доп.статус когда срабатывает автостатус
+[Set sound volume when auto-status is N/A]
+Специальная громкость для режима <Недоступен>
+[minutes]
+минут
+[Auto-message:]
+Автосообщение:
+
+####Design####
+[Design]
+Внешний вид
+[Common]
+Общее
+[Roaster]
+Контакт-лист
+[Contact list]
+Вид контакт-листа
+[Contact list is always on top]
+Контакт-лист всегда сверху
+[Enable groups]
+Показывать группы
+[Indent contacts in groups]
+Смещать контакты в группах правее
+[Texturized windows]
+Текстуры на окнах
+[Show "i'm visible to" picture flag]
+Выделять контакты, для которых я видим 
+[Show icons]
+Показывать иконки
+[Not authorized]
+Нужна авторизация
+[I'm visible to]
+Виден контакту
+[ICQ client icon]
+Иконки ICQ-клиентов
+[IM icon]
+Иконка программы
+[Birthday baloon]
+Шарики дня рождения
+[Animated open/close groups in contact list]
+Анимированное открытие/закрытие групп в контакт-листе
+[Show unauthorized as offline]
+Считать контакты с неизвестным статусом отключенными.
+[Auto-size up]
+Автоизменения размера КЛ вверх
+[Show UIN-delimiter]
+Показывать разделители номеров
+[Use single click in tray]
+Одиночные щелчки в системном лотке
+[Docking to chat]
+Присоединять к чату
+[Docking contact list to chat]
+Вставлять КЛ в окно чата
+[experimental]
+экспериментально!
+
+[Window title bar]
+Заголовок окна 
+[Contact list window title]
+Заголовок контакт-листа
+[Show close button acting as minimize button]
+Использовать <Закрыть> в качестве <Свернуть>
+[Show border]
+Показывать окантовку
+[Reduce border]
+Уменьшить окантовку
+[Sort contacts]
+ Сортировать контакты 
+[alphabetic]
+по алфавиту
+[by last event time]
+по последнему событию
+[by status]
+по статусу
+[Contact list docking]
+ Пристыковка к краям экрана 
+[docking]
+Да
+[docking+resize]
+Да, и менять размер
+[Snap CL and chat windows to screen edges]
+Пристыковка КЛ и окна чата к краям экрана
+[Contact list italic]
+ Выделять курсивом 
+[For contacts in visible-list]
+Контакты в списке видимости
+[For contacts i'm visible to]
+Контакты, которым я виден
+[Roaster bar]
+ Строка статуса 
+[Filter bar]
+ Строка фильтра
+[Top]
+Вверху
+[Bottom]
+Внизу
+[Off]
+Выкл.
+[Icon blink speed]
+ Частота мигания иконки
+[Blink with status]
+Мигание со статусом
+[Use theme per contacts]
+Использовать персональные темы на контакты
+[Fast]
+Быстро
+[Slow]
+Медленно
+[Example]
+Пример:
+[Auto-size contact list]
+Авторазмер контакт-листа
+[Disabled]
+Выключено
+[Only online]
+Только контакты <В сети>
+[Full list]
+Весь лист
+[Transparency]
+Прозрачность
+[Transparency (works only with Windows XP/2000)]
+ Прозрачность (работает в Win2K+)
+[For contact list]
+Для контакт-листа
+[For chat window]
+Для окна чата
+[Max]
+Макс.
+[Min]
+Мин.
+[opacity when inactive]
+Когда окно неактивно
+[opacity when active]
+Когда окно активно
+[For tray notifications]
+Для всплывающих сообщений
+[opacity]
+Прозрачность
+[Avatars]
+Аватары
+[Show avatars in chat]
+Показывать аватары в окне чата
+[Show avatars in hints]
+Показывать аватары в <Подсказках>
+[Show avatars in tray]
+Показывать аватары во вспл.сообщениях
+[Max avatar size in tips]
+Макс. размер аватар во вспл. сообщениях
+$[ICQ]
+Общие
+
+####Start####
+[Start]
+Запуск
+[End]
+Конец
+[Auto-connect on start]
+Подключаться при запуске
+[Skip splash screen on startup]
+Пропускать начальную заставку
+[Check for read-only files at start]
+Проверять файлы на возможность записи
+[File not exists]
+Файл не существует
+[Start minimized]
+Запускать свернутой в трей
+[Lock on start (hum, to stop your little sister)]
+Блокировать R&&Q при запуске
+[Retrieve offline messages on start]
+Получать офлайн-сообщения при запуске
+[Delete offline messages (from server) on start]
+Удалять принятые офлайн-сообщения с сервера
+[Reopen open chats on start]
+Открывать чаты при запуске
+[Auto start with UIN]
+Запуск с UIN'ом
+[current UIN]
+Текущим
+[Starting status]
+Статус
+[Use last set status]
+Использовать последний выбраный
+[only for the 1st connection]
+Только для первого подключения
+[Starting visibility]
+Видимость
+[Additional users path]
+Дополнительные пути пользователей
+
+####Plugins####
+[Plugins]
+Плагины
+[Found plugins]
+Найденные плагины:
+[Filename]
+Имя файла
+[&Reload]
+Перезагрузить
+[&Preferences]
+Свойства
+
+####Privacy & Security####
+[Privacy & Security]
+Безопасность
+[Dont' save password]
+Не сохранять пароль
+[Clear password after disconnect]
+Очищать пароль при отключении
+[Ask password before exit from  Boss-mode]
+Спрашивать пароль для выхода из режима <Анти-Босс>
+[Set password for account]
+Установить пароль на учетную запись
+[Account password]
+Пароль учетной записи
+[Change account password]
+Cменить пароль
+[Wrong password]
+Неправильный пароль
+[Please enter password]
+Введите пароль
+[Send the "i added you" message when adding contacts]
+Сообщить <Я Вас добавил> при добавлении в контакт-лист
+[My authorization is required before people add me to their lists]
+Требовать авторизацию при добавлении меня в контакт-лист
+[Show client identifier]
+Показывать другим версию клиента
+[Add client capability]
+Добавить подпись клиента
+[Add defined]
+Доб. опред.
+[Webaware (enable status indicators on the web)]
+Webaware (включить веб-индикацию статуса)
+[Warn me when someone uses visibility exploit on me]
+Предупреждать, если кто-то использует проверку моего статуса
+[%s - %s is using visibility exploit to check your online presence]
+%s - %s использует проверку невидимых, чтобы определить ваше присутствие
+[%s - would like to send you file "%s"]
+%s - хочет прислать вам файл "%s"
+[IP address visible for]
+ Показывать мой IP-адрес 
+[My contacts]
+Пользователям из контактов
+[Anyone]
+Всем
+[History encryption]
+Шифрование истории
+[Save MD5 hash instead password]
+Сохранять MD5-хэш вместо самого пароля
+[Make bakup for files before write]
+Делать резервные копии файлов перед записью
+[Add to temporary visible before send message]
+Добавлять к временно видимым до отправки сообщения
+[Login]
+Подключение
+[Simple]
+Обычное
+[MD5]
+Использовать MD5-хэш
+
+####Hotkeys####
+[Hotkeys]
+Горячие клавиши
+[Hotkey]
+Комбинация
+[system-wide]
+Во всей системе
+[WIN key]
+Клавиша "WIN"
+[Action]
+Действие
+[SW]
+Активность
+[Save]
+Сохранить
+[Replace]
+Заменить
+[system-wide hotkeys can be used also when R&Q is in background/hidden]
+Системные комбинации также работают, когда R&Q свернут/спрятан
+[warning: changes can't be canceled]
+Внимание: изменения невозможно отменить
+[Yes]
+Да
+[No]
+Нет
+
+####MACRO OPCODE####
+[Show/hide chat window]
+Показать/спрятать окно чата
+[Show/hide contact list]
+Показать/Спрятать контакт-лист
+[Simulate double-click on tray]
+Двойное нажатие на иконку в системном лотке
+[Clear event]
+Очистить события
+[Clear all events]
+Очистить все события
+[Pop event]
+Высветить сообщение
+[Quit]
+Выход
+[Shutdown the computer]
+Выключить компьютер
+[Show/hide groups]
+Показать/спрятать группы
+[Pop up main menu]
+Показать главное меню
+[Pop up status menu]
+Показать меню статусов
+[Pop up visibility menu]
+Показать меню видимости
+[Open browser]
+Открыть браузер
+[Show/hide offline contacts]
+Показать/спрятать контакты "не в сети"
+[Toggle autosize]
+Включить/выключить авторазмер
+[Show preferences]
+Показать настройки
+[Show contact info]
+Показать личные данные
+[Toggle contact list border]
+Вкл/Выкл границы контакт-листа
+[Contact tip pop up]
+Всплывающие подсказки контактов
+[Simulate double-click on tip message]
+Эмулировать двойное нажатие на сообщении-подсказке
+[Connect]
+Подключиться
+[Play audio cd]
+Играть аудио компакт-диск
+[Stop/eject audio cd]
+Стоп/Вытащить аудио компакт-диск
+[Show 'add by uin' dialog]
+Показать диалог <Добавить по UIN>
+[Show white-pages]
+Показать поиск по <Белым Страницам>
+[Reload theme]
+Перезагрузить тему
+[Reload language]
+Перезагрузить язык
+[Visible to selected contact]
+Виден для выбранного контакта
+[Sound on/off]
+Включить/выключить звук
+[Start play]
+Начать воспроизведение
+[Pause play]
+Приостановить воспроизведение
+[Stop play]
+Остановить воспроизведение
+[Play next track]
+Играть следующий трек
+[Play prev track]
+Играть предыдущий трек
+[Player volume Up]
+Прибавить громкость плеера
+[Player volume Down]
+Убавить громкость плеера
+[Add files to player]
+Добавить файлы в плеер
+[Bosskey]
+Режим <Анти-Босс>
+[Restart R&Q]
+Перезагрузить R&Q
+[test it]
+Тест
+
+####Other####
+[Other]
+Другое
+[Mouse wheel speed:]
+Скорость скрола мыши:
+[lines at time]
+линий за оборот
+[Minimize before hiding contact list]
+Минимизировать перед скрытием контактов
+[Exit confirmation]
+Подтверждение выхода
+[Auto switch keyboard layout]
+Автоматически менять раскладку клавиатуры
+[Play sounds]
+Играть звуки
+[Need bass.dll version %s]
+Нужна bass.dll версии %s
+[Save not-in-list without asking]
+Сохранять контакты <не в списке> без подтверждения
+[Do with not-in-list on exit]
+При выходе из программы, тех кто <не в списке>:
+[save all]
+сохранить все
+[clear all]
+удалить все
+[ask]
+спросить о действии
+[Show tip for contacts]
+Показывать подсказки для контактов
+[Adjust windows position]
+Сохранять позиции окон
+[Consume events when you see them]
+Скрывать события, если Вы их видите
+[Show dialog box when i click on oncoming contact]
+Показывать диалог при нажатии на входящий контакт
+[Auto-hide contact list on inactivity]
+Скрывать контакт-лист через
+[seconds]
+секунд
+[interval]
+Интервал
+[Show the birthday balloon icon to people]
+ Показывать иконку-напоминание о Дне Рождения
+[Never]
+Никогда
+[Always]
+Всегда
+[On my birtday]
+На мой День Рождения
+[On specified date]
+В указанную дату
+[Use server-side contact list (need reconnect)]
+Использовать серверный контакт-лист (СКЛ) (нужно переподключиться)
+[Show invisible status (when use ssi)]
+Показывать, что Вы невидимы (тем кто сможет увидеть, только с СКЛ)
+[Work with local contacts]
+Работать с локальными контактами
+[Web browser]
+ Веб браузер 
+[Default]
+По умолчанию
+[Receiving files path]
+Папка для сохранения файлов
+[About path]
+Переменные
+[Check path]
+Проверить путь
+[You can use this templates:\n%userpath%\n%rnqpath%\n%uid%\n%nick%]
+Вы можете использовать эти переменные:\n%userpath%\n%rnqpath%\n%uid%\n%nick%
+
+####Anti-spam####
+[Anti-spam]
+Антиспам
+[Filter]
+Фильтр
+[Bot]
+Антиспам-бот
+[Number of tryes]
+Количество попыток
+[Answers]
+Ответы
+[Warn me upon filtered messages]
+Сообщать об отфильтрованных сообщениях
+[Ignore messages from people who's not in your list]
+Игнорировать сообщения от тех, кого нет в контакт-листе
+[Ignore pager messages]
+Игнорировать сообщения от пейджера
+[Ignore authorization requests from people who's not in your list]
+Игнорировать запрос на авторизацию от тех, кого нет в контактах
+[Add filtered messages to "0spamers" history]
+Добавлять отфильтрованые сообщения в историю "0spamers"
+[Ignore messages when all the rules apply]
+Игнорировать сообщения, если выполняются ВСЕ следующие правила: 
+[is a multiple-recipient message]
+Сообщение отправлено нескольким адресатам
+[sender is not in my contact list]
+Отправителя нет в контакт-листе
+[history is empty]
+История сообщений пуста
+[the message contains a word from this list:]
+Сообщение содержит слово из этого списка:
+[UIN is greater than]
+UIN больше, чем
+[Enable]
+Включить
+[Use questions]
+Использовать вопросы
+[Question]
+Вопрос
+[Answer]
+Ответ
+
+
+####Ignore list####
+[Enabled]
+Включить
+[Remove]
+Удалить
+
+####Events####
+[Events]
+События
+[Event]
+Событие
+[Triggers]
+Реакции
+[tray notification]
+изменение иконки
+[play sound]
+играть звук
+[open a chat]
+открыть чат
+[add to history]
+добавить в историю
+[save to disk]
+сохранить на диск
+;[show tip]
+;показать подсказку
+[show pop-up message]
+показать всплывающее сообщение
+[pop up chat]
+открыть окно чата
+[flash chat]
+мигание окна чата
+;[show balloon]
+;показать всплывающую подсказку
+[show balloon in tray (Win2K+)]
+показать всплыв. сообщение в сист. лотке (Win2K+)
+[Show balloons tips in tray (Win2K+)]
+Показывать всплывающие подсказки в сист. лотке (Win2K+)
+[multiplicate for message length plus]
+умножить на длину сообщения плюс
+[Simulate 'oncoming' exiting away status]
+Реагировать на выход из <Ушел>, как на появление в сети
+[Ignore oncoming/offgoing events if faster than]
+Игнорировать приход\уход, если чаще, чем
+[Flash chat window on any event]
+При событиях мигать окном чата
+[Focus on chat window popup]
+При открытии чата окно активно
+[Bring info-window foreground]
+Окно информации на передний план
+[Duration]
+Длительность
+[Volume]
+Громкость
+
+####Extra disabling####
+[Extra disabling]
+Отключение событий
+[on status]
+Статус
+[disable]
+Убрать
+[tips]
+подсказки
+[Tips]
+Подсказки
+[blinking]
+мигание
+[sounds]
+звуки
+[Disable events on close groups]
+Отключить события для закрытых групп
+
+####Auto-update####
+[Auto-update]
+Автообновление
+[Auto-check for new versions]
+Автопроверка новых версий
+[Check every]
+Проверять каждый(е)
+[Check every login]
+Проверять при каждом подключении
+[hours]
+час(ов)
+[Check updates for beta-testers]
+Проверка обновлений для бета-тестеров
+[You are running OLD TEST BUILD!\nRun anyway?]
+Вы запускаете устаревшую тестовую сборку!\nВсе равно продолжить?\n(Рекомендуется скачать обновленную версию)
+[Build]
+Сборка
+[Built at]
+Сборка от
+
+####Log####
+[Log]
+Журнал
+[Log packets & events]
+Журнал событий и пакетов
+[Save history on disk]
+Сохранять историю на диск
+[Log packets]
+Записывать пакеты
+[On window]
+В окно
+[On file]
+В файл
+[Clear on start]
+Очищать при запуске
+[Log events]
+Записывать события
+
+####Chat####
+[Style]
+Стиль
+[Chat]
+Чат
+[Auto-copy in clipboard]
+Автокопирование выделенного текста
+[Auto-deselect]
+Снимать автовыделение
+[Single-message by default]
+Одиночные сообщения по умолчанию
+[Close page instead of window on single]
+Закрывать вкладку вместо окна при одиночном сообщении
+[Show contact status on tabs]
+Показывать на вкладках статус контактов
+[Send when i press "ENTER" key %d times]
+Отправлять сообщение при нажатии "Enter" %d раз(а)
+[Place cursor below quoted text]
+Поместить курсор после процитированного текста
+[Quote selected text (if any)]
+Цитировать выбранный текст
+[Font style codes]
+Поддержка тэгов форматирования (* и _)
+[Chat window is always on top]
+Окно чата поверх всех окон
+[Use plugin-panel in center]
+Показывать кнопки плагинов в центре чата
+[Show hints]
+Показывать подсказки
+[Show msg in window with wrap]
+Переносить слова в отдельном окне просмотра
+[Close on send empty string]
+Закрывать при отправке пустой строки
+[Show avatars]
+Показывать аватары
+
+####Themes####
+[Refresh]
+Обновить
+
+####Theme editor####
+[Theme editor]
+Редактор тем
+[Properties]
+Свойства
+[This is a font example]
+Это пример шрифта
+[Size]
+Размер
+
+[Visibility auto check]
+Автопроверка на невидимость
+[Check status every]
+Проверять статус каждые
+[Request status]
+Запрос статуса
+[Select contacts]
+Выбор контактов
+[Select]
+Выбрать
+[Select Invisibility check list]
+Список проверки на невидимость
+[Unselect all]
+Убрать все
+[Permanent menu height]
+Постоянная высота меню
+
+; ################ Countries #################
+[Unspecified]
+Не указано
+[Afghanistan]
+Афганистан
+[Albania]
+Албания
+[Algeria]
+Алжир
+[American Samoa]
+Американская Самоа
+[Andorra]
+Андорра
+[Angola]
+Ангола
+[Anguilla]
+Ангилья
+[Antigua]
+Антигуа
+[Antigua and Barbuda]
+Антигуа и Барбуда
+[Antilles]
+Антильские о-ва
+[Argentina]
+Аргентина
+[Armenia]
+Армения
+[Aruba]
+Аруба
+[Ascension Island]
+О-в Вознесения
+[Australia]
+Австралия
+[Australian Antarctic Territory]
+Австралийская Антарктическая Территория
+[Austria]
+Австрия
+[Azerbaijan]
+Азербайджан
+[Bahamas]
+Багамы
+[Bahrain]
+Бахрейн
+[Bangladesh]
+Бангладеш
+[Barbados]
+Барбадос
+[Barbuda]
+Барбуда
+[Belarus]
+Беларусь
+[Belgium]
+Бельгия
+[Belize]
+Белиз
+[Benin]
+Бенин
+[Bermuda]
+Бермудские о-ва
+[Bhutan]
+Бутан
+[Bolivia]
+Боливия
+[Bosnia and Herzegovina]
+Босния и Герцеговина
+[Botswana]
+Ботсвана
+[Brazil]
+Бразилия
+[British Virgin Islands]
+Британские Виргинские о-ва
+[Brunei]
+Бруней
+[Bulgaria]
+Болгария
+[Burkina Faso]
+Буркина-Фасо
+[Burundi]
+Бурунди
+[Cambodia]
+Камбоджи
+[Cameroon]
+Камерун
+[Canada]
+Канада
+[Canary Islands]
+Канарские о-ва
+[Cape Verde Islands]
+О-ва Зеленого Мыса
+[Cayman Islands]
+Каймановы о-ва
+[Central African Republic]
+Центрально-Африканская Республика
+[Chad]
+Чад
+[Chile]
+Чили
+[Chile, Republic of]
+Республика Чили
+[China]
+Китай
+[Christmas Island]
+О-в Рождества
+[Cocos-Keeling Islands]
+Кокосовые о-ва
+[Cocos (Keeling) Islands]
+Кокосовые о-ва
+[Colombia]
+Колумбия
+[Comoros]
+Коморские о-ва
+[Dem. Rep. of the Congo]
+Демократическая республика Конго
+[Congo]
+Конго
+[Congo, Democratic Republic of (Zaire)]
+Демократическая республика Конго (Заир)
+[Congo, Republic of the]
+Конго
+[Cook Islands]
+О-ва Кука
+[Costa Rica]
+Коста-Рика
+[Cote d'Ivoire (Ivory Coast)]
+Берег Слоновой кости
+[Croatia]
+Хорватия
+[Cuba]
+Куба
+[Cyprus]
+Кипр
+[Czech Republic]
+Чехия
+[Denmark]
+Дания
+[Diego Garcia]
+Диего Гарсия
+[Djibouti]
+Джибути
+[Dominica]
+Доминика
+[Dominican Republic]
+Доминиканская Республика
+[Ecuador]
+Эквадор
+[Egypt]
+Египет
+[El Salvador]
+Сальвадор
+[Equatorial Guinea]
+Экваториальная Гвинея
+[Eritrea]
+Эритрея
+[Estonia]
+Эстония
+[Ethiopia]
+Эфиопия
+[F.Y.R.O.M. (Former Yugoslav Republic of Macedonia)]
+Македония F.Y.R.O.M.
+[Faeroe Islands]
+О-ва Фаэро
+[Falkland Islands]
+Фолклендские о-ва
+[Fiji Islands]
+О-ва Фиджи
+[Fiji]
+Фиджи
+[Finland]
+Финляндия
+[France]
+Франция
+[French Antilles]
+Французские Антильськие о-ва
+[French Guiana]
+Французская Гвиана
+[French Polynesia]
+Французская Полинезия
+[Gabon]
+Габон
+[Gambia]
+Гамбия
+[Georgia]
+Грузия
+[Germany]
+Германия
+[Ghana]
+Гана
+[Gibraltar]
+Гибралтар
+[Greece]
+Греция
+[Greenland]
+Гренландия
+[Grenada]
+Гренада
+[Guadeloupe]
+Гваделупа
+[Guam]
+Гуам
+[Guantanamo Bay]
+Бухта Гватенамо
+[Guam, US Territory of]
+Гуам (США)
+[Guatemala]
+Гватемала
+[Guinea]
+Гвинея
+[Guinea-Bissau]
+Гвинея-Бисау
+[Guyana]
+Гайана
+[Haiti]
+Гаити
+[Honduras]
+Гондурас
+[Hong Kong]
+Гонконг
+[Hungary]
+Венгрия
+[Iceland]
+Исландия
+[India]
+Индия
+[Indonesia]
+Индонезия
+[INMARSAT]
+Океан
+[INMARSAT (Atlantic-East)]
+Океан (Восточная Атлантика)
+[INMARSAT (Pacific)]
+Океан (Тихий океан)
+[INMARSAT (Indian)]
+Океан (Индийский океан)
+[INMARSAT (Atlantic-West)]
+Океан (Западная Атлантика)
+[International Freephone Service]
+Международная услуга Freephone
+[Iran]
+Иран
+[Iran (Islamic Republic of)]
+Иран
+[Iraq]
+Ирак
+[Ireland]
+Ирландия
+[Israel]
+Израиль
+[Italy]
+Италия
+[Ivory Coast]
+Берег Слоновой кости
+[Jamaica]
+Ямайка
+[Japan]
+Япония
+[Jordan]
+Иордания
+[Kazakhstan]
+Казахстан
+[Kenya]
+Кения
+[Kiribati Republic]
+Республика Кирибати
+[Kiribati]
+Кирибати
+[Korea (North)]
+Северная Корея
+[Korea, North]
+Северная Корея
+[Korea (Republic of)]
+Южная Корея
+[Korea, South]
+Южная Корея
+[Kuwait]
+Кувейт
+[Kyrgyz Republic]
+Киргизия
+[Kyrgyzstan]
+Киргизия
+[Laos]
+Лаос
+[Latvia]
+Латвия
+[Lebanon]
+Ливан
+[Lesotho]
+Лесото
+[Liberia]
+Либерия
+[Libya]
+Ливия
+[Libyan Arab Jamahiriya]
+Ливия
+[Liechtenstein]
+Лихтенштейн
+[Lithuania]
+Литва
+[Luxembourg]
+Люксембург
+[Macau]
+Макао
+[Macedonia (F.Y.R.O.M.)]
+Македония
+[Madagascar]
+Мадагаскар
+[Malawi]
+Малави
+[Malaysia]
+Малайзия
+[Maldives]
+Мальдивские о-ва
+[Mali]
+Мали
+[Malta]
+Мальта
+[Marshall Islands]
+Маршалловы о-ва
+[Martinique]
+Мартиника
+[Mauritania]
+Мавритания
+[Mauritius]
+Мавритий
+[Mayotte Island]
+О-в Майотт
+[Mexico]
+Мексика
+[Micronesia, Federated States of]
+Микронезия
+[Moldova]
+Молдова
+[Moldova, Republic of]
+Молдова
+[Monaco]
+Монако
+[Mongolia]
+Монголия
+[Montserrat]
+Монсерат
+[Morocco]
+Марокко
+[Mozambique]
+Мозамбик
+[Myanmar]
+Мьянма
+[Namibia]
+Намибия
+[Nauru]
+Науру
+[Nepal]
+Непал
+[Netherlands]
+Нидерланды
+[Netherlands Antilles]
+Нидерландские Антильские о-ва
+[Nevis]
+Невис
+[New Caledonia]
+Новая Каледония
+[New Zealand]
+Новая Зеландия
+[Nicaragua]
+Никарагуа
+[Niger]
+Нигер
+[Nigeria]
+Нигерия
+[Niue]
+Ниуэ
+[Norfolk Island]
+О-в Норфолк
+[Norway]
+Норвегия
+[Oman]
+Оман
+[Pakistan]
+Пакистан
+[Palau]
+Палау
+[Panama]
+Панама
+[Papua New Guinea]
+Папуа - Новая Гвинея
+[Paraguay]
+Парагвай
+[Peru]
+Перу
+[Philippines]
+Филиппины
+[Poland]
+Польша
+[Portugal]
+Португалия
+[Puerto Rico]
+Пуэртэ-Рико
+[Qatar]
+Катар
+[Reunion Island]
+О-в Реюнион
+[Romania]
+Румыния
+[Rota Island]
+О-в Рота
+[Russia]
+Россия
+[Rwanda]
+Руанда
+[Saint Helena]
+О-в Святой Елены
+[Saint Kitts]
+Сент-Кристофер
+[Saint Kitts and Nevis]
+Сент-Кристофер и Невис
+[Saint Lucia]
+Санта Люсия
+[Saint Pierre and Miquelon]
+Сент-Пьер и Микелон
+[Saint Vincent and the Grenadines]
+Сент-Винсент и Гренадины
+[Saipan Island]
+О-в Сайпан
+[San Marino]
+Сан-Марино
+[Sao Tome and Principe]
+Сан-Томе и Принсипи
+[Saudi Arabia]
+Саудовская Аравия
+[Scotland]
+Шотландия
+[Senegal Republic]
+Сенегал
+[Seychelle Islands]
+Сейшельские о-ва
+[Senegal]
+Сенегал
+[Seychelles]
+Сейшельские о-ва
+[Sierra Leone]
+Сиерра-Леоне
+[Singapore]
+Сингапур
+[Slovak Republic]
+Словакия
+[Slovakia]
+Словакия
+[Slovenia]
+Словения
+[Solomon Islands]
+Соломоновы о-ва
+[Somalia]
+Сомали
+[South Africa]
+Южная Африка
+[Spain]
+Испания
+[Sri Lanka]
+Шри-Ланка
+[St. Helena]
+Св. Елены
+[St. Kitts]
+Св. Китс
+[St. Pierre and Miquelon]
+Сен-Пьер и Микелон
+[St. Vincent and the Grenadines]
+Св. Винсент и Гренадины
+[Sudan]
+Судан
+[Suriname]
+Суринам
+[Swaziland]
+Свазиленд
+[Sweden]
+Швеция
+[Switzerland]
+Швейцария
+[Syria]
+Сирия
+[Taiwan, Republic of China]
+Тайвань
+[Syrian Arab Republic]
+Сирия
+[Taiwan]
+Тайвань
+[Tajikistan]
+Таджикистан
+[Tanzania]
+Танзания
+[Thailand]
+Таиланд
+[Tinian Island]
+О-ов Тиниан
+[Togo]
+Того
+[Tokelau]
+Токелау
+[Tonga]
+Тонга
+[Trinidad and Tobago]
+Тринидад и Тобаго
+[Tunisia]
+Тунис
+[Turkey]
+Турция
+[Turkmenistan]
+Туркменистан
+[Turks and Caicos Islands]
+О-ва Туркс и Кайкос
+[Tuvalu]
+Тувалу
+[Uganda]
+Уганда
+[Ukraine]
+Украина
+[United Arab Emirates]
+ОАЭ
+[United Kingdom]
+Великобритания
+[United States Virgin Islands]
+Вирджинские о-ва США
+[Uruguay]
+Уругвай
+[USA]
+США
+[Uzbekistan]
+Узбекистан
+[Vanuatu]
+Вануату
+[Vatican City]
+Ватикан
+[Venezuela]
+Венесуэла
+[Vietnam]
+Вьетнам
+[Virgin Islands (USA)]
+Вирджинские о-ва (США)
+[Wales]
+Уэльс
+[Wallis and Futuna Islands]
+О-ва Валис и Футуна
+[Western Samoa]
+Самоа
+[Yemen]
+Йемен
+[Yugoslavia]
+Югославия
+[Yugoslavia - Serbia]
+Сербия
+[Yugoslavia - Montenegro]
+Черногория
+[Zambia]
+Замбия
+[Zimbabwe]
+Зимбабве
+
+; Sex
+
+[Male]
+Мужской
+[Female]
+Женский
+
+; Age
+
+[Not specified]
+Не указан
+[Birthday]
+День рождения
+[Age]
+Возраст
+
+; Lang
+
+
+[Afrikaans]
+Африканский
+[Albanian]
+Албанский
+[Arabic]
+Арабский
+[Armenian]
+Армянский
+[Azerbaijani]
+Азербайджанский
+[Belorussian]
+Белорусский
+[Bhojpuri]
+Бойпури
+[Bosnian]
+Боснийский
+[Bulgarian]
+Болгарский
+[Burmese]
+Бирмантский
+[Cantonese]
+Кантонский
+[Catalan]
+Каталанский
+[Chamorro]
+Чаморо
+[Chinese]
+Китайский
+[Croatian]
+Хорватский
+[Czech]
+Чешский
+[Danish]
+Датский
+[Dutch]
+Голландский
+[English]
+Английский
+[Esperanto]
+Эсперанто
+[Estonian]
+Эстонский
+[Farci]
+Фарси
+[Farsi]
+Фарси
+[Finnish]
+Финский
+[French]
+Французский
+[Gaelic]
+Гельский
+[German]
+Немецкий
+[Greek]
+Греческий
+[Gujarati]
+Гуджаратский
+[Hebrew]
+Иврит
+[Hindi]
+Хинди
+[Hungarian]
+Венгерский
+[Icelandic]
+Исландский
+[Indonesian]
+Индонезийский
+[Italian]
+Итальянский
+[Japanese]
+Японский
+[Khmer]
+Кхмерский
+[Korean]
+Корейский
+[Kurdish]
+Курдский
+[Lao]
+Лаосский
+[Latvian]
+Латвийский
+[Lithuanian]
+Литовский
+[Macedonian]
+Македонский
+[Malay]
+Малайский
+[Mandarin]
+Мандарин
+[Mongolian]
+Монгольский
+[Norwegian]
+Норвежский
+[Persian]
+Персидский
+[Polish]
+Польский
+[Portuguese]
+Португальский
+[Punjabi]
+Панджабский
+[Romanian]
+Румынский
+[Russian]
+Русский
+[Serbo-Croatian]
+Сербо-Хорватский
+[Sindhi]
+Синдхи
+[Slovak]
+Словацкий
+[Slovenian]
+Словенский
+[Somali]
+Сомали
+[Spanish]
+Испанский
+[Swahili]
+Суахили
+[Swedish]
+Шведский
+[Tagalog]
+Тагалогский
+[Taiwaness]
+Тайванский
+[Tamil]
+Тамильский
+[Tatar]
+Татарский
+[Thai]
+Тайский
+[Taiwanese]
+Тайванский
+[Turkish]
+Турецкий
+[Ukrainian]
+Украинский
+[Urdu]
+Урду
+[Vietnamese]
+Вьетнамский
+[Welsh]
+Уэльсский
+[Yiddish]
+Идиш
+[Yoruba]
+Йоруба
+
+; Интересы
+[Art]
+Искусство
+[Cars]
+Автомобили
+[Celebrity Fans]
+Фан-клуб
+[Collections]
+Коллекционирование
+[Computers]
+Компьютеры
+[Culture & Literature]
+Культура и литература
+[Fitness]
+Фитнесс
+[Hobbies]
+Хобби
+[ICQ - Providing Help]
+ICQ-помощь
+[Lifestyle]
+Стиль жизни
+[Movies/TV]
+Кино/ТВ
+[Outdoor Activities]
+Гражданская активность
+[Parenting]
+Воспитание детей
+[Pets/Animals]
+Животные
+[Religion]
+Религия
+[Science/Technology]
+Наука/Технология
+[Skills]
+Профессии
+[Sports]
+Спорт
+[Web Design]
+Веб-дизайн
+[Nature and Environment]
+Природа
+[News & Media]
+Новости и медиа
+[Government]
+Органы власти
+[Business & Economy]
+Бизнес и экономика
+[Mystics]
+Мистика
+[Travel]
+Путешествия
+[Astronomy]
+Астрономия
+[Space]
+Космос
+[Clothing]
+Одежда
+[Parties]
+Вечеринки
+[Women]
+Женщины
+[Social science]
+Общественные науки
+[50's]
+50-тые
+[60's]
+60-тые
+[70's]
+70-тые
+[80's]
+80-тые
+[Finance and corporate]
+Финансы и управление
+[Entertainment]
+Развлечения
+[Consumer electronics]
+Бытовая электроника
+[Retail stores]
+Розничные магазины
+[Health and beauty]
+Здоровье и красота
+[Media]
+СМИ
+[Household products]
+Домохозяйство
+[Mail order catalog]
+Каталог товаров почтой
+[Business services]
+Бизнес услуги
+[Audio and visual]
+Аудио и видео
+[Sporting and athletic]
+Спорт и атлетика
+[Publishing]
+Издательство
+[Home automation]
+Домашняя автоматика
+
+[Marital status not specified]
+Не установлено
+[User is single]
+Одинок(-ая)
+[User is in a long-term relationship]
+Долгие отношения
+[User is engaged]
+Занят
+[User is married]
+Женат(замужем)
+[User is divorced]
+Разведен
+[User is separated]
+Разошлись
+[User is widowed]
+Вдовец(вдова)
+
+
+[Privacy]
+Личное
+[Share details]
+Показывать детали
+[Only contacts]
+Только контактам
+[Share E-Mail and phone only with contacts. The rest with everybody]
+Показывать E-Mail и телефон только контактам. Остальное всем.
+[Everybody]
+Всем
+
+######################################################################
+
+[View SSI]
+Просмотр SSI
+[Server side information]
+Информация хранимая на сервере
+[Server side]
+Хранится на сервере
+[Load from file]
+Загрузить из файла
+[Fill tree]
+Заполнить дерево
+[Load SSI from server]
+Загрузить SSI с сервера
+[List Item]
+Элемент списка
+[Alias]
+Отображать
+[Note]
+Заметка
+[Ext]
+Доп.
+[Auth]
+Авторизация
+[Extended data hex view]
+Нераспознаное
+[Delete item]
+Удалить элемент
+[Selected Item Hex View]
+Шестнадцатиричный вид нераспознанных данных
+
+[default Theme for R&Q]
+Тема по умолчанию для R&Q
+
+[msg]
+Сообщение
+[Message]
+Сообщение
+[URL]
+URL
+[file]
+файл
+[File]
+Файл
+[authreq]
+запрос авторизации
+[Authorization request]
+Запрос авторизации
+[addedyou]
+Добавили Вас
+[oncoming]
+появление
+[offgoing]
+уход
+[Oncoming]
+Появление
+[Offgoing]
+Уход
+;[auth]
+;Авторизация
+[Authorization given]
+Авторизация
+;[authdenied]
+;Отказ в авторизации
+[Authorization denied]
+Отказ в авторизации
+;[statuschange]
+;Изменение статуса
+[Status changed]
+Изменение статуса
+;[automsgreq]
+;Автосообщение (авторизация)
+[Auto-message request]
+Запрос автосообщения
+[Green-card]
+Открытка
+[automsg]
+Автосообщение
+[sent you an URL]
+прислал URL
+[Begin typing]
+Начал печатать
+[Finish typing]
+Закончил печатать
+[XStatus message]
+Сообщение доп-статуса
+[XStatus request]
+Запрос доп-статуса
+[Sent you contacts]
+Прислал вам контакты
+[Sent you file]
+Прислал вам файл
+[Do you want to accept file "%s" from %s?]
+Вы хотите принять файл "%s" от %s?
+[denied authorization]
+отказал(а) в авторизации
+[Requested your auto-message]
+Запросил(а) автосообщение
+[Requested your XStatus]
+Запросил(а) доп. статус
+[Sent you a greeting card]
+Прислал вам открытку
+#[auto-message]
+#автосообщение
+[xstatusmsg]
+Сообщение доп. статуса
+[xstatusreq]
+запрос доп. статуса
+[Yes to &All]
+Да для всех
+[This action might make you visible to the contact.\nDo you want to continue?]
+Это может сделать вас видимым для контакта.\nПродолжить?
+
+[Submit interests with info]
+Сохранять интересы при сохранении деталей
+[Send UTF-8 support]
+Поддержка кодировки UTF-8
+[Send UTF-8 messages]
+Посылать сообщения в UTF-8
+[Send messages with advanced method]
+Посылка сообщений в расширенном виде
+[Encrypt messages]
+Шифровать сообщения
+[%s is typing a message]
+%s печатает Вам
+[Typing Notification]
+Оповещение о наборе текста
+[Typing Notification (after reconnect)]
+Оповещение о наборе текста (изменения после подключения)
+[Send Typing]
+Сообщать, что я пишу сообщение
+[Typing idle interval]
+Интервал неактивности
+[Support invisibility check]
+Поддержка проверки невидимых
+[Check when send offline]
+Проверять при отправке сообщения
+[Check when go offline]
+Проверять уходящих
+[Show message about offline]
+Сообщать, что контакт отсутствует
+[Method]
+Метод проверки
+[Method 1 (old)]
+Метод 1 (старый)
+[Method 2 (new)]
+Метод 2 (новый)
+[Support avatars]
+Поддержка аватар
+[Auto load avatars]
+Автоматически загружать аватары
+[Auto get flash-avatars]
+Загружать флэш-аватары
+[Auto request XStatus]
+Автозапрос доп. статуса
+[Support XMPP contacts]
+Поддержка XMPP контактов
+[Use old XStatus]
+Использовать старые доп. статусы
+[History utilities]
+Управление историей
+[Thanks to Basenko Andrey for this functions!\n e-mail: and-basenko@yandex.ru\nICQ UIN: 74835516]
+Спасибо Басенко Андрею за эти функции!\n e-mail: and-basenko@yandex.ru\nICQ UIN: 74835516
+[Select contact whom to add history]
+Выбрать контакт, которому добавить в историю
+[Add history from another clients]
+Добавить историю из других клиентов
+[Add history from one contact to another]
+Добавить историю одного контакта другому
+[Please close all chat pages!]
+Пожалуйста, закройте все активные чаты!
+[Close all chats?]
+Закрыть все чаты?
+[Are you sure you want to delete %s from your list?]
+Действительно удалить %s???
+[Are you sure you want to delete %s from your list with his history?]
+Действительно удалить %s вместе с историей разговоров?
+[Send file]
+Отправить файл
+[Send pics]
+Отправить рисунок
+[Send message with simple method]
+Посылка сообщений простым методом
+[You have some not-in-list contact.\nDo you want to see them next time?]
+Некоторые из ваших контактов не сохранены в контакт-листе.\nВы хотите их видеть в следующий раз?
+[Your message is too long. Max %d characters.\n\n                       Split the message?]
+Слишком длинное сообщение. Макс. количество символов: %d.\n\n                       Разбить сообщение?
+[To antispam]
+В антиспам
+[XStatus]
+Доп. статус
+[Old XStatus "%s"]
+Старый доп.статус "%s"
+[Show XStatus icons]
+Показывать иконки доп. статуса
+[Show XStatus buttons in menus]
+Показывать доп. статус в меню выбора статуса
+[Show XStatus as main status]
+Использовать доп. статус как основной
+[Show new XStatuses]
+Показывать новые доп. статусы
+[Extended drawing menu]
+Меню с улучшенной прорисовкой
+[Use system default codepage for clipboard]
+Использовать системную кодовую страницу по умолчанию
+[Select directory with history]
+Выберите папку с историей
+[Syncronize CL with Server]
+Синхронизировать контакты с сервером
+[Send multiple]
+Отправка списком
+[Contacts selected: %d/%d]
+Выбрано: %d из %d контактов
+[Delete this uin-list]
+Удалить этот список
+[Remove the uin-list from the selected]
+Удалить список из отмеченных
+[Add the uin-list to the selected]
+Добавить список к отмеченным
+[Save selected as a uin-list]
+Сохранить отмеченные как список
+[ -no info]
+- нет информации
+[ -newer info available on server]
+- на сервере есть более новая информация
+[Internal IP]
+Внутренний IP-адрес
+
+[Automatically load playlist on player startup]
+Автоматически загружать список при открытии
+[Options]
+Настройки
+[Equalaizer]
+Эквалайзер
+[Delete from playlist]
+Удалить из списка
+[Clear playlist]
+Очистить список
+[Save playlist]
+Сохранить список
+[Load PlayList]
+Загрузить список
+[Add to Playlist]
+Добавить в список
+[Repeat One]
+Повторять дорожку
+[Repeat All]
+Повторять все
+[Random Track]
+В случайном порядке
+[Play List]
+Список
+[Next]
+Следующий
+[prev]
+Предыдущий
+[stop]
+Стоп
+[&Stop]
+Стоп
+[S&top]
+Стоп
+[pause]
+Пауза
+[play]
+Играть
+[%s asks to add you to his/her contact list.]
+%s просит добавить Вас в свои контакты
+[authorization request]
+Запрос авторизации
+[No with &Reason]
+Отказ с причиной
+[&Authorize]
+Авторизовать
+[Close this window after reply]
+Закрыть окно после ответа
+[Convert history from Jimm to &&RQ]
+Конвертировать историю из Jimm в R&&Q
+[Convert history from Jimm to R&&Q]
+Конвертировать историю из Jimm в R&&Q
+
+# Tips
+[Max count of tips]
+Максимальное кол-во вспл. сообщений
+[Tips disabled]
+Вспл. сообщения отключены
+[Space between tips, pixels]
+Расстояние между вспл. сообщениями, пиксели
+[Space between tips]
+Расстояние между вспл. сообщениями
+[pixels]
+пиксели
+[Corner]
+Угол
+[Bottom Right]
+Нижний Правый
+[Bottom Left]
+Нижний Левый
+[Top Left]
+Верхний Левый
+[Top Right]
+Верхний Правый
+[Indent]
+Отступ
+[Horizontal]
+По горизонтали
+[Vertical]
+По вертикали
+[Select file with history]
+Выбрать файл с историей
+[Repair history]
+Обновить историю
+[Show balloons]
+Показывать всплывающие сообщения в сист. лотке
+[Security]
+Безопасность
+[Add traffic]
+Добавить трафик
+[in opened tabs]
+В открытых вкладках
+[in all contacts]
+Во всех контактах
+[Send track]
+Отправить информацию о дорожке
+[Rewind]
+Перемотать
+[Left mouse button - refresh weather. Right mouse button - menu.]
+Левая кнопка мыши - обновить погоду. Правая кнопка мыши - меню.
+[Client capabilities]
+Возможности клиента:
+[Invalid UIN]
+Неверный номер
+[Error]
+Ошибка
+[Information]
+Информация
+[Warning]
+Внимание
+[Confirm]
+Подтвердите
+[&Yes]
+&Да
+[&Yes (%d)]
+&Да (%d)
+[&No]
+&Нет
+[&No (%d)]
+&Нет (%d)
+[Cancel (%d)]
+Отмена (%d)
+[This feature isn't available yet.\nCome back tomorrow...]
+Эта возможность пока не реализована. Ждите новых версий...
+[You have to select a user to delete it]
+Вы должны выбрать пользователя, чтобы удалить его.
+[Change password]
+Сменить пароль
+[Current password]
+Текущий пароль
+[Remember password]
+Запомнить пароль
+[New password]
+Новый пароль
+[Re-type the new password]
+Повторите новый пароль
+[Save new password]
+Сохр. новый пароль
+[uin-list]
+UIN-лист
+[Has avatar]
+Есть аватар
+[&Request avatar]
+Запрос аватара
+[Open chat]
+Чат с контактом
+[Not in list %s]
+Не в списке %s
+[not in list]
+не в списке
+[&Help]
+Помощь
+[miniguide.html]
+MiniguideRus.html
+
+[from %s]
+От %s
+
+[Add ALL contacts to the list]
+Добавить всех в контакт-лист
+[pause play]
+Пауза
+[stop play]
+Остановить
+[bosskey]
+Режим босса
+
+[Use EQ]
+Включить
+[Load preset]
+Загрузить
+[Reset EQ]
+Сбросить
+
+[Disconnected]
+Рассоединен
+
+[Can't load file: %s]
+Не получилось загрузить файл: %s
+[Can't load file from stream: %s]
+Не получилось загрузить файл из потока: %s
+[Couldn't load avatar for %s]
+Не получилось загрузить аватар для %s
+[%s has flash avatar, but it not auto-loaded]
+У %s есть flash-аватар, но он не загрузился автоматически
+[%s has avatar of unsupported type]
+У %s аватар неизвестного типа
+
+# Антиспам
+[Your message has been blocked for antispam reason.]
+Your message has been blocked for antispam guard.\nВаше сообщение заблокировано фильтром антиспама.
+[You entered invalid code. Try again.]
+You entered invalid code. Try again.\nВы ввели неверный код. Попробуйте еще раз.
+[Confirmation accepted. Your message recieved. Thank you.]
+Confirmation accepted. Your message recieved. Thank you.\nКод принят. Ваше сообщение получено. Спасибо.
+[You failed antispam verification. You have no attemts. Your UIN (%uin%) is ignored.]
+You failed antispam verification. You have no attemts. Your UIN (%uin%) is ignored.\nВы не прошли антиспам-фильтр. У вас не осталось попыток. Ваш UIN (%uin%) игнорируется.
+[Please, type digital CODE which you can see below (3 digits).]
+Please, type digital CODE which you can see below (3 digits).\nПожалуйста, введите цифровой КОД, который вы видите ниже (3 цифры).
+[You have attempts: %attempt%.]
+You have attempts: %attempt%.\nОсталось попыток: %attempt%.
+[Please, type answer on question which you can see below.]
+Пожалуйста напишите ответ на вопрос, который вы видите ниже.
+
+# Ошибки
+#### Errors ####
+[Error initializing audio!]
+Ошибка инициализации звука!
+[Error loading HOOK.DLL\nSome features won't work]
+Ошибка при загрузке HOOK.DLL\nНекоторые функции не будут работать
+[Some files are read-only, so R&&Q can't start]
+Некоторые файлы не доступны для записи, потому R&&Q не может запуститься
+[Directory "%s" does not exist. Do you want to create it?]
+Каталога "%s" не существует. Хотите создать?
+[Can't write to file: "%s"]
+Не получилось записать файл: "%s"
+[Coudn't append file %s]
+Невозможно дописать в файл %s
+[Can't find theme %s]
+Не могу найти тему %s
+[Theme not selected]
+Не выбрана тема
+
+[Not found this theme's description. Make Refresh-List.]
+Не найдено описание темы. Обновите список тем.
+[This file is too big]
+Этот файл слишком большой
+[PROXY: Unknown reply\n%s]
+Прокси: Неизвестный ответ\n%s
+[PROXY: Unknown reply\n%d\n%s]
+Прокси: Неизвестный ответ\n%d\n%s
+[Disconnected\n[%d]\n%s]
+Отключены от сервера\n[%d]\n%s
+[Disconnected\n[%d]]
+Отключены от сервера\n[%d]
+[Server is sick, wait 2 seconds and try again]
+Сервер занят, ждите 2 сек. и пробуйте снова
+[Server says you're reconnecting too fastly, try later or change user.]
+Вы соединяетесь слишком часто - попробуйте позже.
+[Cannot connect\n[%d]\n%s]
+Не могу соединиться\n[%d]\n%s
+[Cannot connect\n[%d]]
+Не могу соединиться\n[%d]
+[Unknown error]
+Неизвестная ошибка
+[Your uin is not correct]
+Ваш UIN не корректен
+[Missing password]
+Отсутствует пароль
+[Your current UIN is used by someone else right now, server disconnected you]
+Ваш UIN используется кем-то ещё - сервер Вас отсоединил
+[Server disconnected]
+Сервер отключился
+[Wrong password, correct it and try again]
+Неправильный пароль - внимательно введите его,\nобращая внимание на раскладку,\nи пробуйте ещё.\nЕсли пароль больше 8 символов, вводите только первые 8.
+[Cannot change password]
+Не получается поменять пароль
+[Queried contact is invalid]
+Запрошеный контакт неправильный
+[can't directly connect]
+Не получается соединиться напрямую
+[can't directly connect\n[%d]\n%s]
+Не получается соединиться напрямую\n[%d]\n%s
+[proxy: error]
+Ошибка прокси
+[PROXY: Invalid user/password]
+Прокси: Неправильный пароль или имя пользователя
+[PROXY: Unknown reply\n[%d]\n%s]
+Прокси: Неизвестная ошибка\n[%d]\n%s
+[This picture format is not supported]
+Формат этой картинки не поддерживается
+
+[Error saving uinlists]
+Ошибка сохранения UIN-листов
+[Select contacts to ignore]
+Выберите контакты для игнорирования
+[Error. Can't create directory!]
+Ошибка. Нельзя создать папку!
+
+[Images]
+Изображения
+[Draft]
+Эскиз
+
+[Credits >]
+Благодарности
+[< About]
+О программе
+
+
+[Width]
+Ширина
+[Height]
+Высота
+
+[SET]
+Установить
+
+[days]
+дней
+
+[Use the forum for support or to contact us]
+Используйте форум, чтобы связаться с нами
+
+[none]
+Нет
+[lock]
+заблокировать

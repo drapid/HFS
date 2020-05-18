@@ -73,7 +73,11 @@ type
     function getHashFor(fn:string):string;
     end;
 
-  TstringToIntHash = class(ThashedStringList)
+  Tint2int = Tdictionary<integer,integer>;
+  Tstr2str = Tdictionary<string,string>;
+  Tstr2pointer = Tdictionary<string,pointer>;
+
+  TstringToIntHash = class(ThashedStringList)
     constructor create;
     function getInt(s:string):integer;
     function getIntByIdx(idx:integer):integer;
@@ -88,17 +92,20 @@ type
     ts: Tdatetime;
     end;
 
+  Tstr2section = Tdictionary<string,PtplSection>;
+
   Ttpl = class
   protected
 //    src: RawByteString;
     srcU: String;
-    lastExt,   // cache for getTxtByExt()
-    last: record section:string; idx:integer; end; // cache for getIdx()
+//    lastExt,   // cache for getTxtByExt()
+//    last: record section:string; idx:integer; end; // cache for getIdx()
     fileExts: TStringDynArray;
     strTable: THashedStringList;
-    fUTF8: boolean;
+//    fUTF8: boolean;
     fOver: Ttpl;
-    function  getIdx(section:string):integer;
+//    sections: array of TtplSection;
+    sections: Tstr2section;
     function  getTxt(section:string):string;
     function  newSection(section:string):PtplSection;
     procedure fromString(txt: String);
@@ -106,20 +113,19 @@ type
     procedure fromRaw(txt: RawByteString);
     function  toRaw: RawByteString;
     procedure setOver(v:Ttpl);
-    procedure updateUTF8();
+    procedure clear();
   public
     onChange: TNotifyEvent;
-    sections: array of TtplSection;
     constructor create(txt: RawByteString=''; over:Ttpl=NIL);
     destructor Destroy; override;
     property txt[section:string]:string read getTxt; default;
     property fullText: RawByteString read toRaw write fromRaw;
     property fullTextS: String read toS write fromString;
-    property utf8:boolean read fUTF8;
+//    property utf8:boolean read fUTF8;
     property over:Ttpl read fOver write setOver;
     function sectionExist(section:string):boolean;
     function getTxtByExt(fileExt:string):string;
-    function getSection(section:string):PtplSection;
+    function getSection(section:string; inherit:boolean=TRUE):PtplSection;
     function getSections():TStringDynArray;
     procedure appendString(txt: String);
     function getStrByID(id:string):string;
@@ -169,7 +175,7 @@ type
   Tsession = class
     vars: THashedStringList;
     created, ttl, expires: Tdatetime;
-    user: String;
+    user, ip, redirect: String;
     procedure setVar(k, v:string);
     function getVar(k: String):string;
     class function getNewSID():string;
@@ -178,6 +184,7 @@ type
     constructor create(const sid: TSessionId='');
     destructor Destroy; override;
     procedure keepAlive();
+    procedure setTTL(t:Tdatetime);
     property v[k: TSessionId]: String read getVar write setVar;
    end;
 
@@ -187,8 +194,9 @@ type
     constructor create;
     destructor Destroy; override;
     procedure clearSession(sId: TSessionId);
+    procedure destroySession(sId: TSessionId);
     function  getSession: Tsession; OverLoad;
-    function  initNewSession: TSessionId;
+    function  initNewSession(peerIp: String = ''): TSessionId;
     function  getSession(sId: TSessionId): Tsession; OverLoad;
     function  noSession(sId: TSessionId): Boolean;
     procedure keepAlive(sId: TSessionId);
@@ -199,6 +207,8 @@ type
   ThashFunc = function(s:string):string;
 
   TconnDataMain = class  // data associated to a client connection
+  public
+    class function getSafeHost(cd:TconnDataMain):string;
   public
     address: string;   // this is address shown in the log, and it is not necessarily the same as the socket address
     time: Tdatetime;  // connection start time
@@ -511,13 +521,14 @@ end; // autoupdatedFiles_getCounter
 
 constructor Ttpl.create(txt: RawByteString=''; over:Ttpl=NIL);
 begin
+sections:=Tstr2section.Create();
 fullText:=txt;
 self.over:=over;
 end;
 
 destructor Ttpl.destroy;
 begin
-freeAndNIL(strTable);
+fullText:=''; // this will cause the disposing
 inherited;
 end; // destroy
 
@@ -533,124 +544,66 @@ if (result = '') and assigned(over) then
   result:=over.getStrByID(id)
 end; // getStrByID
 
-function Ttpl.getIdx(section:string):integer;
-begin
-if section <> last.section then
-  begin
-  last.section:=section;
-  for result:=0 to length(sections)-1 do
-    if sameText(sections[result].name, section) then
-      begin
-      last.idx:=result;
-      exit;
-      end;
-  last.idx:=-1;
-  end;
-result:=last.idx
-end; // getIdx
-
 function Ttpl.newSection(section:string):PtplSection;
-var
-  i: integer;
 begin
-// add
-i:=length(sections);
-setLength(sections, i+1);
-result:=@sections[i];
+new(result);
+sections.Add(section, result);
 result.name:=section;
-// getIdx just filled 'last' with not-found, so we must update
-last.section:=section;
-last.idx:=i;
-// manage file.EXT sections
-if not ansiStartsText('file.', section) then exit;
-i:=length(fileExts);
-setLength(fileExts, i+2);
-delete(section, 1, 4);
-fileExts[i]:=section;
-fileExts[i+1] := unUtf(str_(last.idx));
-lastExt.section:=section;
-lastExt.idx:=last.idx;
 end; // newSection
 
 function Ttpl.sectionExist(section:string):boolean;
 begin
-result:=getIdx(section)>=0;
+result:=assigned(getSection(section));
 if not result and assigned(over) then
   result:=over.sectionExist(section);
 end;
 
-function Ttpl.getSection(section:string):PtplSection;
-var
-  i: integer;
+function Ttpl.getSection(section:string; inherit:boolean=TRUE):PtplSection;
 begin
-result:=NIL;
-i:=getIdx(section);
-if i >= 0 then result:=@sections[i];
-if assigned(over) and ((result = NIL) or (trim(result.txt) = '')) then
+  result:=NIL;
+  if not sections.TryGetValue(section, result) then
+     result:=NIL;
+if inherit and assigned(over) and ((result = NIL) or (trim(result.txt) = '')) then
   result:=over.getSection(section);
 end; // getSection
 
 function Ttpl.getTxt(section:string):string;
 var
-  i: integer;
+  s: PTplSection;
 begin
-i:=getIdx(section);
-if i >= 0 then
-  result:=sections[i].txt
-else if assigned(over) then
-  result:=over[section]
+  s := getSection(section);
+if s <> NIL then
+  result:=s.txt
 else
   result:=''
 end; // getTxt
 
 function Ttpl.getTxtByExt(fileExt:string):string;
+begin result:=getTxt('file.'+fileExt) end;
+
+procedure Ttpl.clear();
 var
-  i: integer;
+  p: PtplSection;
 begin
-  result := '';
-  if (lastExt.section > '') and (fileExt = lastExt.section) then
-    begin
-      if lastExt.idx >= 0 then
-        result := sections[lastExt.idx].txt;
-      exit;
-    end;
-  i := idxOf(fileExt, fileExts);
-  if (i < 0) and assigned(over) then
-    begin
-      result := over.getTxtByExt(fileExt);
-      if result > '' then
-        exit;
-    end;
-  lastExt.section := fileExt;
-  lastExt.idx := i;
-  if i < 0 then
-    exit;
-  i := int_(StrToUTF8(fileExts[i+1]));
-  lastExt.idx := i;
-  result := sections[i].txt;
-end; // getTxtByExt
+  srcU := '';
+  for p in sections.values do
+    dispose(p);
+  sections.clear();
+  freeAndNIL(strTable);  // mod by mars
+end;
 
 procedure Ttpl.fromRaw(txt: RawByteString);
 var
   s: String;
 begin
-  srcU := '';
-  sections := NIL;
-  fileExts := NIL;
-  last.section := #255'null'; // '' is a valid (and often used) section name. This is a better null value.
-  freeAndNIL(strTable);  // mod by mars
-
+  clear;
   s := unUTF(txt);
   appendString(s);
 end; // fromString
 
 procedure Ttpl.fromString(txt: String);
 begin
-  srcU := '';
-  sections := NIL;
-  fileExts := NIL;
-  last.section := #255'null'; // '' is a valid (and often used) section name. This is a better null value.
-  freeAndNIL(strTable);  // mod by mars
+  clear;
 
   appendString(txt);
 end; // fromString
@@ -736,20 +689,17 @@ var
   for i:=0 to length(ss)-1 do
     begin
     s:=trim(ss[i]);
-    si:=getIdx(s);
+    sect:=getSection(s, FALSE);
     from:=NIL;
-    if si < 0 then // not found
+    if sect = NIL then // not found
       begin
       if append then
         from:=getSection(s);
       sect:=newSection(s);
       end
     else
-      begin
-      sect:=@sections[si];
       if append then
         from:=sect;
-      end;
     if from<>NIL then
       begin // inherit from it
       sect.txt:=from.txt+base.txt;
@@ -787,7 +737,6 @@ first:=TRUE;
   ptxt:=succ(ansiStrPos(bos, #10)); // get to the end of line (and then beyond)
   first:=FALSE;
   until ptxt = NIL;
-updateUTF8();
 if assigned(onChange) then
   onChange(self);
 end; // appendString
@@ -795,23 +744,10 @@ end; // appendString
 procedure Ttpl.setOver(v: Ttpl);
 begin
 fOver:=v;
-updateUTF8();
 end; // setOver
 
-procedure Ttpl.updateUTF8();
-begin
-  fUTF8 := assigned(over) and over.utf8 or utf8test(fullText)
-end;
-
 function Ttpl.getSections():TStringDynArray;
-var
-  i: integer;
-begin
-i:=length(sections);
-setLength(result, i);
-for i:=0 to i-1 do
-  result[i]:=sections[i].name;
-end;
+begin result:=sections.Keys.ToArray() end;
 
 function Ttpl.me():Ttpl;
 begin result:=self end;
@@ -927,9 +863,11 @@ begin expires:=now() + ttl end;
 
 function Tsession.getVar(k:string):string;
 begin
+  Result := '';
   if vars = NIL then
-    Result := ''
+    Exit
    else
+     if vars.IndexOfName(k) >= 0 then
 try result:=vars.values[k];
 except result:=''
   end;
@@ -940,6 +878,12 @@ begin
 if vars= NIL then
   vars:=THashedStringList.create;
 vars.addPair(k,v);
+end;
+
+procedure Tsession.setTTL(t:Tdatetime);
+begin
+ttl:=t;
+keepAlive();
 end;
 
 constructor Tsessions.create;
@@ -954,7 +898,8 @@ end;
 
 function Tsessions.getSession(sId: String): Tsession;
 begin
-  Result := fS.Items[sId];
+  if not fS.TryGetValue(sId, Result) then
+    Result := NIL;
 end;
 
 function Tsessions.getSession: Tsession;
@@ -963,17 +908,30 @@ begin
   fS.Add(result.id, result);
 end;
 
-function Tsessions.initNewSession: TSessionId;
+function Tsessions.initNewSession(peerIp: String = ''): TSessionId;
 var
   s: Tsession;
 begin
   s := getSession;
   Result := s.id;
+  s.ip := peerIp;
 end;
 
 procedure Tsessions.clearSession(sId: TSessionId);
 begin
   fS.Remove(sId);
+end;
+
+procedure Tsessions.destroySession(sId: TSessionId);
+var
+  s: Tsession;
+begin
+  s := getSession(sId);
+  if Assigned(s) then
+    begin
+      fS.Remove(sId);
+      s.free;
+    end;
 end;
 
 function Tsessions.noSession(sId: TSessionId): Boolean;
@@ -1045,12 +1003,24 @@ end;
 
 procedure TconnDataMain.logout();
 begin
-  sessions.clearSession(sessionID);
+  sessions.destroySession(sessionID);
   usr:='';
   pwd:='';
   account := NIL;
   conn.delCookie(SESSION_COOKIE);
 end; // logout
+
+class function TconnDataMain.getSafeHost(cd:TconnDataMain):string;
+begin
+result:='';
+if cd = NIL then exit;
+if addressmatch(forwardedMask, cd.conn.address) then
+  result:=cd.conn.getHeader('x-forwarded-host');
+if result = '' then
+  result:=cd.conn.getHeader('host');
+result:=stripChars(result, ['0'..'9','a'..'z','A'..'Z',':','.','-','_'], TRUE);
+end; // getSafeHost
+
 
 
 end.

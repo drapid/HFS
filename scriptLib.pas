@@ -1695,7 +1695,7 @@ var
     begin
     usr:=md.cd.usr;
     if name = '%host%' then
-      result:=getSafeHost(md.cd)
+      result:=md.cd.getSafeHost(md.cd)
     else if name = '%ip%' then
       result:=md.cd.address
     else if name = '%ip-to-name%' then
@@ -2108,7 +2108,7 @@ try
         result:=intToStr(parI(0)+random(1+parI(1)-parI(0)));
 
     if name = 'force ansi' then
-      if satisfied(md.tpl) and md.tpl.utf8 then
+      if satisfied(md.tpl) then //and md.tpl.utf8 then
 //        result:=noMacrosAllowed(UTF8toAnsi(p))
         result:=noMacrosAllowed(AnsiString(p))
       else
