@@ -2127,7 +2127,11 @@ if notModified(cd.conn, s, '') then
   exit;
 }
 cd.conn.reply.mode:=HRM_REPLY;
+{$IFDEF HFS_GIF_IMAGES}
 cd.conn.reply.contentType:='image/gif';
+{$ELSE ~HFS_GIF_IMAGES}
+cd.conn.reply.contentType:='image/png';
+{$ENDIF HFS_GIF_IMAGES}
 cd.conn.reply.bodyMode := RBM_RAW;
 cd.downloadingWhat:=DW_ICON;
 cd.lastFN:=copy(url,2,1000);
@@ -6355,6 +6359,7 @@ resourcestring
   MEMORY = 'Mem';
   CUSTOMIZED = 'Customized template';
   ITEMS = 'VFS: %d items';
+  ITEMS_NS = 'VFS: %d items - not saved';
 var
   tempText: string;
 begin
@@ -6373,8 +6378,7 @@ if not easyMode then
     smartSize(outTotalOfs+srv.bytesSent)]) );
   sbarIdxs.totalIn:=addPanel( format(TOT_IN,[
     smartSize(inTotalOfs+srv.bytesReceived)]) );
-  sbarIdxs.notSaved:=addPanel( format(ITEMS,[filesBox.items.count-1])
-    +if_(VFSmodified,' - not saved') );
+  sbarIdxs.notSaved:=addPanel( format(if_(VFSmodified, ITEMS_NS, ITEMS),[filesBox.items.count-1]));
   if not vFsmodified then sbarIdxs.notSaved:=-1;
   end;
 checkDiskSpace();
@@ -7536,7 +7540,11 @@ const
   FK_ACCOUNTS = 12;
   FK_FILESFILTER = 13;
   FK_FOLDERSFILTER = 14;
+{$IFDEF HFS_GIF_IMAGES}
   FK_ICON_GIF = 15;
+{$ELSE ~HFS_GIF_IMAGES}
+  FK_ICON_PNG = 115;
+{$ENDIF HFS_GIF_IMAGES}
   FK_REALM = 16;
   FK_UPLOADACCOUNTS = 17;
   FK_DEFAULTMASK = 18;
@@ -7609,7 +7617,11 @@ else s:=TLV(FK_DLCOUNT, str_(f.DLcount)); // called on a folder would be recursi
 result:=TLV(FK_NODE, commonFields
   +TLVS_NOT_EMPTY(FK_NAME, f.name)
   +TLV(FK_ADDEDTIME, str_(f.atime))
+{$IFDEF HFS_GIF_IMAGES}
   +TLV_NOT_EMPTY(FK_ICON_GIF, pic2str(f.icon))
+{$ELSE ~HFS_GIF_IMAGES}
+  +TLV_NOT_EMPTY(FK_ICON_PNG, pic2str(f.icon))
+{$ENDIF HFS_GIF_IMAGES}
   +s
   +result // subnodes
 );
@@ -7759,7 +7771,11 @@ while not tlv.isOver() do
     FK_DIFF_TPL: f.diffTpl := UnUTF(data2);
     FK_DONTCOUNTASDOWNLOADMASK: f.dontCountAsDownloadMask := UnUTF(data2);
     FK_DONTCOUNTASDOWNLOAD: if boolean(data2[1]) then include(f.flags, FA_DONT_COUNT_AS_DL);  // legacy, now moved into flags
+{$IFDEF HFS_GIF_IMAGES}
     FK_ICON_GIF: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2));
+{$ELSE ~HFS_GIF_IMAGES}
+    FK_ICON_PNG: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2));
+{$ENDIF HFS_GIF_IMAGES}
     FK_AUTOUPDATED_FILES: parseAutoupdatedFiles(UnUTF(data2));
     FK_HFS_BUILD: loadingVFS.build:= UnUTF(data2);
     FK_HEAD, FK_HFS_VER: ; // recognize these fields, but do nothing
@@ -10276,7 +10292,7 @@ if quitASAP then
   exit;
   end;
 
-  LoadSomeLanguage('HFS');
+  LoadSomeLanguage('HFS', exePath);
   translateWindows;
 show();
 strToConnColumns(serializedConnColumns);

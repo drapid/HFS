@@ -27,7 +27,9 @@ uses
   types, windows, graphics, dialogs, registry, classes, dateUtils,
   comCtrls, shlobj, shellapi, activex, comobj, forms, stdctrls, controls, psAPI,
   menus, math, iniFiles, richedit, sysutils, strutils,
-  OverbyteIcsWSocket, OverbyteIcshttpProt, gifimg,
+//  Vcl.Imaging.gifimg,
+  Vcl.Imaging.pngImage,
+  OverbyteIcsWSocket, OverbyteIcshttpProt,
   regexpr,
   longinputDlg,
   main, hslib,
@@ -58,8 +60,13 @@ procedure fixFontFor(frm:Tform);
 function hostFromURL(s:string):string;
 function hostToIP(name: string):string;
 function allocatedMemory():int64;
+{$IFDEF HFS_GIF_IMAGES}
 function stringToGif(s: RawByteString; gif:TgifImage=NIL):TgifImage;
 function gif2str(gif:TgifImage): RawByteString;
+{$ELSE ~HFS_GIF_IMAGES}
+function stringToPNG(s: RawByteString; png: TpngImage=NIL):TpngImage;
+function png2str(png:TPngImage): RawByteString;
+{$ENDIF HFS_GIF_IMAGES}
 function bmp2str(bmp:Tbitmap): RawByteString;
 function pic2str(idx:integer): RawByteString;
 function str2pic(s: RawByteString):integer;
@@ -3137,6 +3144,7 @@ finally
   end;
 end; // deltree
 
+{$IFDEF HFS_GIF_IMAGES}
 function stringToGif(s: RawByteString; gif: TgifImage=NIL):TgifImage;
 var
   ss: TAnsiStringStream;
@@ -3216,6 +3224,95 @@ begin
     gif.free
   end;
 end; // str2pic
+{$ELSE ~HFS_GIF_IMAGES}
+function stringToPNG(s: RawByteString; png: TpngImage=NIL):TpngImage;
+var
+  ss: TAnsiStringStream;
+begin
+  ss := TAnsiStringStream.create(s);
+try
+  if png = NIL then
+    png:=TPNGImage.Create();
+  png.loadFromStream(ss);
+  result:=png;
+finally ss.free end;
+end; // stringToGif
+
+function png2str(png:TpngImage): RawByteString;
+var
+  stream: Tbytesstream;
+begin
+stream:=Tbytesstream.create();
+png.SaveToStream(stream);
+setLength(result, stream.size);
+move(stream.bytes[0], result[1], stream.size);
+stream.free;
+end; // gif2str
+
+function bmp2str(bmp:Tbitmap): RawByteString;
+var
+	png: TPNGImage;
+begin
+png:=TPNGImage.Create();
+try
+//  png.ColorReduction:=rmQuantize;
+  png.Assign(bmp);
+  result:=png2str(png);
+finally png.free;
+  end;
+end; // bmp2str
+
+function pic2str(idx:integer): RawByteString;
+var
+  ico: Ticon;
+  bmp: TBitmap;
+  png: TpngImage;
+begin
+result:='';
+if idx < 0 then exit;
+idx:=idx_ico2img(idx);
+if length(imagescache) <= idx then
+  setlength(imagescache, idx+1);
+result:=imagescache[idx];
+if result > '' then exit;
+
+ico:=Ticon.Create;
+png:=TPNGImage.Create;
+bmp := TBitmap.Create;
+try
+  mainfrm.images.getIcon(idx, ico);
+  ico.AssignTo(bmp);
+  png.Assign(bmp);
+  result:=png2str(png);
+  imagescache[idx]:=result;
+finally
+  bmp.Free;
+  png.Free;
+  ico.free;
+  end;
+end; // pic2str
+
+function str2pic(s: RawByteString):integer;
+var
+	png: TPNGImage;
+  bmp: TBitmap;
+begin
+  for result:=0 to mainfrm.images.count-1 do
+    if pic2str(result) = s then
+      exit;
+// in case the pic was not found, it automatically adds it to the pool
+  png := stringToPNG(s);
+  try
+    bmp := TBitmap.Create;
+    bmp.Assign(png);
+    result := mainfrm.images.addMasked(bmp, bmp.TransparentColor);
+    etags.values['icon.'+intToStr(result)] := MD5PassHS(s);
+   finally
+    bmp.Free;
+    png.free
+  end;
+end; // str2pic
+{$ENDIF HFS_GIF_IMAGES}
 
 function getImageIndexForFile(fn:string):integer;
 var
