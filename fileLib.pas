@@ -345,15 +345,14 @@ end; // hasRightAttributes
 function hasRightAttributes(lp: TLoadPrefs; const fn: string):boolean; overload;
 begin result:=hasRightAttributes(lp, GetFileAttributes(pChar(fn))) end;
 
-function getFiles(mask:string):TstringList;
+function getFiles(mask:string):TStringDynArray;
 var
   sr: TSearchRec;
 begin
-result:=TstringList.create;
-result.CaseSensitive:=FALSE;
+result:=NIL;
 if findFirst(mask, faAnyFile, sr) = 0 then
   try
-    repeat result.add(sr.name)
+    repeat addString(sr.name, result)
     until findNext(sr) <> 0;
   finally findClose(sr) end;
 end; // getFiles
@@ -1135,7 +1134,7 @@ var
   f: Tfile;
   first: boolean;
 
-  function add2diff(s:string):boolean;
+  function add2diff(const s:string):boolean;
   begin
   result:=FALSE;
   if s = '' then exit;
@@ -1145,20 +1144,6 @@ var
     + diff;
   result:=TRUE;
   end; // add2diff
-
-  procedure loadStar();
-  var
-    list: TstringList;
-    s: string;
-  begin
-  list:=getFiles(exePath+'*.diff.tpl');
-  try
-    list.sort();
-    for s in list do
-      add2diff(s);
-  finally list.free
-    end;
-  end;
 
 begin
 result:='';
@@ -1206,7 +1191,8 @@ while assigned(f) do
   f:=f.parent;
   first:=FALSE;
   end;
-loadStar();
+for s in sortArrayF(getFiles(exePath+'*.diff.tpl')) do
+  add2diff(UnUTF(loadFileA(s)));
 result:=diff;
 end; // getRecursiveDiffTplAsStr
 

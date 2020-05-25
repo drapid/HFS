@@ -17,7 +17,7 @@ This file is part of HFS ~ HTTP File Server.
     along with HFS; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 }
-{$A+,B-,C+,E-,F-,G+,H+,I-,J-,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,X+,Y+,Z1}
+{ $A+,B-,C+,E-,F-,G+,H+,I-,J-,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,X+,Y+,Z1}
 {$INCLUDE defs.inc }
 
 unit main;
@@ -159,7 +159,6 @@ type
     trayicons1: TMenuItem;
     trayfordownloadChk: TMenuItem;
     N8: TMenuItem;
-    leavedisconnectedconnectionsChk: TMenuItem;
     Loadfilesystem1: TMenuItem;
     Savefilesystem1: TMenuItem;
     N1: TMenuItem;
@@ -431,6 +430,7 @@ type
     updateBtn: TToolButton;
     delayUpdateChk: TMenuItem;
     oemTarChk: TMenuItem;
+    AnyAddressV6: TMenuItem;
     procedure FormResize(Sender: TObject);
     procedure filesBoxCollapsing(Sender: TObject; Node: TTreeNode; var AllowCollapse: Boolean);
     procedure newfolder1Click(Sender: TObject);
@@ -483,7 +483,6 @@ type
     procedure Savefilesystem1Click(Sender: TObject);
     procedure filesBoxDeletion(Sender: TObject; Node: TTreeNode);
     procedure Loadfilesystem1Click(Sender: TObject);
-    procedure leavedisconnectedconnectionsChkClick(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure Officialwebsite1Click(Sender: TObject);
     procedure showmaintrayiconChkClick(Sender: TObject);
@@ -585,7 +584,6 @@ type
     procedure Disable1Click(Sender: TObject);
     procedure saveNewFingerprintsChkClick(Sender: TObject);
     procedure Createfingerprintonaddition1Click(Sender: TObject);
-    procedure pwdInPagesChkClick(Sender: TObject);
     procedure Howto1Click(Sender: TObject);
     procedure Name1Click(Sender: TObject);
     procedure Size1Click(Sender: TObject);
@@ -648,6 +646,7 @@ type
     procedure Reverttopreviousversion1Click(Sender: TObject);
     procedure updateBtnClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
+    procedure AnyAddressV6Click(Sender: TObject);
   private
     function searchLog(dir:integer):boolean;
     function  getGraphPic(cd:TconnData=NIL): RawByteString;
@@ -659,7 +658,7 @@ type
       message WM_ENDSESSION;
     procedure WMNCLButtonDown(var msg:TWMNCLButtonDown);
       message WM_NCLBUTTONDOWN;
-    procedure trayEvent(sender:Tobject; ev: TtrayEvent);
+    procedure trayEvent(sender:Tobject; ev:TtrayEvent);
     procedure downloadtrayEvent(sender:Tobject; ev:TtrayEvent);
     procedure httpEvent(event:ThttpEvent; conn:ThttpConn);
     function  addFileRecur(f:Tfile; parent:TTreeNode=NIL):Tfile; OverLoad;
@@ -667,7 +666,7 @@ type
     function  pointedFile(strict:boolean=TRUE):Tfile;
     function  pointedConnection():TconnData;
     procedure updateSbar();
-    function  getFolderPage(folder: Tfile; cd: TconnData; otpl: Tobject): String;
+    function  getFolderPage(folder:Tfile; cd:TconnData; otpl:Tobject):string;
     procedure getPage(sectionName:string; data:TconnData; f:Tfile=NIL; tpl2use:Ttpl=NIL);
     function  selectedConnection():TconnData;
     function  sendPic(cd:TconnData; idx:integer=-1):boolean;
@@ -815,13 +814,11 @@ implementation
 uses
   AnsiStrings, MMsystem, UITypes,
   clipbrd, dateutils, shlobj, shellapi, winsock,
-//  registry, activex, FileCtrl,
   OverbyteIcsZLibHigh, OverbyteIcsUtils,
   Base64,
   RDFileUtil, RDUtils,
   RnQzip, RnQCrypt, RnQNet.Uploads, RnQLangs,
   langLib,
-//  RnQGraphics32,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib, hfsVars;
 
@@ -864,7 +861,7 @@ result:=assigned(account) and account.noLimits;
 end; // noLimitsFor
 
 function isAnyMacroIn(s:RawByteString):boolean; inline;
-begin result := pos(MARKER_OPEN, s) > 0 end;
+begin result := pos(AMARKER_OPEN, s) > 0 end;
 
 function isDownloading(data:TconnData):boolean;
 begin
@@ -1140,7 +1137,7 @@ begin
 if externalIP = '' then exit;
 mainfrm.setStatusBarText('Updating dynamic DNS...');
 dyndns.lastTime:=now();
-try s:=httpGet(xtpl(dyndns.url, ['%ip%', externalIP]));
+try s:=UnUTF(httpGet(xtpl(dyndns.url, ['%ip%', externalIP])));
 except s:='' end;
 if s > '' then dyndns.lastResult:=s;
 if not mainfrm.logOtherEventsChk.checked then exit;
@@ -1399,7 +1396,7 @@ for i:=0 to length(parts)-1 do
     begin
 //    found:=stringExists(n.text, s) or sameText(n.text, UTF8toAnsi(s));
 //        found := stringExists(n.text, s) or sameText(n.text, s);
-        found := sameText(n.text, s);
+    found:=sameText(n.text, s);
     if found then break;
     n:=n.getNextSibling();
     end;
@@ -1518,7 +1515,7 @@ end; // uptimeStr
 function loadMD5for(fn:string):string;
 begin
 if getMtimeUTC(fn+'.md5') < getMtimeUTC(fn) then result:=''
-else result:=trim(getTill(' ',loadfile(fn+'.md5')))
+else result:=trim(getTill(' ',UnUTF(loadfile(fn+'.md5'))))
 end; // loadMD5for
 
 function shouldRecur(data:TconnData):boolean;
@@ -1569,12 +1566,12 @@ var
   idx:=0;
   p:=1;
     repeat
-    p := ipos(PATTERN, result, p);
+    p:=ipos(PATTERN, result, p);
     if p = 0 then exit;
     inc(idx);
     idxS:=intToStr(idx);
     delete(result, p, length(PATTERN)-length(idxS));
-    MoveChars(idxS[1], result[p], length(idxS));
+    moveChars(idxS[1], result[p], length(idxS));
     until false;
   end; // applySequential
 
@@ -1707,7 +1704,7 @@ begin
 
   if macrosLogChk.checked and not appendmacroslog1.checked then
     resetLog();
-  diffTpl := Ttpl.create();
+  diffTpl:=Ttpl.create();
   folder.lock();
 try
   buildTime := now();
@@ -1971,7 +1968,7 @@ var
     with data.uploadResults[i] do
       files:=files+xtpl(tpl2use[ if_(reason='','upload-success','upload-failed') ],[
         '%item-name%', htmlEncode(macroQuote(fn)),
-        '%item-url%', macroQuote(encodeURL(fn)),
+        '%item-url%', macroQuote(encodeURLW(fn)),
         '%item-size%', smartsize(size),
         '%item-resource%', f.resource+'\'+fn,
         '%idx%', intToStr(i+1),
@@ -2485,7 +2482,7 @@ try
       +xtpl(formatDatetime(APACHE_TIMESTAMP_FORMAT, now()),
          ['!!!',MONTH2STR[monthOf(now())]])
       +' '+logfile.apacheZoneString+']';
-    'r': res:=getTill(CRLF, cd.conn.request.full);
+    'r': res:= UnUTF(getTill(CRLFA, cd.conn.request.full));
     's': res:=code;
     'B': res:=intToStr(cd.conn.bytesSentLastItem);
     'b': if cd.conn.bytesSentLastItem = 0 then res:='-' else res:=intToStr(cd.conn.bytesSentLastItem);
@@ -2607,7 +2604,7 @@ finally
 end; // runTplImport
 
 // returns true if template was patched
-function setTplText(text:string):boolean;
+function setTplText(text:string=''):boolean;
 (* postponed to next release
   procedure patch290();
   {$J+}
@@ -2640,8 +2637,10 @@ begin
 result:=FALSE; // mod by mars
 //patch290();
 // if we'd use optUTF8() here, we couldn't make use of tpl.utf8, because text would not be parsed yet
+if trim(text) = trim(defaultTpl.fullTextS) then
+  text:='';
 tpl.fullTextS := text;
-tplIsCustomized:= text <> defaultTpl;
+tplIsCustomized:= text > '';
 if boolOnce(tplImport) then
   runTplImport();
 end; // setTplText
@@ -2651,13 +2650,13 @@ begin
 if fileExists(tplFilename) then
   begin
   if newMtime(tplFilename, tplLast) then
-    if setTplText(loadFile(tplFilename)) then
+    if setTplText(UnUTF(loadFile(tplFilename))) then
       saveFile2(tplFilename, tpl.fullText);
   end
 else if tplLast <> 0 then
   begin
   tplLast:=0; // we have no modified-time in this case, but this will stop the refresh
-  setTplText(defaultTpl);
+  setTplText();
   end;
 end; // keepTplUpdated
 
@@ -3218,7 +3217,7 @@ var
       FAILED = 'Login failed';
     var
       m: TStringDynArray;
-      fTemp: Tfile;
+//      fTemp: Tfile;
     begin
     result:=FALSE;
     if assigned(forceFile) then f:=forceFile;
@@ -3417,19 +3416,21 @@ var
         ss.redirect:=getAccountRedirect(acc);
       end;
     data.account:=acc;
+    data.usr:=acc.user;
+    data.pwd:=acc.pwd;
     end; //urlAuth
 
   var
     b: boolean;
     s: string;
-    i: integer;
+//    i: integer;
     section: PtplSection;
   begin
   // eventually override the address
   if addressmatch(forwardedMask, conn.address) then
     begin
     data.address:=getTill(':', getTill(',', conn.getHeader('x-forwarded-for')));
-    if not checkAddressSyntax(data.address) then
+    if not checkAddressSyntax(data.address, false) then
       data.address:=conn.address;
     end;
 
@@ -3903,7 +3904,7 @@ if assigned(data) then
 
 if dumpTrafficChk.Checked and (event in [HE_GOT, HE_SENT]) then
   appendFileA(exePath+'hfs-dump.bin', TLV(if_(event=HE_GOT,1,2),
-    TLV(10, str_(now()))+TLV(11, data.address)+TLV(12, conn.port)+TLV(13, conn.eventData)
+    TLV(10, str_(now()))+TLVS(11, data.address)+TLVS(12, conn.port)+TLV(13, conn.eventData)
   ));
 
 if preventStandbyChk.checked and assigned(setThreadExecutionState) then
@@ -4001,18 +4002,9 @@ case event of
   HE_DISCONNECTED:
     begin
     closeUploadingFile_partial();
-    if leavedisconnectedconnectionsChk.checked then
-      begin
-      if assigned(data) then
-        data.averageSpeed:=safeDiv(conn.bytesSent,SECONDS*(now()-data.time));
-      setupDownloadIcon(data); // remove the tray icon anyway
-      end
-    else
-      begin
-      data.deleting:=TRUE;
-      toDelete.add(data);
-      with connBox.items do count:=count-1;
-      end;
+    data.deleting:=TRUE;
+    toDelete.add(data);
+    with connBox.items do count:=count-1;
     runEventScript('disconnected');
     connBox.invalidate();
     end;
@@ -4078,7 +4070,7 @@ case event of
 
     refreshConn(data);
     end;
-  HE_POST_VAR: data.postVars.add(conn.post.varname+'='+conn.post.data);
+  HE_POST_VAR: data.postVars.add(conn.post.varname+'='+UnUTF(conn.post.data));
   HE_POST_VARS:
     if conn.post.mode = PM_URLENCODED then
       urlToStrings(conn.post.data, data.postVars);
@@ -4660,7 +4652,13 @@ end; // changePort
 function b64utf8(const s:string): RawByteString;
 begin result:=Base64EncodeString(UTF8encode(s)); end;
 
-function decodeB64utf8(const s: RawByteString):string;
+function b64utf8W(const s:string): UnicodeString;
+begin result:=Base64EncodeString(UTF8encode(s)); end;
+
+function decodeB64utf8(const s: RawByteString):string; OverLoad;
+begin result:=UnUTF(Base64DecodeString(s)); end;
+
+function decodeB64utf8(const s: String):string; OverLoad;
 begin result:=UnUTF(Base64DecodeString(s)); end;
 
 
@@ -4668,11 +4666,25 @@ function TmainFrm.getCfg(exclude:string=''):string;
 type
   Tencoding=(E_PLAIN, E_B64, E_ZIP);
 
-  function encode(s:string; encoding: Tencoding): RawByteString;
+  function encodeW(s:string; encoding: Tencoding): String;
   begin
   case encoding of
     E_PLAIN: result:=s;
-    E_B64: result:=b64utf8(s);
+    E_B64: result:=b64utf8W(s);
+    E_ZIP:
+      begin
+      result := Base64EncodeString(zCompressStr(StrToUTF8(s)));
+//      if length(result) > round(0.95*length(s)) then result:=s;
+//      result := Base64EncodeString(result);
+      end;
+    end;
+  end;
+
+  function encodeA(s: RawByteString; encoding: Tencoding): RawByteString;
+  begin
+  case encoding of
+    E_PLAIN: result:=s;
+    E_B64: result:=Base64EncodeString(s);
     E_ZIP:
       begin
       result := zCompressStr(s);
@@ -4688,7 +4700,12 @@ type
     a: Paccount;
 
     function prop(name, value:string; encoding:Tencoding=E_PLAIN):string;
-    begin result:=if_(value>'', '|'+name+':'+encode(value, encoding)) end;
+    begin
+      if value > '' then
+        result:='|'+name+':'+encodeW(value, encoding)
+       else
+        Result := '';
+    end;
 
   begin
   result:='';
@@ -4740,7 +4757,7 @@ var
     begin
     j:=idx_img2ico(iconMasks[i].int);
     if j >= USER_ICON_MASKS_OFS then
-      userIconMasks:=userIconMasks+format('%d:%s|', [j, encode(pic2str(j), E_ZIP)]);
+      userIconMasks:=userIconMasks+format('%d:%s|', [j, encodeA(pic2str(j), E_ZIP)]);
     result:=result+format('%s|%d||', [iconMasks[i].str, j]);
     end;
   end; // iconMasksToStr
@@ -4802,7 +4819,7 @@ result:='HFS '+ hfsGlobal.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'custom-ip='+join(';',customIPs)+CRLF
 +'listen-on='+listenOn+CRLF
 +'external-ip-server='+customIPservice+CRLF
-+'dynamic-dns-updater='+b64utf8(dyndns.url)+CRLF
++'dynamic-dns-updater='+b64utf8W(dyndns.url)+CRLF
 +'dynamic-dns-user='+dyndns.user+CRLF
 +'dynamic-dns-host='+dyndns.host+CRLF
 +'search-better-ip='+yesno[searchbetteripChk.checked]+CRLF
@@ -4885,7 +4902,6 @@ result:='HFS '+ hfsGlobal.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'address2name='+join('|',address2name)+CRLF
 +'recent-files='+join('|',recentFiles)+CRLF
 +'trusted-files='+join('|',trustedFiles)+CRLF
-+'leave-disconnected-connections='+yesno[leavedisconnectedconnectionsChk.checked]+CRLF
 +'accounts='+accountsToStr()+CRLF
 +'account-notes-wrap='+yesno[optionsFrm.notesWrapChk.checked]+CRLF
 +'tray-instead-of-quit='+yesno[trayInsteadOfQuitChk.checked]+CRLF
@@ -5251,7 +5267,6 @@ while cfg > '' do
 		if h = 'auto-save-vfs' then autosaveVFSchk.checked:=yes;
     if h = 'add-to-folder' then addToFolder:=l;
     if h = 'getright-template' then DMbrowserTplChk.checked:=yes;
-    if h = 'leave-disconnected-connections' then leavedisconnectedconnectionsChk.checked:=yes;
 		if h = 'speed-limit' then setSpeedLimit(real);
 		if h = 'speed-limit-ip' then setSpeedLimitIP(real);
     if h = 'no-download-timeout' then setNoDownloadTimeout(int);
@@ -5344,7 +5359,7 @@ if lastGoodLogWidth > 0 then
 if lastGoodConnHeight > 0 then
   connPnl.Height:=lastGoodConnHeight;
 if not fileExists(tplFilename) then
-  setTplText(defaultTpl);
+  setTplText();
 srv.persistentConnections:=persistentconnectionsChk.Checked;
 applyFilesBoxRatio();
 updateRecentFilesMenu();
@@ -5383,11 +5398,11 @@ function loadCfg(var ini,tpl:string):boolean;
 begin
 result:=TRUE;
 ipsEverConnected.text:=UnUTF(loadfile(IPS_FILE));
-ini:=loadFile(cfgPath+CFG_FILE);
+ini:=UnUTF(loadFile(cfgPath+CFG_FILE));
 if ini > '' then
   begin
   saveMode:=SM_FILE;
-  moveLegacyTpl(loadFile(cfgPath+TPL_FILE));
+  moveLegacyTpl(UnUTF(loadFile(cfgPath+TPL_FILE)));
   exit;
   end;
 ini:=loadregistry(CFG_KEY, '');
@@ -5415,7 +5430,7 @@ var
 begin
 cd:=selectedConnection();
 if cd = NIL then exit;
-msgDlg(first([cd.conn.request.full, cd.conn.getBuffer(), '(empty)']));
+msgDlg(UnUTF(first([cd.conn.request.full, cd.conn.getBuffer(), RawByteString('(empty)')])));
 end;
 
 procedure TmainFrm.connmenuPopup(Sender: TObject);
@@ -6401,7 +6416,8 @@ end; // updateSbar
 procedure Tmainfrm.refreshIPlist();
 CONST
   INDEX_FOR_URL = 2;
-  INDEX_FOR_NIC = 1;
+//  INDEX_FOR_NIC = 1;
+  INDEX_FOR_NIC = 2;
 var
   a: TStringDynArray;
   a6: TStringDynArray;
@@ -6418,19 +6434,24 @@ for i:=0 to length(a)-1 do
 // fill 'Accept connections on' menu
 while Acceptconnectionson1.count > INDEX_FOR_NIC  do
   Acceptconnectionson1.delete(INDEX_FOR_NIC);
-Anyaddress1.checked:= listenOn = '';
-a:=listToArray(localIPlist);
-addUniqueString('127.0.0.1', a);
-for i:=0 to length(a)-1 do
-  Acceptconnectionson1.Insert(INDEX_FOR_NIC,
-    newItem( a[i], 0, a[i]=listenOn, TRUE, acceptOnMenuclick, 0, '') );
+
+// IPv6
+AnyaddressV6.checked:= listenOn = '[*]';
   a6 := listToArray(localIPlist(sfIPv6));
+  addUniqueString('::1', a6);
   if length(a6) > 0 then
    for i:=0 to length(a6)-1 do
     Acceptconnectionson1.Insert(INDEX_FOR_NIC,
       newItem( '[' + a6[i] + ']', 0,
               ((a6[i]=listenOn)or (('[' + a6[i] + ']') = listenOn)),
               TRUE, acceptOnMenuclick, 0, '') );
+//IPv4
+Anyaddress1.checked:= listenOn = '';
+a:=listToArray(localIPlist);
+addUniqueString('127.0.0.1', a);
+for i:=0 to length(a)-1 do
+  Acceptconnectionson1.Insert(INDEX_FOR_NIC,
+    newItem( a[i], 0, a[i]=listenOn, TRUE, acceptOnMenuclick, 0, '') );
 end; // refreshIPlist
 
 procedure TmainFrm.filesBoxDblClick(Sender: TObject);
@@ -7863,26 +7884,6 @@ if promptForFileName(fn, 'VirtualFileSystem|*.vfs', 'vfs', 'Open VFS file') then
   loadVFS(fn);
 end;
 
-procedure TmainFrm.leavedisconnectedconnectionsChkClick(Sender: TObject);
-var
-  i: integer;
-  data: TconnData;
-begin
-if leavedisconnectedconnectionsChk.checked then exit;
-i:=0;
-while i < connBox.items.count do
-  begin
-  data:=conn2data(i);
-  if data.conn.state = HCS_DISCONNECTED then
-    begin
-    toDelete.Add(data);
-    data.deleting:=TRUE;
-    end;
-  inc(i);
-  end;
-connBox.items.count:=srv.conns.count;
-end;
-
 procedure drawGraphOn(cnv:Tcanvas; colors:TIntegerDynArray=NIL);
 var
   i, h, maxV: integer;
@@ -9192,7 +9193,7 @@ while i < length(params) do
         fn:=getSinglePar();
         if not fileExists(fn) then fn:=cfgPath+fn;
         if not fileExists(fn) then exit;
-        mainfrm.setcfg(loadFile(fn));
+        mainfrm.setcfg(UnUTF(loadFile(fn)));
         end;
       'c': mainfrm.setcfg(unescapeNL(getSinglePar()));
       end;
@@ -9648,7 +9649,7 @@ resourcestring
   // we many need to try this specific test more than once
     repeat
     t:=now();
-    try result:=httpGet(SELF_TEST_URL+'?port='+port+'&host='+host+'&natted='+YESNO[localIPlist.IndexOf(externalIP)<0] )
+    try result:=UnUTF(httpGet(SELF_TEST_URL+'?port='+port+'&host='+host+'&natted='+YESNO[localIPlist.IndexOf(externalIP)<0] ))
     except break end;
     t:=now()-t;
     if (result ='') or (result[1] <> '4') or progFrm.cancelRequested then break;
@@ -9859,7 +9860,7 @@ begin
 if not fileExists(tplFilename) then
   begin
   tplFilename:=TPL_FILE;
-  saveFileU(tplFilename, defaultTpl);
+  saveFileU(tplFilename, defaultTpl.fullTextS);
   end;
 exec(getTplEditor(), '"'+tplFilename+'"');
 end;
@@ -9902,7 +9903,7 @@ resourcestring
   MSG = 'The current template is using macros.'
     +#13'Do you want to cancel this action?';
 begin
-if anyMacroMarkerIn(tpl.fullText) and not enableMacrosChk.Checked then
+if anyMacroMarkerIn(tpl.fullTextS) and not enableMacrosChk.Checked then
   enableMacrosChk.Checked:=msgDlg(MSG, MB_ICONWARNING+MB_YESNO) = MRYES;
 end;
 
@@ -10215,7 +10216,7 @@ and only1instanceChk.checked and not mono.master then
   end;
 
 if not cfgLoaded then
-  setTplText(defaultTpl);
+  setTplText();
   
 processParams_before(params);
 
@@ -10624,6 +10625,12 @@ listenOn:='';
 restartServer();
 end;
 
+procedure TmainFrm.AnyAddressV6Click(Sender: TObject);
+begin
+listenOn:='[*]';
+restartServer();
+end;
+
 procedure Tmainfrm.acceptOnMenuclick(sender:Tobject);
 begin
 listenOn:=(sender as Tmenuitem).caption;
@@ -10673,22 +10680,8 @@ try setAutoFingerprint(strToUInt(s))
 except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR) end;
 end;
 
-procedure TmainFrm.pwdInPagesChkClick(Sender: TObject);
-resourcestring
-  MSG = 'This feature is INCOMPATIBLE with Internet Explorer.';
-begin
-if pwdInPagesChk.Checked
-and (msgDlg(MSG, MB_ICONWARNING+MB_OKCANCEL) = IDOK) then
-  begin
-  msgDlg(MSG_ENABLED);
-  exit;
-  end;
-pwdInPagesChk.checked:=FALSE;
-msgDlg(MSG_DISABLED)
-end;
-
 procedure TmainFrm.Howto1Click(Sender: TObject);
-begin msgDLg(getRes('uploadHowTo')) end;
+begin msgDLg(UnUTF(getRes('uploadHowTo'))) end;
 
 procedure TmainFrm.Name1Click(Sender: TObject);
 begin defSorting:='name' end;
@@ -10806,7 +10799,8 @@ if (Form=NIL) or (Form.ClassName<>'TInputQueryForm') then
 
   Edit := NIL;
   Prompt := NIL;
-  Ctrl := NIL;
+//  Ctrl := NIL;
+  ButtonTop := 0;
 
 for I := 0 to Form.ControlCount-1 do
   begin
@@ -10864,7 +10858,7 @@ function TFileHlp.url(fullEncode:boolean=FALSE):string;
 begin
 assert(node<>NIL, 'node can''t be NIL');
 if isLink() then result:=relativeURL(fullEncode)
-else result:='/'+encodeURL(pathTill(rootFile,'/'), fullEncode)
+else result:='/'+encodeURLW(pathTill(rootFile,'/'), fullEncode)
   +if_(isFolder() and not isRoot(), '/');
 end; // url
 
@@ -10877,7 +10871,7 @@ base:=fullURL(ip)+'?';
 k:=user+':'+pwd;
 try result:=base+userPwdHashCache[k]
 except
-  s:='mode=auth&u='+encodeURL(user);
+  s:='mode=auth&u='+encodeURLW(user);
   s:=s+'&s2='+strSHA256(s+pwd); // sign with password
   userPwdHashCache.add(k,s);
   result:=base+s;
@@ -10971,12 +10965,9 @@ if savefileA(tmpPath+'test.tmp','') then
   tmpPath:=getTempDir();
 lastUpdateCheckFN:=tmpPath+'HFS last update check.tmp';
 setCurrentDir(exePath); // sometimes people mess with the working directory, so we force it to the exe path
-if fileExists('default.tpl') then
-  defaultTpl:= UnUTF(loadfile('default.tpl'))
-else
-  defaultTpl:= UnUTF(getRes('defaultTpl'));
+defaultTpl:=Ttpl.create(getRes('defaultTpl'));
+tpl:=Ttpl.create('', defaultTpl);
 tpl_help := UnUTF(getRes('tplHlp'));
-tpl:=Ttpl.create();
 defSorting:='name';
 dmBrowserTpl:=Ttpl.create(getRes('dmBrowserTpl'));
 filelistTpl:=Ttpl.create(getRes('filelistTpl'));
@@ -11039,6 +11030,7 @@ FINALIZATION
 progFrm.free;
 toDelete.free;
 tpl.free;
+defaultTpl.Free;
 filelistTpl.free;
 autoupdatedFiles.free;
 iconsCache.free;

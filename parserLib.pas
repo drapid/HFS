@@ -20,6 +20,13 @@ const
   MARKER_UNQUOTE = ':}';
   MARKERS: array [0..4] of string = ( MARKER_OPEN, MARKER_CLOSE, MARKER_SEP, MARKER_QUOTE, MARKER_UNQUOTE );
 
+  AMARKER_OPEN = RawByteString('{.');
+  AMARKER_CLOSE = RawByteString('.}');
+  AMARKER_SEP = RawByteString('|');
+  AMARKER_QUOTE = RawByteString('{:');
+  AMARKER_UNQUOTE = RawByteString(':}');
+  AMARKERS: array [0..4] of RawByteString = ( MARKER_OPEN, MARKER_CLOSE, MARKER_SEP, MARKER_QUOTE, MARKER_UNQUOTE );
+
 function anyMacroMarkerIn(const s:string):boolean;
 function findMacroMarker(const s:string; ofs:integer=1):integer;
 procedure applyMacrosAndSymbols(var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);

@@ -55,7 +55,8 @@ uses
   hfsJclOthers in 'hfsJclOthers.pas',
   FileLib in 'FileLib.pas',
   hfsGlobal in 'hfsGlobal.pas',
-  hfsVars in 'hfsVars.pas';
+  hfsVars in 'hfsVars.pas',
+  langLib in 'langLib.pas';
 
 {$R *.res}
 

@@ -105,7 +105,7 @@ function getIPs():TStringDynArray;
 function getPossibleAddresses():TstringDynArray;
 function whatStatusPanel(statusbar:Tstatusbar; x:integer):integer;
 function getExternalAddress(var res:string; provider:Pstring=NIL):boolean;
-function checkAddressSyntax(address:string; wildcards:boolean=TRUE):boolean;
+function checkAddressSyntax(address:string; mask:boolean=TRUE):boolean;
 function inputQueryLong(const caption, msg:string; var value:string; ofs:integer=0):boolean;
 procedure purgeVFSaccounts();
 function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
@@ -199,6 +199,7 @@ function stringExists(s:string; a:array of string; isSorted:boolean=FALSE):boole
 function listToArray(l:Tstrings):TstringDynArray;
 function arrayToList(a:TStringDynArray; list:TstringList=NIL):TstringList;
 procedure sortArray(var a:TStringDynArray);
+function sortArrayF(const a:TStringDynArray):TStringDynArray;
 // convert
 function boolToPtr(b:boolean):pointer;
 function strToCharset(s:string):TcharsetW;
@@ -226,6 +227,7 @@ function getUniqueName(const start:string; exists:TnameExistsFun):string;
 function getStr(from,to_: pAnsichar): RawByteString; OverLoad;
 function getStr(from,to_: pchar): String; OverLoad;
 function TLV(t:integer; const data: RawByteString): RawByteString;
+function TLVS(t:integer; const data: String): RawByteString;
 function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
 function TLVS_NOT_EMPTY(t:integer; const data: String): RawByteString;
 function popTLV(var s,data: RawByteString):integer;
@@ -256,6 +258,7 @@ function first(a,b:double):double; overload;
 function first(a,b:pointer):pointer; overload;
 function first(const a,b:string):string; overload;
 function first(a:array of string):string; overload;
+function first(a:array of RawByteString): RawByteString; overload;
 function stripChars(s:string; cs:TcharsetW; invert:boolean=FALSE):string;
 function strAt(const s, ss:string; at:integer):boolean; inline;
 function substr(const s: RawByteString; start:integer; upTo:integer=0): RawByteString; inline; OverLoad;
@@ -386,10 +389,10 @@ begin
     BytesReturned := 0;
     if not DeviceIoControl(Handle, FSCTL_GET_REPARSE_POINT, nil, 0, @ReparseData, MAXIMUM_REPARSE_DATA_BUFFER_SIZE, BytesReturned, nil) then
       exit;
-    if BytesReturned < DWORD(ReparseData.Reparse.SubstituteNameLength + SizeOf(WideChar)) then
+    if BytesReturned < DWORD(ReparseData.Reparse.SymbolicLinkReparseBuffer.SubstituteNameLength + SizeOf(WideChar)) then
       exit;
-    SetLength(Destination, (ReparseData.Reparse.SubstituteNameLength div SizeOf(WideChar)));
-    Move(ReparseData.Reparse.PathBuffer[0], Destination[1], ReparseData.Reparse.SubstituteNameLength);
+    SetLength(Destination, (ReparseData.Reparse.SymbolicLinkReparseBuffer.SubstituteNameLength div SizeOf(WideChar)));
+    Move(ReparseData.Reparse.SymbolicLinkReparseBuffer.PathBuffer[0], Destination[1], ReparseData.Reparse.SymbolicLinkReparseBuffer.SubstituteNameLength);
     Result := True;
    finally
     CloseHandle(Handle)
@@ -876,6 +879,10 @@ end; // strToRect
 function TLV(t:integer; const data: RawByteString): RawByteString;
 begin result:=str_(t)+str_(length(data))+data end;
 
+function TLVS(t:integer; const data: String): RawByteString;
+begin result:=TLV(t, StrToUTF8(data)) end;
+
+
 function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
 begin if data > '' then result:=TLV(t,data) else result:='' end;
 
@@ -905,51 +912,7 @@ for i:=1 to length(data) div 4 do
   inc(p);
   end;
 end; // crc
-{
-function bmpToHico(bitmap:Tbitmap):hicon;
-var
-  iconX, iconY : integer;
-  IconInfo: TIconInfo;
-  IconBitmap, MaskBitmap: TBitmap;
-  dx,dy,x,y: Integer;
-  tc: TColor;
-begin
-if bitmap=NIL then
-  begin
-  result:=0;
-  exit;
-  end;
-iconX := GetSystemMetrics(SM_CXICON);
-iconY := GetSystemMetrics(SM_CYICON);
-IconBitmap:= TBitmap.Create;
-IconBitmap.Width:= iconX;
-IconBitmap.Height:= iconY;
-IconBitmap.TransparentColor:=Bitmap.TransparentColor;
-tc:=Bitmap.TransparentColor and $FFFFFF;
-Bitmap.transparent:=FALSE;
-dx:=bitmap.width*2;
-dy:=bitmap.height*2;
-if (dx < iconX) and (dy < iconY) then
-  begin
-  IconBitmap.Canvas.brush.color:=tc;
-  with IconBitmap.Canvas do fillrect(clipRect);
-  x:=(iconX-dx) div 2;
-  y:=(iconY-dy) div 2;
-  IconBitmap.Canvas.StretchDraw(Rect(x,y,x+dx,y+dy), Bitmap);
-  end
-else
-  IconBitmap.Canvas.StretchDraw(Rect(0, 0, iconX, iconY), Bitmap);
-MaskBitmap:= TBitmap.Create;
-MaskBitmap.Assign(IconBitmap);
-with MaskBitmap.canvas do fillrect(cliprect);
-IconInfo.fIcon:= True;
-IconInfo.hbmMask:= MaskBitmap.MaskHandle;
-IconInfo.hbmColor:= IconBitmap.Handle;
-Result:= CreateIconIndirect(IconInfo);
-MaskBitmap.Free;
-IconBitmap.Free;
-end; // bmpToHico
-}
+
 function msgDlg(msg:string; code:integer=0; title:string=''):integer;
 var
   parent: Thandle;
@@ -1501,56 +1464,73 @@ while mask > '' do
 result:=result xor odd(invert);
 end; // filematch
 
-function checkAddressSyntax(address:string; wildcards:boolean=TRUE):boolean;
+function checkAddressSyntax(address:string; mask:boolean=TRUE):boolean;
 var
   a1, a2: string;
-  i, dots, lastDot: integer;
-  wildcardsMet: boolean;
-
-  function validNumber():boolean;
-  begin result:=strToIntDef(substr(a1,lastDot+1,i-1), 0) <= 255 end;
-
+  sf: TSocketFamily;
 begin
+if not mask then
+  exit(WSocketIsIPEx(address, sf));
 result:=FALSE;
 if address = '' then exit;
-while (address > '') and (address[1] = '\') do delete(address,1,1);
+while (address > '') and (address[1] = '\') do
+  delete(address,1,1);
 while address > '' do
   begin
   a2:=chop(';', address);
-  if sameText(a2, 'lan') then continue;
+  if sameText(a2, 'lan') then
+    continue;
   a1:=chop('-', a2);
   if a2 > '' then
     if not checkAddressSyntax(a1, FALSE)
     or not checkAddressSyntax(a2, FALSE) then
       exit;
-  wildcardsMet:=FALSE;
-  dots:=0;
-  lastDot:=0;
-  for i:=1 to length(a1) do
-    case a1[i] of
-      '.':
-        begin
-        if not validNumber() then exit;
-        lastDot:=i;
-        inc(dots);
-        end;
-      '0'..'9': ;
-      '?','*' : if wildcards then wildcardsMet:=TRUE else exit;
-      else exit;
-      end;
-  if (dots > 3) or not wildcardsMet and (dots <> 3) then exit;
+  if reMatch(a1, '^[?*a-f0-9\.:]+$', '!') = 0 then
+    exit;
   end;
-result:=validNumber();
+result:=TRUE;
 end; // checkAddressSyntax
+
+function ipv6hex(ip:TIcsIPv6Address):string;
+begin
+setLength(result, 4*8);
+binToHex(@ip.words[0], pchar(result), sizeOf(ip))
+end;
 
 function addressMatch(mask, address:string):boolean;
 var
   invert: boolean;
-  part1, part2: string;
-  addrInt: dword;
-  ofs, i, bits: integer;
-  masks: TStringDynArray;
-  mode: (SINGLE, BITMASK, RANGE);
+  addr4: dword;
+  addr6: string;
+  bits: integer;
+  a: TStringDynArray;
+
+  function ipv6fix(s:string):string;
+  var
+    ok: boolean;
+    r: TIcsIPv6Address;
+  begin
+  if length(s) = 39 then
+    exit(replaceStr(s,':',''));
+  r:=wsocketStrToipv6(s, ok);
+  if ok then
+    exit(ipv6hex(r));
+  exit('');
+  end;
+
+  function ipv6range():boolean;
+  var
+    min, max: string;
+  begin
+  min:=ipv6fix(a[0]);
+  if min = ''then
+    exit(FALSE);
+  max:=ipv6fix(a[1]);
+  if max = '' then
+    exit(FALSE);
+  result:=(min <= addr6) and (max >= addr6)
+  end; // ipv6range
+
 begin
 result:=FALSE;
 invert:=FALSE;
@@ -1559,39 +1539,45 @@ while (mask > '') and (mask[1] = '\') do
   delete(mask,1,1);
   invert:=not invert;
   end;
-addrInt:=ipToInt(address);
-masks:=split(';',mask);
-ofs:=1;
-while not result and (ofs <= length(mask)) do
+addr6:=ipv6fix(address);
+addr4:=0;
+if addr6 = '' then
+  addr4:=ipToInt(address);
+for mask in split(';',mask) do
   begin
-  mode:=SINGLE;
-  part1:=trim(substr(mask, ofs, max(0,posEx(';', mask, ofs)-1) ));
-  inc(ofs, length(part1)+1);
-
-  if sameText(part1, 'lan') then
+  if result then
+    break;
+  if sameText(mask, 'lan') then
     begin
     result:=isLocalIP(address);
     continue;
     end;
 
-  i:=lastDelimiter('-/', part1);
-  if i > 0 then
+  // range?
+  a:=split('-', mask);
+  if length(a) = 2 then
     begin
-    if part1[i] = '-' then mode:=RANGE
-    else mode:=BITMASK;
-    part2:=part1;
-    part1:=chop(i, 1, part2);
+    if addr6 > '' then
+      result:=ipv6range()
+    else
+      result:=(pos(':',a[0]) = 0) and (addr4 >= ipToInt(a[0])) and (addr4 <= ipToInt(a[1]));
+    continue;
     end;
 
-  case mode of
-    SINGLE: result:=match( pchar(part1), pchar(address) ) > 0;
-    RANGE: result:=(addrInt >= ipToInt(part1)) and (addrInt <= ipToInt(part2));
-    BITMASK:
-      try
-        bits:=32-strToInt(part2);
-        result:=addrInt shr bits = ipToInt(part1) shr bits;
-      except end;
+  // bitmask? ipv4 only
+  a:=split('/', mask);
+  if (addr6='') and (length(a) = 2) then
+    begin
+    try
+      bits:=32-strToInt(a[1]);
+      result:=addr4 shr bits = ipToInt(a[0]) shr bits;
+    except
+      end;
+    continue;
     end;
+
+  // single
+  result:=match( pchar(mask), pchar(address) ) > 0;
   end;
 result:=result xor invert;
 end; // addressMatch
@@ -2374,6 +2360,18 @@ for i:=0 to length(a)-1 do
   end;
 end; // first
 
+function first(a:array of RawByteString): RawByteString; overload;
+var
+  i: integer;
+begin
+result:='';
+for i:=0 to length(a)-1 do
+  begin
+  result:=a[i];
+  if result > '' then exit;
+  end;
+end; // first
+
 function first(const a,b:string):string;
 begin if a = '' then result:=b else result:=a end;
 
@@ -2933,6 +2931,17 @@ for i:=0 to l-2 do
     swapMem(a[i], a[j], sizeof(a[i]), ansiCompareText(a[i], a[j]) > 0);
 end; // sortArray
 
+function sortArrayF(const a:TStringDynArray):TStringDynArray;
+var
+  i, j, l: integer;
+begin
+result:=a;
+l:=length(result);
+for i:=0 to l-2 do
+  for j:=i+1 to l-1 do
+    swapMem(result[i], result[j], sizeof(result[i]), ansiCompareText(result[i], result[j]) > 0);
+end; // sortArray
+
 procedure onlyForExperts(controls:array of Tcontrol);
 var
   i: integer;
@@ -3264,7 +3273,6 @@ end; // bmp2str
 
 function pic2str(idx:integer): RawByteString;
 var
-  ico: Ticon;
   bmp: TBitmap;
   png: TpngImage;
 begin
@@ -3276,19 +3284,17 @@ if length(imagescache) <= idx then
 result:=imagescache[idx];
 if result > '' then exit;
 
-ico:=Ticon.Create;
 png:=TPNGImage.Create;
 bmp := TBitmap.Create;
+bmp.PixelFormat := pf32bit;
 try
-  mainfrm.images.getIcon(idx, ico);
-  ico.AssignTo(bmp);
+  mainfrm.images.GetBitmap(idx, bmp);
   png.Assign(bmp);
   result:=png2str(png);
   imagescache[idx]:=result;
 finally
   bmp.Free;
   png.Free;
-  ico.free;
   end;
 end; // pic2str
 
@@ -3319,7 +3325,7 @@ var
   i, n: integer;
   ico: Ticon;
   shfi: TShFileInfo;
-  s: string;
+  sR: RawByteString;
 begin
   ZeroMemory(@shfi, SizeOf(TShFileInfo));
 // documentation reports shGetFileInfo() to be working with relative paths too,
@@ -3347,14 +3353,14 @@ ico:=Ticon.create();
 try
   systemimages.getIcon(shfi.iIcon, ico);
   i:=mainfrm.images.addIcon(ico);
-  s:=pic2str(i);
-  etags.values['icon.'+intToStr(i)] := MD5PassHS(s);
+  sR:=pic2str(i);
+  etags.values['icon.'+intToStr(i)] := MD5PassHS(sR);
 finally ico.free end;
 // now we can search if the icon was already there, by byte comparison
 n:=0;
 while n < length(sysidx2index) do
   begin
-  if pic2str(sysidx2index[n].idx) = s then
+  if pic2str(sysidx2index[n].idx) = sR then
     begin // found, delete the duplicate
     mainfrm.images.delete(i);
     setlength(imagescache, i);

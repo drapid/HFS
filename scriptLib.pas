@@ -711,8 +711,10 @@ var
 
   procedure convert();
   begin
-  if sameText(p, 'ansi') and sameText(par(1), 'utf-8') then result:=ansiToUTF8(par(2))
-  else if sameText(p, 'utf-8') and sameText(par(1), 'ansi') then result:=utf8ToAnsi(par(2))
+  if sameText(p, 'ansi') and sameText(par(1), 'utf-8') then
+    result:=ansiToUTF8(par(2))
+  else if sameText(p, 'utf-8') and sameText(par(1), 'ansi') then
+    result:=utf8ToAnsi(par(2))
   end; // convert
 
   procedure encodeuri();

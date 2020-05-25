@@ -104,7 +104,6 @@ type
     strTable: THashedStringList;
 //    fUTF8: boolean;
     fOver: Ttpl;
-//    sections: array of TtplSection;
     sections: Tstr2section;
     function  getTxt(section:string):string;
     function  newSection(section:string):PtplSection;
@@ -116,7 +115,8 @@ type
     procedure clear();
   public
     onChange: TNotifyEvent;
-    constructor create(txt: RawByteString=''; over:Ttpl=NIL);
+    constructor create(txt: RawByteString=''; over:Ttpl=NIL); OverLoad;
+    constructor create(txt: String; over:Ttpl=NIL); OverLoad;
     destructor Destroy; override;
     property txt[section:string]:string read getTxt; default;
     property fullText: RawByteString read toRaw write fromRaw;
@@ -526,6 +526,13 @@ fullText:=txt;
 self.over:=over;
 end;
 
+constructor Ttpl.create(txt: String; over:Ttpl=NIL);
+begin
+sections:=Tstr2section.Create();
+fullTextS:=txt;
+self.over:=over;
+end;
+
 destructor Ttpl.destroy;
 begin
 fullText:=''; // this will cause the disposing
@@ -561,7 +568,8 @@ end;
 function Ttpl.getSection(section:string; inherit:boolean=TRUE):PtplSection;
 begin
   result:=NIL;
-  if not sections.TryGetValue(section, result) then
+  if sections.containsKey(section) then
+   if not sections.TryGetValue(section, result) then
      result:=NIL;
 if inherit and assigned(over) and ((result = NIL) or (trim(result.txt) = '')) then
   result:=over.getSection(section);
@@ -569,11 +577,11 @@ end; // getSection
 
 function Ttpl.getTxt(section:string):string;
 var
-  s: PTplSection;
+  p: PTplSection;
 begin
-  s := getSection(section);
-if s <> NIL then
-  result:=s.txt
+  p := getSection(section);
+if p <> NIL then
+  result:=p.txt
 else
   result:=''
 end; // getTxt

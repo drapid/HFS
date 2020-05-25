@@ -1,4 +1,4 @@
-Welcome! This is the default template for HFS 2.4
+Welcome! This is the default template for HFS 2.4m
 template revision TR3.
 
 Here below you'll find some options affecting the template.
@@ -45,7 +45,6 @@ COMMENT with the ones above you can disable some features of the template. They 
 	{.$list panel.}
 	</div>
 </body>
-<!-- Build-time: %build-time% -->
 </html>
 
 [list panel]
@@ -57,7 +56,7 @@ COMMENT with the ones above you can disable some features of the template. They 
 	</div>
 :}.}
 <div id="serverinfo">
-	<a href="http://www.rejetto.com/hfs/"><i class="fa fa-coffee"></i> {.!Uptime.}: %uptime%</a>
+	<a href="http://www.rejetto.com/hfs/" title="Build-time: %build-time%"><i class="fa fa-coffee"></i> {.!Uptime.}: %uptime%</a>
 </div>
 
 
@@ -203,7 +202,9 @@ $(function(){
 [upload panel]
 <div id="upload-panel" class="additional-panel closeable" style="display:none">
 	<div id="upload-counters">
-		{.!Uploaded.}: <span id="upload-ok">0</span> - {.!Failed.}: <span id="upload-ko">0</span> - {.!Queued.}: <span id="upload-q">0</span>
+		{.!Uploaded.}: <span id="upload-ok">0</span>
+		<span style="display:none"> - {.!Failed.}: <span id="upload-ko">0</span></span>
+		- {.!Queued.}: <span id="upload-q">0</span>
 	</div>
 	<div id="upload-results"></div>
 	<div id="upload-progress">
@@ -301,16 +302,16 @@ confirm=Are you sure?
 
 {.$icons.css.}
 
-button { background-color: #cde; color: #444; padding: .5em 1em; border: transparent; text-decoration: none; border-radius: .3em; vertical-align: middle; cursor:pointer; }
-body { font-family:tahoma, verdana, arial, helvetica, sans; transition:background-color 1s ease; }
-a { text-decoration:none; color:#26c; border:1px solid transparent; padding:0 0.1em; }
+button { background-color: #bcd; color: #444; padding: .5em 1em; border: transparent; text-decoration: none; border-radius: .3em; vertical-align: middle; cursor:pointer; }
+body { font-family:tahoma, verdana, arial, helvetica, sans; transition:background-color 1s ease; color:#777; }
+a { text-decoration:none; color:#357; border:1px solid transparent; padding:0 0.1em; }
 #folder-path { float:left; margin-bottom: 0.2em; }
 #folder-path button { padding: .4em; }
 #folder-path button:first-child { padding: .2em .4em;} #folder-path i.fa { font-size:135% }
 button i.fa { font-size:110% }
 .item { margin-bottom:.3em; padding:.3em  .8em; border-top:1px solid #ddd;  }
 .item:hover { background:#f8f8f8; }
-.item-props { float:right; font-size:90%; margin-left:12px; color:#777; margin-top:.2em; }
+.item-props { float:right; font-size:90%; margin-left:12px; margin-top:.2em; }
 .item-link { float:left; word-break:break-word; /* fix long names without spaces on mobile */ }
 .item img { vertical-align: text-bottom; margin:0 0.2em; }
 .item .fa-lock { margin-right: 0.2em; }
@@ -356,14 +357,16 @@ button i.fa { font-size:110% }
 .ask input { border:1px solid rgba(0,0,0,0.5); padding: .2em; margin-top: .5em; }
 .ask .close { float: right; font-size: 1.2em; color: red; position: relative; top: -0.4em; right: -0.3em; }
 
-#additional-panels input {     color: #555; padding: .1em 0.3em; border-radius: 0.4em; }
+#additional-panels input { border:0; color: #555; padding: .1em .3em .2em; border-radius: 0.4em; }
 
-.additional-panel { position:relative; max-height: calc(100vh - 5em); text-align:left; margin: 0.5em 1em; padding: 0.5em 1em; border-radius: 1em; background-color:#555; border: 2px solid #aaa; color:#fff; line-height: 1.5em; display:inline-block;  }
+.additional-panel { position:relative; max-height: calc(100vh - 5em); text-align:left; margin: 0.5em 1em; padding: 0.5em 1em; border-radius: 1em; background-color:#667; border: 2px solid #aaa; color:#fff; line-height: 1.5em; display:inline-block;  }
 .additional-panel .close { position: absolute; right: -0.8em; top: -0.2em; color: #aaa; font-size: 130%; }
 
 body.dark-theme { background:#222; color:#aaa; }
+body.dark-theme #menu-panel { background:#345 }
 body.dark-theme #title-bar { color:#bbb }
 body.dark-theme a { color:#79b }
+body.dark-theme .item { border-color:#444; }
 body.dark-theme .item:hover { background:#111; }
 body.dark-theme button { background:#89a; }
 body.dark-theme .item .comment { background-color:#444; color:#888; }
@@ -379,7 +382,7 @@ body.dark-theme #additional-panels input
 #msgs { display:none; }
 #msgs li:first-child { font-weight:bold; }
 
-#menu-panel { position:fixed; top:0; left:0; width: 100%; background:#555; text-align:center;
+#menu-panel { position:fixed; top:0; left:0; width: 100%; background:#678; text-align:center;
 position: -webkit-sticky; position: -moz-sticky; position: -ms-sticky; position: -o-sticky; position: sticky; margin-bottom:0.3em;
 z-index:1; /* without this .item-menu will be over*/ }
 #menu-panel button span { margin-left:.8em }
@@ -775,9 +778,8 @@ function getSelectedItems() {
 }
 
 function getSelectedItemsName() {
-    return getSelectedItems().get().map(function(x) {
-        return getItemName(x)
-    })
+    return getSelectedItems().get().map(x=>
+        getItemName(x))
 }//getSelectedItemsName
 
 function deleteFiles(files) {
@@ -837,9 +839,7 @@ function selectionMask() {
             re = new RegExp(s, "i");
         }
         $("#files .selector")
-            .filter(function(i, e) {
-                return invert ^ re.test(getItemName(e));
-            })
+            .filter((i, e)=> invert ^ re.test(getItemName(e)))
             .prop('checked',true);
         selectionChanged()
     });
@@ -1009,9 +1009,8 @@ function sendFiles(files, done) {
             try {
                 data = JSON.parse(data)
                 data.forEach(function(r) {
-                    $('#upload-'+(r.err ? 'ko' : 'ok')).text(function(i, s) {
-                        return Number(s) + 1
-                    })
+                    $('#upload-'+(r.err ? 'ko' : 'ok')).text((i, s)=> +s +1)
+						.parent().show() // only for 'ko'
                     $(r.err ? '<span title="'+r.err+'"><i class="fa fa-ban"></i> '+ r.name+'</span>' 
 						: '<a title="{.!Size.}: '+r.size+'&#013;{.!Speed.}: '+r.speed+'B/s" href="'+r.url+'"><i class="fa fa-'+(r.err ? 'ban' : 'check-circled')+'"></i> '+r.name+'</a>')
 						.appendTo('#upload-results');
@@ -1137,18 +1136,16 @@ $(function(){
             $('<div class="buttons">').html([
                 it.closest('.can-delete').length > 0
 				&& $('<button><i class="fa fa-trash"></i> {.!Delete.}</button>')
-					.click(function() { deleteFiles([name]) }),
+					.click(()=> deleteFiles([name]) ),
                 it.closest('.can-rename').length > 0
 				&& $('<button><i class="fa fa-edit"></i> {.!Rename.}</button>').click(renameItem),
                 it.closest('.can-comment').length > 0
 				&& $('<button><i class="fa fa-quote-left"></i> {.!Comment.}</button>').click(setComment),
                 it.closest('.can-move').length > 0
 				&& $('<button><i class="fa fa-truck"></i> {.!Move.}</button>')
-					.click(function(){  moveFiles([name]) })
+					.click(()=> moveFiles([name]) )
             ])
         ]).addClass('item-menu-dialog')
-
-        //{.if|{.and|{.!option.move.}|{.can move.}.}| <button id='moveBtn' onclick='moveFiles()'>{.!Move.}</button> .}
 
         function setComment() {
             var value = it.find('.comment-text').text() || '';
@@ -1159,9 +1156,8 @@ $(function(){
         }//setComment
 
         function renameItem() {
-            ask(this.innerHTML+ ' '+name, { type: 'text', value: name }, function(to){
-                ajax("rename", { from: name, to: to });
-            })
+            ask(this.innerHTML+ ' '+name, { type: 'text', value: name }, to=>
+                ajax("rename", { from: name, to: to }))
         }
     })
 

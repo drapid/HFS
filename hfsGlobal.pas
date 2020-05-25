@@ -6,11 +6,12 @@ uses
 
 const
 {$I RnQBuiltTime.inc}
-  VERSION = '2.4 beta1 RD';
-  VERSION_BUILD = '303';
+  VERSION = '2.4 beta2 RD';
+  VERSION_BUILD = '305';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
+  CRLFA = RawByteString(#13#10);
   TAB = #9;
   BAK_EXT = '.bak';
   CORRUPTED_EXT = '.corrupted';

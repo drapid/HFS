@@ -130,6 +130,8 @@ type
   {$ENDIF BORLAND}
   PJclAddr = ^TJclAddr;
 
+  TJclULargeInteger = ULARGE_INTEGER;
+
 
 // EJclError
 type
@@ -242,14 +244,27 @@ type
     ReparseDataLength: Word;
     Reserved: Word;
     case Integer of
-      0: ( // SymbolicLinkReparseBuffer and MountPointReparseBuffer
-        SubstituteNameOffset: Word;
-        SubstituteNameLength: Word;
-        PrintNameOffset: Word;
-        PrintNameLength: Word;
-        PathBuffer: array [0..0] of WCHAR);
-      1: ( // GenericReparseBuffer
-        DataBuffer: array [0..0] of Byte);
+      0: (
+        SymbolicLinkReparseBuffer: record
+          SubstituteNameOffset: Word;
+          SubstituteNameLength: Word;
+          PrintNameOffset: Word;
+          PrintNameLength: Word;
+          Flags: ULONG;
+          PathBuffer: array [0..0] of WCHAR;
+        end);
+      1: (
+        MountPointReparseBuffer: record
+          SubstituteNameOffset: Word;
+          SubstituteNameLength: Word;
+          PrintNameOffset: Word;
+          PrintNameLength: Word;
+          PathBuffer: array [0..0] of WCHAR;
+        end);
+      2: (
+        GenericReparseBuffer: record
+          DataBuffer: array [0..0] of Byte;
+        end);
   end;
   {$EXTERNALSYM REPARSE_DATA_BUFFER}
   REPARSE_DATA_BUFFER = _REPARSE_DATA_BUFFER;
@@ -305,6 +320,14 @@ const
   {$EXTERNALSYM IO_REPARSE_TAG_DFS}
   IO_REPARSE_TAG_FILTER_MANAGER = DWORD($8000000B);
   {$EXTERNALSYM IO_REPARSE_TAG_FILTER_MANAGER}
+  {$EXTERNALSYM IO_REPARSE_TAG_FILTER_MANAGER}
+  IO_REPARSE_TAG_SYMLINK     = DWORD($A000000C);
+  {$EXTERNALSYM IO_REPARSE_TAG_SYMLINK}
+  IO_REPARSE_TAG_DFSR        = DWORD($80000012);
+  {$EXTERNALSYM IO_REPARSE_TAG_DFSR}
+  IO_REPARSE_TAG_NFS         = DWORD($80000014);
+  {$EXTERNALSYM IO_REPARSE_TAG_NFS}
+
   IO_COMPLETION_MODIFY_STATE = $0002;
   {$EXTERNALSYM IO_COMPLETION_MODIFY_STATE}
   IO_COMPLETION_ALL_ACCESS   = DWORD(STANDARD_RIGHTS_REQUIRED or SYNCHRONIZE or $3);

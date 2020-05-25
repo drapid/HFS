@@ -7,8 +7,16 @@ desc=Русский
 Меню
 [Self Test]
 Самодиагностика
+[De&bug]
+Отладка
 [Debug]
 Отладка
+[Donate!]
+Пожертвовать
+[Other options]
+Другие настройки
+[Help]
+Помощь
 [Add files...]
 Добавить файлы...
 [Save options]
@@ -24,6 +32,16 @@ desc=Русский
 Виртуальная Файловая Система
 [File]
 Файл
+[Progress]
+Ход
+[IP address]
+IP Адрес
+[Status]
+Статус
+[Speed]
+Скорость
+[Time left]
+Оставшееся время
 
 resourcestrings:
 [Port: %s]
@@ -38,6 +56,8 @@ resourcestrings:
 ВЫКЛЮЧИТЬ
 [Switch ON]
 ВКЛЮЧИТЬ
+[Exit]
+Выйти
 [Log]
 Журнал
 [Connections: %d]

@@ -104,14 +104,7 @@ procedure translateComponent(c: Tcomponent; window: Tform);
 var
   i, k: integer;
 begin
-  if c is TControl then
-    with TLangControl(c) do
-    begin
-     hint := trans(hint);
-     if caption > '' then
-      caption :=trans(caption)
-    end
-   else if c is Tmenu then
+   if c is Tmenu then
     with c as Tmenu do
       recurMenu(items)
    else if c is Tlabelededit then
@@ -135,6 +128,11 @@ begin
          itemIndex := i;
         end;
       end
+   else if c is TListView then
+      begin  // itemindex is lost during translation
+       for var cc in TListView(c).Columns do
+         TListColumn(cc).Caption := trans(TListColumn(cc).Caption)
+      end
 {    else if c is TVirtualDrawTree then
      begin
        for I := 0 to TVirtualDrawTree(c).Header.Columns.Count - 1 do
@@ -146,6 +144,13 @@ begin
 else if c is Tchecklistbox then with c as Tchecklistbox do
   tstrings_trans(items)
 }
+  else if c is TControl then
+    with TLangControl(c) do
+    begin
+     hint := trans(hint);
+     if caption > '' then
+      caption :=trans(caption)
+    end
 ;
 
 {if c is TColorPickerButton then with c as TColorPickerButton do

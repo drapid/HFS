@@ -30,7 +30,8 @@ interface
 
 uses
   classes, messages, winprocs, forms, extctrls, sysutils,
-  contnrs, strUtils, winsock, OverbyteIcsWSocket, inifiles, types,
+  contnrs, strUtils, winsock, inifiles, types,
+  OverbyteIcsWSocket, //OverbyteIcsWSockets,
   hfsGlobal;
 
 const
@@ -230,6 +231,7 @@ type
 //    procedure addHeader(s:string; overwrite:boolean=TRUE); OverLoad; // append an additional header line
     procedure addHeader(const s:RawByteString; overwrite:boolean=TRUE); OverLoad; // append an additional header line
     procedure addHeader(const h, v:RawByteString; overwrite:boolean=TRUE); OverLoad; // append an additional header line
+    procedure addHeader(const h, v: String; overwrite:boolean=TRUE); OverLoad;
     function  setHeaderIfNone(s:string):boolean; // set header if not already existing
     procedure removeHeader(name: RawByteString);
     function  getHeader(h:string):string;  // extract the value associated to the specified header field
@@ -282,6 +284,7 @@ type
     procedure calculateSpeed();
     procedure processDisconnecting();
   public
+//    sock: TwsocketServer;     // listening multiple sockets
     sock: Twsocket;     // listening socket
     conns,          // full list of connected clients
     disconnecting,  // list of pending disconnections
@@ -396,6 +399,8 @@ function isLocalIP(const ip:string):boolean;
 var
   r: record d,c,b,a:byte end;
 begin
+if ip = '::1' then
+  exit(TRUE);
 dword(r):=WSocket_ntohl(WSocket_inet_addr(ansiString(ip)));
 result:=(r.a in [0,10,23,127])
   or (r.a = 192) and ((r.b = 168) or (r.b = 0) and (r.c = 2))
@@ -619,7 +624,8 @@ end; // getIP
 function replyHeader_IntPositive(const name:string; int:int64):string;
 begin
 result:='';
-if int >= 0 then result:=name+': '+intToStr(int)+CRLF;
+if int >= 0 then
+  result:=name+': '+intToStr(int)+CRLF;
 end;
 
 function replyHeader_Str(const name:string; const str:string):string;
@@ -716,11 +722,18 @@ begin
 result:=FALSE;
 if active or not assigned(sock) then exit;
 try
-  if onAddress = '' then onAddress:='*';
-  if (onAddress = '') or (onAddress = '*') then
-    sock.addr := '0.0.0.0'
+  if onAddress = '[*]' then
+    begin
+      sock.addr := '[0::0]'
+    end
    else
-    sock.addr := onAddress;
+    begin
+      if onAddress = '' then onAddress:='*';
+      if (onAddress = '') or (onAddress = '*') then
+        sock.addr := '0.0.0.0'
+       else
+        sock.addr := onAddress;
+    end;
   sock.port:=port;
 //  sock.proto:='6';
   sock.proto := 'tcp';
@@ -729,6 +742,19 @@ try
   if port = '0' then
     P_port := sock.getxport();
   result := TRUE;
+
+{
+  if onAddress = '*' then
+    try
+      sock.MultiListenSockets.Clear();
+      with sock.MultiListenSockets.Add do
+        begin
+        addr := '::';
+        Port := sock.port
+        end;
+      sock.MultiListen();
+    except end;
+}
   notify(HE_OPEN, NIL);
 except
   end;
@@ -737,7 +763,10 @@ end; // start
 procedure ThttpSrv.stop();
 begin
 if assigned(sock) then
+ begin
   try sock.Close() except end;
+//  try sock.multiListenSockets.clear() except end;
+ end;
 end;
 
 procedure ThttpSrv.connected(Sender: TObject; Error: Word);
@@ -751,6 +780,7 @@ begin notify(HE_CLOSE, NIL) end;
 
 constructor ThttpSrv.create();
 begin
+//sock:=TWSocketServer.create(NIL);
 sock:=TWSocket.create(NIL);
 sock.OnSessionAvailable:=connected;
 sock.OnSessionClosed:=disconnected;
@@ -1775,6 +1805,13 @@ begin
   if overwrite then
     removeHeader(h);
   reply.fAdditionalHeaders := reply.fAdditionalHeaders + h + ': ' + v + CRLF;
+end; // addHeader
+
+procedure ThttpConn.addHeader(const h, v:String; overwrite:boolean=TRUE);
+begin
+  if overwrite then
+    removeHeader(h);
+  reply.fAdditionalHeaders := reply.fAdditionalHeaders + StrToUTF8(h) + ': ' + StrToUTF8(v) + CRLF;
 end; // addHeader
 
 function ThttpConn.getDontFree():boolean;

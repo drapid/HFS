@@ -47,10 +47,9 @@ var
   addingItemsCounter: integer = -1; // -1 is disabled
   stopAddingItems, queryingClose: boolean;
   port: string;
-  defaultTpl: string;
   tpl_help: string;
   lastWindowRect: Trect;
-  dmBrowserTpl, filelistTpl: Ttpl;
+  defaultTpl, dmBrowserTpl, filelistTpl: Ttpl;
   tplEditor: string;
   tplLast: Tdatetime;
   tplImport: boolean;

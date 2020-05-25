@@ -2866,6 +2866,10 @@ object mainFrm: TmainFrm
         Caption = 'Any address'
         OnClick = Anyaddress1Click
       end
+      object AnyAddressV6: TMenuItem
+        Caption = 'Any IPv6 address'
+        OnClick = AnyAddressV6Click
+      end
     end
     object DynamicDNSupdater1: TMenuItem
       Caption = 'Dynamic DNS updater'
@@ -2907,12 +2911,10 @@ object mainFrm: TmainFrm
       object encodenonasciiChk: TMenuItem
         AutoCheck = True
         Caption = 'Encode non-ASCII characters'
-        Checked = True
       end
       object pwdInPagesChk: TMenuItem
         AutoCheck = True
         Caption = 'Include password in pages (for download managers)'
-        OnClick = pwdInPagesChkClick
       end
       object httpsUrlsChk: TMenuItem
         AutoCheck = True
@@ -3164,11 +3166,6 @@ object mainFrm: TmainFrm
     object Viewhttprequest1: TMenuItem
       Caption = 'View http request'
       OnClick = Viewhttprequest1Click
-    end
-    object leavedisconnectedconnectionsChk: TMenuItem
-      AutoCheck = True
-      Caption = 'Leave disconnected connections'
-      OnClick = leavedisconnectedconnectionsChkClick
     end
     object trayiconforeachdownload1: TMenuItem
       Caption = 'Tray icon for each download'
