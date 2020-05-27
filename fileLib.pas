@@ -1,4 +1,4 @@
-unit FileLib;
+unit fileLib;
 
 interface
 
@@ -1395,28 +1395,29 @@ end; // getRecursiveFileMask
 
 function Tfile.getAccountsFor(action:TfileAction; specialUsernames:boolean=FALSE; outInherited:Pboolean=NIL):TstringDynArray;
 var
-  i: integer;
   f: Tfile;
-  s: string;
 begin
 result:=NIL;
 f:=self;
 if assigned(outInherited) then outInherited^:=FALSE;
 while assigned(f) do
   begin
-  for i:=0 to length(f.accounts[action])-1 do
+  for var s in f.accounts[action] do
   	begin
-    s:=f.accounts[action][i];
     if (s = '')
-    or (action = FA_UPLOAD) and not f.isRealFolder() then continue; // we must ignore this setting
+    or (action = FA_UPLOAD) and not f.isRealFolder() then // we must ignore this setting
+      continue;
 
     if specialUsernames and (s[1] = '@')
     or accountExists(s, specialUsernames) then // we admit groups only if specialUsernames are admitted too
       addString(s, result);
     end;
-  if (action = FA_ACCESS) and (f.user > '') then addString(f.user, result);
-  if assigned(result) then exit;
-  if assigned(outInherited) then outInherited^:=TRUE;
+  if (action = FA_ACCESS) and (f.user > '') then
+    addString(f.user, result);
+  if assigned(result) then
+    exit;
+  if assigned(outInherited) then
+    outInherited^:=TRUE;
   f:=f.parent;
   end;
 end; // getAccountsFor

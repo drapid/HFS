@@ -193,7 +193,7 @@ function onlyString(const s: String; ss: TStringDynArray): boolean;
 function addArray(var dst:TstringDynArray; src:array of string; where:integer=-1; srcOfs:integer=0; srcLn:integer=-1):integer;
 function removeArray(var src:TstringDynArray; toRemove:array of string):integer;
 function addUniqueArray(var a:TstringDynArray; b:array of string):integer;
-procedure uniqueStrings(var a:TstringDynArray);
+procedure uniqueStrings(var a:TstringDynArray; ci:Boolean=TRUE);
 function idxOf(s:string; a:array of string; isSorted:boolean=FALSE):integer;
 function stringExists(s:string; a:array of string; isSorted:boolean=FALSE):boolean;
 function listToArray(l:Tstrings):TstringDynArray;
@@ -704,13 +704,14 @@ if i < 0 then addString(s, ss)
 else removeString(ss, i);
 end; // toggleString
 
-procedure uniqueStrings(var a:TstringDynArray);
+procedure uniqueStrings(var a:TstringDynArray; ci:Boolean=TRUE);
 var
   i, j: integer;
 begin
 for i:=length(a)-1 downto 1 do
   for j:=i-1 downto 0 do
-    if ansiCompareText(a[i], a[j]) = 0 then
+    if ci and SameText(a[i], a[j])
+    or not ci and (a[i] = a[j]) then
       begin
       removeString(a, i);
       break;
@@ -1295,6 +1296,11 @@ end;
 
 // exec but does not wait for the process to end
 function execNew(cmd:string):boolean;
+begin
+result:=32 < ShellExecute(0, nil, 'cmd.exe', pchar('/C '+cmd), nil, SW_SHOW);
+end; // execNew
+
+function execNew2(cmd:string):boolean;
 var
   si: TStartupInfo;
   pi: TProcessInformation;
@@ -1783,30 +1789,76 @@ end; // inputQueryLong
 
 function httpGet(const url:string; from:int64=0; size:int64=-1): RawByteString;
 var
-  http: THttpCli;
-  reply: TAnsiStringStream;
+  fs: TMemoryStream;
+  httpCli: TSslHttpCli;
 begin
 if size = 0 then
   begin
   result:='';
   exit;
   end;
-reply:=TAnsiStringStream.Create('');
-try
-  http:=Thttpcli.create(NIL);
+
+//  Result := LoadFromURLStr(url, from, size);
+  fs := nil;
+  Result := '';
+
   try
-    http.URL:=url;
-    http.followRelocation:=TRUE;
-    http.rcvdStream:=reply;
-    http.agent:=HFS_HTTP_AGENT;
-    if (from <> 0) or (size > 0) then
-      http.contentRangeBegin:=intToStr(from);
-    if size > 0 then
-      http.contentRangeEnd:=intToStr(from+size-1);
-    http.get();
-    result:=reply.dataString;
-  finally http.free end
-finally reply.free end
+    httpCli := TSslHttpCli.Create(nil);
+    httpCli.MultiThreaded := True;
+    httpCli.URL := URL;
+    httpCli.FollowRelocation := True;
+    httpCli.agent := HFS_HTTP_AGENT;
+    httpCli.SslContext := TSslContext.Create(NIL);
+//    SetupProxy(httpCli);
+
+    fs := TMemoryStream.Create;
+    httpCli.RcvdStream := fs;
+    if (from <> 0) or (size >= 0) then
+      httpCli.contentRangeBegin:=intToStr(from);
+    if size >= 0 then
+      httpCli.contentRangeEnd:=intToStr(from+size-1);
+
+    try
+      if size >= 0 then
+      begin
+        httpCli.Head;
+        if httpCli.ContentLength < from then
+          Exit;
+      end;
+      try
+{
+        if POSTData>'' then
+        begin
+          httpCli.SendStream := TMemoryStream.Create;
+          if POSTData > '' then
+            httpCli.SendStream.Write(POSTData[1], Length(POSTData));
+          httpCli.SendStream.Seek(0, 0);
+          httpCli.Post;
+        end
+        else
+}
+          httpCli.Get;
+        if fs.Size > 0 then
+        begin
+          SetLength(Result, fs.Size);
+          fs.Seek(0, soFromBeginning);
+          fs.Read(Result[1], Length(Result));
+        end;
+      except
+        on E: EHttpException do
+      end;
+
+    finally
+      httpCli.SslContext.Free;
+      httpCli.SslContext := NIL;
+      httpCli.Free;
+      if Assigned(fs) then
+        fs.Free;
+    end;
+  except
+
+  end;
+
 end; // httpGet
 
 function httpFileSize(url:string):int64;
@@ -1856,13 +1908,15 @@ function getExternalAddress(var res:string; provider:Pstring=NIL):boolean;
   procedure loadIPservices(src:string='');
   var
     l:string;
+    sA: RawByteString;
   begin
   if src = '' then
     begin
     if now()-IPservicesTime < 1 then exit; // once a day
     IPservicesTime:=now();
-    try src:=trim(httpGet(IP_SERVICES_URL));
+    try sA:=trim(httpGet(IP_SERVICES_URL));
     except exit end;
+     src := (UnUTF(sA));
     end;
   IPservices:=NIL;
   while src > '' do
@@ -1876,6 +1930,7 @@ const {$J+}
   lastProvider: string = ''; // this acts as a static variable
 var
   s, mark, addr: string;
+  sA: RawByteString;
   i: integer;
 begin
 result:=FALSE;
@@ -1895,17 +1950,21 @@ else
 addr:=chop('|',s);
 if assigned(provider) then provider^:=addr;
 mark:=s;
-try s:=httpGet(addr);
+try
+  sA:=httpGet(addr);
+  s:=UnUTF(sA);
 except exit end;
 if mark > '' then chop(mark, s);
 s:=trim(s);
 if s = '' then exit;
 // try to determine length
 i:=1;
-while (i < length(s)) and (i < 15) and (s[i+1] in ['0'..'9','.']) do inc(i);
-while (i > 0) and (s[i] = '.') do dec(i);
+while (i < length(s)) and (i < 15) and (s[i+1] in ['0'..'9','.']) do
+  inc(i);
+while (i > 0) and (s[i] = '.') do
+  dec(i);
 setLength(s,i);
-result:= checkAddressSyntax(s) and not HSlib.isLocalIP(s);
+result:= checkAddressSyntax(s, false) and not HSlib.isLocalIP(s);
 if not result then exit;
 if (res <> s) and mainFrm.logOtherEventsChk.checked then
   mainFrm.add2log('New external address: '+s+' via '+hostFromURL(addr));
@@ -3275,6 +3334,7 @@ function pic2str(idx:integer): RawByteString;
 var
   bmp: TBitmap;
   png: TpngImage;
+  ico: TIcon;
 begin
 result:='';
 if idx < 0 then exit;
@@ -3286,13 +3346,26 @@ if result > '' then exit;
 
 png:=TPNGImage.Create;
 bmp := TBitmap.Create;
-bmp.PixelFormat := pf32bit;
+ico := TIcon.Create;
+//bmp.PixelFormat := pf32bit;
+//  bmp.PixelFormat := pf24bit;
 try
-  mainfrm.images.GetBitmap(idx, bmp);
+  mainfrm.images.GetIcon(idx, ico);
+//  ico2bmp(ico, bmp);
+  bmp.SetSize(ico.Width, ico.Height);
+  bmp.PixelFormat := pf24bit;
+  bmp.Canvas.Brush.Color:= $010100;
+  bmp.Canvas.FillRect(bmp.Canvas.ClipRect);
+  bmp.Canvas.StretchDraw(Rect(0, 0, bmp.Width, bmp.Height), ico);
+
+  bmp.TransparentColor := $010100;
+  bmp.Transparent := True;
+
   png.Assign(bmp);
   result:=png2str(png);
   imagescache[idx]:=result;
 finally
+  ico.Free;
   bmp.Free;
   png.Free;
   end;

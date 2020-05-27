@@ -185,11 +185,11 @@ type
     destructor Destroy; override;
     procedure keepAlive();
     procedure setTTL(t:Tdatetime);
-    property v[k: TSessionId]: String read getVar write setVar;
+    property v[k: TSessionId]: String read getVar write setVar; default;
    end;
 
   Tsessions = class
-   fS: Tdictionary<TSessionId,Tsession>;
+   fS: TDictionary<TSessionId,Tsession>;
   public
     constructor create;
     destructor Destroy; override;
@@ -201,7 +201,7 @@ type
     function  noSession(sId: TSessionId): Boolean;
     procedure keepAlive(sId: TSessionId);
     procedure checkExpired;
-    property ss[sId: TSessionId]: Tsession read getSession;
+    property  ss[sId: TSessionId]: Tsession read getSession; default;
   end;
 
   ThashFunc = function(s:string):string;

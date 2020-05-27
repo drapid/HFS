@@ -71,6 +71,8 @@ s:='';
 if ts then
     s:='<hr>'+dateTimeToStr(now())+CRLF;
 s:=s+#13'<dt>'+htmlEncode(textIn)+'</dt><dd>'+htmlEncode(textOut)+'</dd>';
+if sizeOfFile(MACROS_LOG_FILE) = 0 then
+  saveFileA(MACROS_LOG_FILE, header, True);
 //result := appendFile(MACROS_LOG_FILE, UTF8Encode(s))
 result:=saveFileU(MACROS_LOG_FILE, s, True);
 end; // macrosLog
@@ -969,6 +971,37 @@ var
     finally free end;
   end; // foreach
 
+  procedure forLine();
+  var
+    lines: TStringList;
+    line, code, run: string;
+    i: integer;
+  begin
+  code:=macroDequote(par(pars.count-1));
+  with TfastStringAppend.create do
+    try
+      lines:=TStringList.create();
+      lines.text:= getVar(par('var'));
+      for line in lines do
+        begin
+        i:=pos('=',line);
+        if i > 0 then
+          begin
+          setVar('line-key', Copy(line, 1, i-1));
+          setVar('line-value', Copy(line, i+1, MAXINT));
+          end;
+        setVar('line', line);
+        run:=code;
+        applyMacrosAndSymbols(run, cbMacros, cbData);
+        append(run);
+        end;
+      result:=reset();
+    finally
+      Free;
+      lines.Free;
+      end;
+  end; //forLine
+
   procedure for_();
   var
     b, e, i, d: integer;
@@ -1107,7 +1140,7 @@ var
   from:=max(0,from);
 
   if reMatch(fn, '^https?://', 'i!') > 0 then
-    try result:=httpGet(fn, from, size)
+    try result:= UnUTF( httpGet(fn, from, size))
     except result:='' end
   else
     result := UnUTF(loadFile(uri2diskMaybe(fn), from, size));
@@ -1177,7 +1210,7 @@ var
         finally free end;
     end;
   // now we have in 's' the content to be saved
-  spaceIf(saveFile2(uri2diskMaybeFolder(p), UTF8Encode(s), name='append'));
+  spaceIf(saveFileU(uri2diskMaybeFolder(p), s, name='append'));
   end; // save
 
   procedure replace();
@@ -2521,8 +2554,12 @@ try
       minOrMax();
 
     if stringExists(name, ['if','if not']) then
-      if isFalse(p) xor (length(name) > 2) then result:=macroDequote(par(2))
+      begin
+      try p:=getVar(parEx('var'));
+      except end;
+      if isTrue(p) xor (length(name) = 2) then result:=macroDequote(par(2))
       else result:=macroDequote(par(1));
+      end;
 
     if stringExists(name, ['=','>','>=','<','<=','<>','!=']) then
       trueIf(compare(name, p, par(1)));
@@ -2537,6 +2574,9 @@ try
 
     if name = 'cut' then
       cut();
+
+    if name ='for line' then
+      forLine();
 
     if pars.count < 3 then exit; // from here, only macros with at least 3 parameters
 

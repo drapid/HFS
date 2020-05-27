@@ -6,8 +6,8 @@ uses
 
 const
 {$I RnQBuiltTime.inc}
-  VERSION = '2.4 beta2 RD';
-  VERSION_BUILD = '305';
+  VERSION = '2.4 beta6 RD';
+  VERSION_BUILD = '308';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
@@ -134,7 +134,7 @@ resourcestring
 
 type
   TcharSetA = TSysCharSet; //set of char;
-  TcharSetW = set of Char; //set of char;
+  TcharSetW = set of Char deprecated 'Holds Char values in the ordinal range of 0..255 only.'; //set of char;
 
 //  Pboolean = ^boolean;
 

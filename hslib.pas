@@ -225,7 +225,7 @@ type
     eventData: RawByteString;
     ignoreSpeedLimit: boolean;
     limiters: TobjectList;     // every connection can be bound to a number of TspeedLimiter
-    constructor create(server:ThttpSrv);
+    constructor create(server:ThttpSrv; acceptingSock:Twsocket);
     destructor Destroy; override;
     procedure disconnect();
 //    procedure addHeader(s:string; overwrite:boolean=TRUE); OverLoad; // append an additional header line
@@ -355,8 +355,6 @@ uses
   AnsiClasses, RDUtils, Base64;
 
 const
-  CRLF = #13#10;
-  CRLFA = RawByteString(#13#10);
   MAX_REQUEST_LENGTH = 64*1024;
   MAX_INPUT_BUFFER_LENGTH = 256*1024;
   // used as body content when the user did not specify any
@@ -772,7 +770,7 @@ end;
 procedure ThttpSrv.connected(Sender: TObject; Error: Word);
 begin
   if error=0 then
-    ThttpConn.create(self)
+    ThttpConn.create(self, sender as Twsocket)
 end;
 
 procedure ThttpSrv.disconnected(Sender: TObject; Error: Word);
@@ -1016,13 +1014,16 @@ begin canClose:=FALSE end;
 
 ////////// CLIENT
 
-constructor ThttpConn.create(server:ThttpSrv);
+constructor ThttpConn.create(server:ThttpSrv; acceptingSock:Twsocket);
 var
   i: integer;
 begin
 // init socket
 sock:=Twsocket.create(NIL);
-sock.Dup(server.sock.Accept);
+if acceptingSock <> NIL then
+  sock.Dup(acceptingSock.accept())
+ else
+  sock.Dup(server.sock.accept());
 sock.OnDataAvailable:=dataavailable;
 sock.OnSessionClosed:=disconnected;
 sock.onSendData:=senddata;

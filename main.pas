@@ -17,7 +17,7 @@ This file is part of HFS ~ HTTP File Server.
     along with HFS; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 }
-{ $A+,B-,C+,E-,F-,G+,H+,I-,J-,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,X+,Y+,Z1}
+{ $A+,B-,C+,E-,F-,G+,H+,I-,J+,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,X+,Y+,Z1}
 {$INCLUDE defs.inc }
 
 unit main;
@@ -2365,6 +2365,13 @@ while i < srv.conns.count do
   end;
 end; // kickBannedOnes
 
+function getAcceptOptions():TstringDynArray;
+begin
+result:=listToArray(localIPlist(sfAny));
+addUniqueString('127.0.0.1', result);
+addUniqueString('::1', result);
+end; // getAcceptOptions
+
 function startServer():boolean;
 
   procedure tryPorts(list:array of string);
@@ -2382,7 +2389,7 @@ begin
 result:=FALSE;
 if srv.active then exit; // fail if already active
 
-if (localIPlist.IndexOf(listenOn) < 0) and (listenOn <> '127.0.0.1') then
+if not stringExists(listenOn, getAcceptOptions()) then
   listenOn:='';
 
 if port > '' then
@@ -2671,7 +2678,8 @@ procedure Tmainfrm.httpEvent(event:ThttpEvent; conn:ThttpConn);
 var
   data: TconnData;
   f: Tfile;
-  url, httpDate: string;
+//  httpDate: string;
+  url: string;
 
   Freq, StartCount, StopCount: Int64;
   TimingSeconds: real;
@@ -2740,20 +2748,23 @@ var
   procedure doLog();
   var
     i: integer;
-    url_: string; // an alias, final '_' is to not confuse with the other var
     s: string;
+     function decodedUrl():string;
+      begin
+      if conn = NIL then
+        exit('');
+      result:=decodeURL(conn.request.url);
+     end;
   begin
   if assigned(data) and data.dontLog and (event <> HE_DISCONNECTED) then exit; // we exit expect for HE_DISCONNECTED because dontLog is always set AFTER connections, so HE_CONNECTED is always logged. The coupled HE_DISCONNECTED should be then logged too.
 
   if assigned(data) and (data.preReply = PR_BAN)
   and not logBannedChk.checked then exit;
 
-  if conn = NIL then url_:=''
-  else url_:=decodeURL(conn.request.url);
   if not (event in [HE_OPEN, HE_CLOSE, HE_CONNECTED, HE_DISCONNECTED, HE_GOT]) then
     if not logIconsChk.checked and (data.downloadingWhat = DW_ICON)
     or not logBrowsingChk.checked and (data.downloadingWhat = DW_FOLDERPAGE)
-    or not logProgressChk.checked and (url_ = '/~progress') then
+    or not logProgressChk.checked and (decodedUrl() = '/~progress') then
       exit;
 
   if not (event in [HE_OPEN, HE_CLOSE])
@@ -2809,7 +2820,7 @@ var
           s:=subStr(conn.getHeader('Range'), 7);
           if s > '' then
             s:=TAB+'['+s+']';
-          add2log(format('Requested %s %s%s', [ METHOD2STR[conn.request.method], url_, s ]), data);
+          add2log(format('Requested %s %s%s', [ METHOD2STR[conn.request.method], decodedUrl(), s ]), data);
           end;
         if dumprequestsChk.checked then
           add2log('Request dump'+CRLF+conn.request.full, data);
@@ -2846,7 +2857,7 @@ var
         add2log(format('Fully downloaded - %s @ %sB/s - %s', [
           smartSize(conn.bytesSentLastItem),
           smartSize(calcAverageSpeed(conn.bytesSentLastItem)),
-          url_]), data);
+          decodedUrl()]), data);
         end;
     end;
 
@@ -3011,6 +3022,21 @@ var
   conn.addHeader('Content-Disposition', if_(attach, RawByteString('attachment; ')) + RawByteString('filename="')+encodeURL(data.lastFN)+'";');
   end;
 
+  function sessionRedirect():boolean;
+  var
+    s: TSession;
+  begin
+  if (data.sessionID = '') or (sessions.noSession(data.sessionID)) then
+    exit(FALSE);
+  s := sessions[data.sessionid];
+  if s.redirect = '' then
+    exit(FALSE);
+  conn.reply.mode:=HRM_REDIRECT;
+  conn.reply.url:=s.redirect;
+  s.redirect:=''; // only once
+  result:=TRUE;
+  end; // sessionRedirect
+
   function sessionSetup():boolean;
   var
 //    idx: Integer;
@@ -3057,13 +3083,6 @@ var
        data.usr:=data.account.user;
        data.pwd:=data.account.pwd;
       end;
-   if Assigned(s) and (s.redirect > '') then
-    begin
-    conn.reply.mode:=HRM_REDIRECT;
-    conn.reply.url:= s.redirect;
-    s.redirect:=''; // only once
-    result:=FALSE;
-    end;
   end; // sessionSetup
 
   procedure serveTar();
@@ -3413,7 +3432,6 @@ var
         if ss.ttl < 0 then
           exit('expired');
         ss.user:=acc.user;
-        ss.redirect:=getAccountRedirect(acc);
       end;
     data.account:=acc;
     data.usr:=acc.user;
@@ -3769,14 +3787,15 @@ var
   if f.isFolder() then
     begin
     deletion();
-
+    if sessionRedirect() then
+      exit;
     data.downloadingWhat:=DW_FOLDERPAGE;
 QueryPerformanceFrequency(Freq);
 QueryPerformanceCounter(StartCount);
     if DMbrowserTplChk.Checked and isDownloadManagerBrowser() then
       s:=getFolderPage(f, data, dmBrowserTpl)
     else
-      s := getFolderPage(f, data, tpl);
+      s:=getFolderPage(f, data, tpl);
     if conn.reply.mode <> HRM_REDIRECT then
       replyWithString(s);
 QueryPerformanceCounter(StopCount);
@@ -4025,7 +4044,7 @@ case event of
     data.downloadingWhat:=DW_UNK;
     data.agent:=getAgentID(conn);
     data.fileXferStart:=now();
-    f:=findFileByURL(decodeURL(conn.request.url));
+    f:=findFileByURL(decodeURL(getTill('?',conn.request.url)));
     data.lastFile:=f; // auto-freeing
     data.uploadSrc:=conn.post.filename;
     data.uploadFailed:='';
@@ -4089,19 +4108,16 @@ end; // httpEvent
 
 procedure findSimilarIP(fromIP:string);
 
-  function howManySameNumbers(ip1,ip2:string):integer;
+  function howManySameChars(ip1,ip2:string):integer;
   var
-    n1, n2: string;
+    i,n: integer;
   begin
-  result:=0;
-  while ip1 > '' do
-    begin
-    n1:=chop('.',ip1);
-    n2:=chop('.',ip2);
-    if n1 <> n2 then exit;
-    inc(result);
-    end;
-  end; // howManySameNumbers
+  i:=1;
+  n:=min(length(ip1),length(ip2));
+  while (i<=n) and (ip1[i] = ip2[i]) do
+    inc(i);
+  result:=i-1;
+  end; // howManySameChars
 
 var
   chosen: string;
@@ -4115,9 +4131,10 @@ if stringExists(fromIP, customIPs) then
   exit;
   end;
 chosen:=getIP();
-a:=getIPs();
+//a:=getIPs();
+a:=getAcceptOptions();
 for i:=0 to length(a)-1 do
-  if howManySameNumbers(chosen, fromIP) < howManySameNumbers(a[i], fromIP) then
+  if howManySameChars(chosen, fromIP) < howManySameChars(a[i], fromIP) then
     chosen:=a[i];
 setDefaultIP(chosen);
 end; // findSimilarIP
@@ -5597,19 +5614,22 @@ if filesBox.SelectionCount = 1 then
 
   a:=NIL;
   if anyFileSelected then
-    a:=expandAccountsByLink(selectedFile.getAccountsFor(FA_ACCESS, TRUE));
+    a:=expandAccountsByLink(selectedFile.getAccountsFor(FA_ACCESS, TRUE))
+      +expandAccountsByLink(selectedFile.getAccountsFor(FA_UPLOAD, TRUE))
+      +expandAccountsByLink(selectedFile.getAccountsFor(FA_DELETE, TRUE));
   visibleIf(CopyURLwithpassword1, assigned(a), ONLY_EXPERT);
   copyURLwithpassword1.Clear();
-  for i:=0 to length(a)-1 do
-    copyURLwithpassword1.add( newItem( a[i], 0, FALSE, TRUE, copyURLwithPasswordMenuClick, 0, '') );
+  uniqueStrings(a, FALSE);
+  for var s in a do
+    copyURLwithpassword1.add( newItem( s, 0, FALSE, TRUE, copyURLwithPasswordMenuClick, 0, '') );
   end;
 
 a:=getPossibleAddresses();
 if length(a) = 1 then a:=NIL;
 visibleIf(CopyURLwithdifferentaddress1, anyFileSelected and assigned(a), ONLY_EXPERT);
 copyURLwithdifferentaddress1.clear();
-for i:=0 to length(a)-1 do
-  copyURLwithdifferentaddress1.add( newItem( a[i], 0, FALSE, TRUE, copyURLwithAddressMenuclick, 0, '') );
+for var s in a do
+  copyURLwithdifferentaddress1.add( newItem( s, 0, FALSE, TRUE, copyURLwithAddressMenuclick, 0, '') );
 
 end;
 
@@ -5785,13 +5805,13 @@ resourcestring
 const
   UPDATE_BATCH_FILE = 'hfs.update.bat';
   UPDATE_BATCH = 'START %0:s /WAIT "%1:s" -q'+CRLF
-    +'ping 127.0.0.1 -n 3 -w 1000> nul'+CRLF
-    +'DEL "%3:s'+PREVIOUS_VERSION+'"'+CRLF
-    +'%2:sMOVE "%1:s" "%3:s'+PREVIOUS_VERSION+'"'+CRLF
-    +'DEL "%1:s"'+CRLF
-    +'MOVE "%4:s" "%1:s"'+CRLF
+    +'ping 127.0.0.1 -n 3 -w 1000> nul'+CRLF // wait
+    +'DEL "%3:s'+PREVIOUS_VERSION+'"'+CRLF // previous backup
+    +'%2:sMOVE "%1:s" "%3:s'+PREVIOUS_VERSION+'"'+CRLF // new backup
+    +'DEL "%1:s"'+CRLF // too zealous?
+    +'MOVE "%4:s" "%1:s"'+CRLF // new becomes current
     +'START %0:s "%1:s"'+CRLF
-    +'DEL %%0'+CRLF;
+    +'DEL %%0'+CRLF; // remove self
 var
   size: integer;
   fn: string;
@@ -5870,7 +5890,7 @@ end; // promptForUpdating
 
 function downloadUpdateInfo():Ttpl;
 const
-  URL = 'http://www.rejetto.com/hfs/hfs.updateinfo.txt';
+  URL = 'https://www.rejetto.com/hfs/hfs.updateinfo.txt';
   ON_DISK = 'hfs.updateinfo.txt';
 resourcestring
   MSG_FROMDISK = 'Update info has been read from local file.'
@@ -5888,7 +5908,8 @@ progFrm.show('Requesting...');
 try
   // this let the developer to test the parsing locally
   if not fileExists(ON_DISK) then
-    try s:=httpGet(URL)
+    try
+      s:=httpGet(URL)
     except end
   else
     begin
@@ -6082,7 +6103,7 @@ var
   procedure every10sec();
   var
     s: string;
-    ss: Tstrings;
+    ss: TstringDynArray;
     sa: TstringDynArray;
   begin
     sa := getPossibleAddresses();
@@ -6100,10 +6121,10 @@ var
     s:=getIP();
     if not isLocalIP(s) then // clearly better
       setDefaultIP(s)
-    else if ansiStartsStr('169', defaultIP) then // we consider the 169 worst of other locals
+    else if ansiStartsStr('169.', defaultIP) then // we consider the 169 worst of other locals
       begin
-      ss:=LocalIPList();
-      if ss.count > 1 then
+      ss:=getAcceptOptions();
+      if length(ss) > 1 then
         setDefaultIP(ss[ if_(ss[0]=defaultIP, 1, 0) ]);
       end;;
     end;
@@ -6179,11 +6200,14 @@ var
         if userIcsBuffer > 0 then
           data.conn.sock.bufSize:=userIcsBuffer;
 
-        size:=minmax(8192, MEGA, round(data.averageSpeed));
         if userSocketBuffer > 0 then
           data.conn.sndBuf:=userSocketBuffer
-        else if highSpeedChk.checked and (safeDiv(0.0+size, data.conn.sndbuf, 2) > 2) then
+        else
+          begin
+          size:=minmax(8192, MEGA, round(data.averageSpeed));
+          if highSpeedChk.checked and (safeDiv(0.0+size, data.conn.sndbuf, 2) > 2) then
             data.conn.sndBuf:=size;
+          end;
         end;
 
       // connection inactivity timeout
@@ -8748,7 +8772,7 @@ f:=selectedFile;
 while assigned(f) and (f.accounts[FA_ACCESS] = NIL) and (f.user = '') do
   f:=f.parent;
 
-if f.user = user then 
+if assigned(f) and (f.user = user) then
   pwd:=f.pwd
 else
   begin
@@ -8857,9 +8881,12 @@ end;
 procedure TmainFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
 quitting:=TRUE;
-runEventScript('quit');
-timer.enabled:=FALSE;
-if autosaveOptionsChk.checked then saveCFG();
+if applicationFullyInitialized then
+  begin
+  runEventScript('quit');
+  timer.enabled:=FALSE;
+  if autosaveOptionsChk.checked then saveCFG();
+  end;
 // we disconnectAll() before srv.free, so we can purgeConnections()
 if assigned(srv) then srv.disconnectAll(TRUE);
 purgeConnections();
@@ -9422,7 +9449,7 @@ end;
 
 procedure forceDynDNSupdate(url:string='');
 resourcestring
-  MSG = 'This option makes pointless the option "Find external address at startup", which has now been disabled for your convenience.';
+  PL_FIND_EXT_MSG = 'This option makes pointless the option "Find external address at startup", which has now been disabled for your convenience.';
 begin
 dyndns.url:=url;
 if url = '' then exit; 
@@ -9431,7 +9458,7 @@ if url = '' then exit;
 if mainfrm.findExtOnStartupChk.checked then
   begin
   mainfrm.findExtOnStartupChk.checked:=FALSE;
-  msgDlg(MSG, MB_ICONINFORMATION);
+  msgDlg(PL_FIND_EXT_MSG, MB_ICONINFORMATION);
   exit;
   end;
 dyndns.active:=TRUE;
@@ -9441,15 +9468,17 @@ end; // forceDynDNSupdate
 
 procedure TmainFrm.Custom2Click(Sender: TObject);
 resourcestring
-  MSG = 'Enter URL for updating.'
+  E_URL = 'Enter URL';
+  CUST_DDNS = 'Enter URL for updating.'
     +#13'%ip% will be translated to your external IP.';
+  CUST_DDNS_NOHTTPS = 'Sorry, HTTPS is not supported yet';
 var
   s: string;
 begin
 s:=dyndns.url;
-if inputQuery('Enter URL', MSG, s) then
+if inputQuery(E_URL, CUST_DDNS, s) then
   if ansiStartsText('https://', s) then
-    msgDlg('Sorry, HTTPS is not supported yet', MB_ICONERROR)
+    msgDlg(CUST_DDNS_NOHTTPS, MB_ICONERROR)
   else
     forceDynDNSupdate(s);
 end;
@@ -9649,7 +9678,9 @@ resourcestring
   // we many need to try this specific test more than once
     repeat
     t:=now();
-    try result:=UnUTF(httpGet(SELF_TEST_URL+'?port='+port+'&host='+host+'&natted='+YESNO[localIPlist.IndexOf(externalIP)<0] ))
+    try
+//        result:=UnUTF(httpGet(SELF_TEST_URL+'?port='+port+'&host='+host+'&natted='+YESNO[localIPlist.IndexOf(externalIP)<0] ))
+      result:=UnUTF(httpGet(SELF_TEST_URL+'?port='+port+'&host='+host+'&natted='+YESNO[not stringExists(externalIP, getAcceptOptions())] ))
     except break end;
     t:=now()-t;
     if (result ='') or (result[1] <> '4') or progFrm.cancelRequested then break;
@@ -9689,7 +9720,8 @@ var
     progFrm.progress:=succ(i)/succ(length(tries));
     s:=doTheTest(tries[i]);
     // we want a digit
-    if (s='') or not (s[1] in ['0'..'9']) then continue;
+//    if (s='') or not (s[1] in ['0'..'9']) then continue;
+    if (s='') or not (IsDigit(s[1])) then continue;
     // we want a better one (lower)
     if (best.res > '') and (best.res[1] <= s[1]) then continue;
     // we consider this to be better, record it
@@ -9806,8 +9838,10 @@ try
   if s = '' then
     try
       progFrm.show('Testing internet connection...');
-      httpGet(ALWAYS_ON_WEB_SERVER);
-      s:='Sorry, the test is unavailable at the moment';
+      if httpGet(ALWAYS_ON_WEB_SERVER) > '' then
+        s:='Sorry, the test is unavailable at the moment'
+       else
+        s:='Your internet connection does not work';
     except s:='Your internet connection does not work' end
   else
     begin
@@ -10229,9 +10263,17 @@ if not quitASAP then
     if not isIntegratedInShell() then
       with TshellExtFrm.create(mainfrm) do
         try
-          if showModal() = mrYes then
-            if not integrateInShell() then
-              msgDlg(MSG_ERROR_REGISTRY, MB_ICONERROR);
+          case showModal() of
+            mrYes:
+              if not integrateInShell() then
+                msgDlg(MSG_ERROR_REGISTRY, MB_ICONERROR);
+            mrNo:;
+            else
+              begin
+              application.terminate();
+              exit;
+              end;
+          end;
         finally free end;
     end;
 
@@ -10889,6 +10931,8 @@ and not mainfrm.noPortInUrlChk.checked then
   result:=':'+srv.port+result;
 if ip = '' then
   ip:=defaultIP;
+if Pos(':',ip, Pos(':',ip)+1) > 0 then // ipv6
+  ip:='['+getTill('%',ip)+']';
 result:=protoColon()+ip+result;
 end; // fullURL
 

@@ -18,7 +18,7 @@ object optionsFrm: ToptionsFrm
   OnResize = FormResize
   OnShow = FormShow
   PixelsPerInch = 96
-  TextHeight = 13
+  TextHeight = 14
   object pageCtrl: TPageControl
     Left = 0
     Top = 0
@@ -32,10 +32,6 @@ object optionsFrm: ToptionsFrm
     object bansPage: TTabSheet
       Caption = 'Bans'
       ImageIndex = 25
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Panel1: TPanel
         Left = 0
         Top = 0
@@ -125,16 +121,16 @@ object optionsFrm: ToptionsFrm
       object Label1: TLabel
         Left = 9
         Top = 16
-        Width = 55
-        Height = 13
+        Width = 57
+        Height = 14
         Caption = 'Account list'
         FocusControl = accountsBox
       end
       object Label7: TLabel
         Left = 251
         Top = 349
-        Width = 325
-        Height = 13
+        Width = 328
+        Height = 14
         Hint = 'You also need to right click on the folder, then restrict access'
         Anchors = [akLeft, akBottom]
         Caption = 
@@ -143,7 +139,6 @@ object optionsFrm: ToptionsFrm
         ParentShowHint = False
         ShowHint = True
         WordWrap = True
-        ExplicitTop = 362
       end
       object accountpropGrp: TGroupBox
         Left = 163
@@ -159,17 +154,17 @@ object optionsFrm: ToptionsFrm
         object Label3: TLabel
           Left = 11
           Top = 173
-          Width = 290
-          Height = 13
+          Width = 312
+          Height = 28
           Caption = 'Here you can see protected resources this user can access...'
           FocusControl = accountAccessBox
           WordWrap = True
         end
         object Label8: TLabel
-          Left = 336
+          Left = 345
           Top = 20
           Width = 28
-          Height = 13
+          Height = 14
           Caption = 'Notes'
           FocusControl = notesBox
           WordWrap = True
@@ -211,23 +206,25 @@ object optionsFrm: ToptionsFrm
           Left = 11
           Top = 63
           Width = 198
-          Height = 21
-          EditLabel.Width = 46
-          EditLabel.Height = 13
+          Height = 22
+          EditLabel.Width = 50
+          EditLabel.Height = 14
           EditLabel.Caption = '&Password'
+          ParentShowHint = False
           PasswordChar = '*'
+          ShowHint = True
           TabOrder = 3
-          OnEnter = pwdBoxEnter
-          OnExit = pwdBoxExit
+          OnChange = pwdBoxChange
+          OnMouseEnter = pwdBoxMouseEnter
         end
         object redirBox: TLabeledEdit
           Left = 11
           Top = 106
           Width = 198
-          Height = 21
-          EditLabel.Width = 107
-          EditLabel.Height = 13
-          EditLabel.Caption = 'After ~login, redirect to'
+          Height = 22
+          EditLabel.Width = 105
+          EditLabel.Height = 14
+          EditLabel.Caption = 'After login, redirect to'
           TabOrder = 4
           OnChange = redirBoxChange
         end
@@ -235,9 +232,9 @@ object optionsFrm: ToptionsFrm
           Left = 11
           Top = 146
           Width = 198
-          Height = 21
-          EditLabel.Width = 50
-          EditLabel.Height = 13
+          Height = 22
+          EditLabel.Width = 51
+          EditLabel.Height = 14
           EditLabel.Caption = 'Member of'
           TabOrder = 5
           OnExit = accountLinkBoxExit
@@ -416,10 +413,6 @@ object optionsFrm: ToptionsFrm
     object mimePage: TTabSheet
       Caption = 'MIME types'
       ImageIndex = 7
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mimeBox: TValueListEditor
         Left = 0
         Top = 30
@@ -476,15 +469,11 @@ object optionsFrm: ToptionsFrm
     object trayPage: TTabSheet
       Caption = 'Tray Message'
       ImageIndex = 10
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Label2: TLabel
         Left = 8
         Top = 16
-        Width = 282
-        Height = 156
+        Width = 292
+        Height = 168
         Caption = 
           'You can customize the message in the tray icon tip. '#13#10'The messag' +
           'e length is determined by your Windows version'#13#10'(in XP the limit' +
@@ -496,15 +485,15 @@ object optionsFrm: ToptionsFrm
           'n'
       end
       object Label10: TLabel
-        Left = 264
-        Top = 157
-        Width = 38
-        Height = 13
+        Left = 291
+        Top = 170
+        Width = 40
+        Height = 14
         Caption = 'Preview'
       end
       object traymsgBox: TMemo
         Left = 16
-        Top = 176
+        Top = 192
         Width = 233
         Height = 121
         Lines.Strings = (
@@ -513,8 +502,8 @@ object optionsFrm: ToptionsFrm
         OnChange = traymsgBoxChange
       end
       object traypreviewBox: TMemo
-        Left = 264
-        Top = 176
+        Left = 291
+        Top = 192
         Width = 233
         Height = 121
         Color = clInfoBk
@@ -525,10 +514,6 @@ object optionsFrm: ToptionsFrm
     object a2nPage: TTabSheet
       Caption = 'Address2name'
       ImageIndex = -1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Panel4: TPanel
         Left = 0
         Top = 0
@@ -541,8 +526,8 @@ object optionsFrm: ToptionsFrm
         object Label4: TLabel
           Left = 8
           Top = 8
-          Width = 292
-          Height = 26
+          Width = 243
+          Height = 28
           Caption = 
             'You can associate a label to an address (or many addresses). It ' +
             'will be used in the log.'
@@ -588,37 +573,32 @@ object optionsFrm: ToptionsFrm
     object iconsPage: TTabSheet
       Caption = 'Icon masks'
       ImageIndex = -1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         797
         385)
       object Label5: TLabel
         Left = 8
         Top = 32
-        Width = 221
-        Height = 13
+        Width = 227
+        Height = 14
         Caption = 'Each line is a file-mask associated with an icon'
         WordWrap = True
       end
       object Label6: TLabel
         Left = 272
         Top = 128
-        Width = 75
-        Height = 13
+        Width = 76
+        Height = 14
         Caption = 'Icon associated'
       end
       object iconMasksBox: TMemo
         Left = 8
-        Top = 48
+        Top = 49
         Width = 225
         Height = 245
         Anchors = [akLeft, akTop, akBottom]
         TabOrder = 0
         OnChange = iconMasksBoxChange
-        ExplicitHeight = 246
       end
       object iconsBox: TComboBox
         Left = 272
@@ -655,7 +635,7 @@ object optionsFrm: ToptionsFrm
       OnClick = okBtnClick
     end
     object applyBtn: TButton
-      Left = 725
+      Left = 724
       Top = 6
       Width = 75
       Height = 25
