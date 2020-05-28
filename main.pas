@@ -3056,7 +3056,7 @@ var
       data.sessionID:= sessions.initNewSession(conn.address);
       conn.setCookie(SESSION_COOKIE, data.sessionID, ['path','/'], 'HttpOnly'); // the session is site-wide, even if this request was related to a folder
       end;
-    s := sessions.ss[data.sessionID];
+    s := sessions[data.sessionID];
     if Assigned(s) then
      begin
         if s.ip <> conn.address then
@@ -3423,7 +3423,7 @@ var
     s:=chop('&s2=',sign);
     if strSHA256(s+acc.pwd)<>sign then
       exit('bad sign');
-    ss := sessions.ss[data.sessionID];
+    ss := sessions[data.sessionID];
     if Assigned(ss) then
       begin
         try ss.setTTL(TTimeZone.Local.ToLocalTime(StrToFloat(data.urlvars.Values['e'])) - now() )
@@ -3432,6 +3432,7 @@ var
         if ss.ttl < 0 then
           exit('expired');
         ss.user:=acc.user;
+        ss.redirect:='.';
       end;
     data.account:=acc;
     data.usr:=acc.user;
