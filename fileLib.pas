@@ -864,9 +864,12 @@ try
   comments:=THashedStringList.create();
   try
     try
-      comments.CaseSensitive:=FALSE;
-      comments.LoadFromFile(resource+'\..\'+COMMENTS_FILE);
-      result:=comments.values[name];
+      if fileExists(resource+'\..\'+COMMENTS_FILE) then
+       begin
+        comments.CaseSensitive:=FALSE;
+        comments.LoadFromFile(resource+'\..\'+COMMENTS_FILE);
+        result:=comments.values[name];
+       end;
     except end
   finally
     if result = '' then

@@ -6,8 +6,8 @@ uses
 
 const
 {$I RnQBuiltTime.inc}
-  VERSION = '2.4 beta6 RD';
-  VERSION_BUILD = '308';
+  VERSION = '2.4 beta7 RD';
+  VERSION_BUILD = '309';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;

@@ -52,6 +52,7 @@ type
   TaccountRecursionStopCase = (ARSC_REDIR, ARSC_NOLIMITS, ARSC_IN_SET);
 
 procedure doNothing(); inline; // useful for readability
+function httpsCanWork():boolean;
 function accountExists(user:string; evenGroups:boolean=FALSE):boolean;
 function getAccount(user:string; evenGroups:boolean=FALSE):Paccount;
 function accountRecursion(account:Paccount; stopCase:TaccountRecursionStopCase; data:pointer=NIL; data2:pointer=NIL):Paccount;
@@ -297,6 +298,7 @@ implementation
 uses
   clipbrd, CommCtrl, //System.Hash,
   AnsiClasses, ansiStrings,
+  OverbyteIcsSSLEAY,
   {$IFDEF HAS_FASTMM}
   fastmm4,
   {$ENDIF HAS_FASTMM}
@@ -1787,10 +1789,51 @@ result:=inputQueryLongdlg.ShowModal() = mrOk;
 if result then value:=inputQueryLongdlg.inputBox.Text;
 end; // inputQueryLong
 
+function dllIsPresent(name:string):boolean;
+var h: HMODULE;
+begin
+h:=LoadLibraryEx(@name, 0, LOAD_LIBRARY_AS_DATAFILE);
+result:= h<>0;
+FreeLibrary(h);
+end;
+
+function httpsCanWork():boolean;
+resourcestring
+  MSG_NO_DLL = 'An HTTPS action is required but some files are missing. Download them?';
+  MSG_DNL_OK = 'Download completed';
+  MSG_DNL_FAIL = 'Download failed';
+
+const
+  baseUrl = 'http://rejetto.com/hfs/';
+var
+  files: array of string; // = ['libcrypto-1_1.dll','libssl-1_1.dll'];
+  missing: TStringDynArray;
+begin
+missing:=NIL;
+  SetLength(files, 2);
+  files[0] := GLIBEAY_110DLL_Name;
+  files[1] := GSSLEAY_110DLL_Name;
+for var s in files do
+  if not FileExists(s) and not dllIsPresent(s) then
+    addString(s, missing);
+if missing=NIL then
+  exit(TRUE);
+if msgDlg(MSG_NO_DLL, MB_OKCANCEL+MB_ICONQUESTION) <> MROK then
+  exit(FALSE);
+for var s in missing do
+  if not httpGetFile(baseUrl+s, s, 2, mainfrm.statusBarHttpGetUpdate) then
+    begin
+    msgDlg(MSG_DNL_FAIL, MB_ICONERROR);
+    exit(FALSE);
+    end;
+mainfrm.setStatusBarText(MSG_DNL_OK);
+result:=TRUE;
+end; // httpsCanWork
+
 function httpGet(const url:string; from:int64=0; size:int64=-1): RawByteString;
 var
   fs: TMemoryStream;
-  httpCli: TSslHttpCli;
+  httpCli: ThttpClient;
 begin
 if size = 0 then
   begin
@@ -1801,103 +1844,82 @@ if size = 0 then
 //  Result := LoadFromURLStr(url, from, size);
   fs := nil;
   Result := '';
-
+  httpCli := ThttpClient.createURL(url);
+  if Assigned(httpCli) then
+with httpCli do
   try
-    httpCli := TSslHttpCli.Create(nil);
-    httpCli.MultiThreaded := True;
-    httpCli.URL := URL;
-    httpCli.FollowRelocation := True;
-    httpCli.agent := HFS_HTTP_AGENT;
-    httpCli.SslContext := TSslContext.Create(NIL);
-//    SetupProxy(httpCli);
-
     fs := TMemoryStream.Create;
-    httpCli.RcvdStream := fs;
-    if (from <> 0) or (size >= 0) then
-      httpCli.contentRangeBegin:=intToStr(from);
-    if size >= 0 then
-      httpCli.contentRangeEnd:=intToStr(from+size-1);
+    rcvdStream:=fs;
+    if (from <> 0) or (size > 0) then
+      contentRangeBegin:=intToStr(from);
+    if size > 0 then
+      contentRangeEnd:=intToStr(from+size-1);
 
-    try
       if size >= 0 then
       begin
         httpCli.Head;
         if httpCli.ContentLength < from then
           Exit;
       end;
-      try
-{
-        if POSTData>'' then
-        begin
-          httpCli.SendStream := TMemoryStream.Create;
-          if POSTData > '' then
-            httpCli.SendStream.Write(POSTData[1], Length(POSTData));
-          httpCli.SendStream.Seek(0, 0);
-          httpCli.Post;
-        end
-        else
-}
-          httpCli.Get;
+
+    get();
         if fs.Size > 0 then
         begin
           SetLength(Result, fs.Size);
           fs.Seek(0, soFromBeginning);
           fs.Read(Result[1], Length(Result));
         end;
-      except
-        on E: EHttpException do
-      end;
+  finally
+    fs.free;
+    Free;
+    end
 
-    finally
-      httpCli.SslContext.Free;
-      httpCli.SslContext := NIL;
-      httpCli.Free;
-      if Assigned(fs) then
-        fs.Free;
-    end;
-  except
-
-  end;
 
 end; // httpGet
 
 function httpFileSize(url:string):int64;
 var
-  http: THttpCli;
+  httpCli: ThttpClient;
 begin
-http:=Thttpcli.create(NIL);
-try
-  http.URL:=url;
-  http.Agent:=HFS_HTTP_AGENT;
+  Result := -1;
+  httpCli := ThttpClient.createURL(url);
+  if Assigned(httpCli) then
+with httpCli do
   try
-    http.head();
-    result:=http.contentLength
-  except result:=-1 end;
-finally http.free end
+    try
+      head();
+      result:=contentLength
+     except result:=-1
+      end;
+  finally free
+    end;
 end; // httpFileSize
 
 function httpGetFile(url, filename:string; tryTimes:integer=1; notify:TdocDataEvent=NIL):boolean;
 var
-  http: THttpCli;
-  reply: Tfilestream;
+  httpCli: ThttpClient;
   supposed: integer;
+  reply: Tfilestream;
 begin
-reply:=TfileStream.Create(filename, fmCreate);
-try
-  http:=Thttpcli.create(NIL);
+  httpCli := ThttpClient.createURL(url);
+  if Assigned(httpCli) then
+with httpCli do
   try
-    http.URL:=url;
-    http.RcvdStream:=reply;
-    http.Agent:=HFS_HTTP_AGENT;
-    http.OnDocData:=notify;
+    reply:=TfileStream.Create(filename, fmCreate);
+    rcvdStream:=reply;
+    onDocData:=notify;
     result:=TRUE;
-    try http.get()
-    except result:=FALSE end;
-    supposed:=http.ContentLength;
-  finally http.free end
-finally reply.free end;
+    try get()
+    except result:=FALSE
+      end;
+    supposed:=ContentLength;
+  finally
+    reply.free;
+    free;
+    end;
 result:= result and (sizeOfFile(filename)=supposed);
-if not result then deleteFile(filename);
+if not result then
+  deleteFile(filename);
 
 if not result and (tryTimes > 1) then
   result:=httpGetFile(url, filename, tryTimes-1, notify);

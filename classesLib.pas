@@ -25,6 +25,7 @@ interface
 uses
   iniFiles, types, strUtils, sysUtils, classes, math,
   system.Generics.Collections,
+  OverbyteIcsWSocket, OverbyteIcshttpProt,
   hslib, hfsGlobal;
 
 type
@@ -77,7 +78,7 @@ type
   Tstr2str = Tdictionary<string,string>;
   Tstr2pointer = Tdictionary<string,pointer>;
 
-  TstringToIntHash = class(ThashedStringList)
+  TstringToIntHash = class(ThashedStringList)
     constructor create;
     function getInt(s:string):integer;
     function getIntByIdx(idx:integer):integer;
@@ -151,6 +152,12 @@ type
     destructor Destroy; override;
     end;
 
+  ThttpClient = class(TSslHttpCli)
+    constructor Create(AOwner: TComponent); override;
+    destructor destroy;
+    class function createURL(url:string):ThttpClient;
+    end;
+
   Ttlv = class
   protected
     cur, bound: integer;
@@ -174,15 +181,18 @@ type
   TSessionId = String;
   Tsession = class
     vars: THashedStringList;
-    created, ttl, expires: Tdatetime;
+    ttl: Double;
+    created, expires: Tdatetime;
     user, ip, redirect: String;
     procedure setVar(k, v:string);
     function getVar(k: String):string;
-    class function getNewSID():string;
+    class function sanitizeSID(s:TSessionId):TSessionId;
+    class function getNewSID(): TSessionId;
   public
-    id: string;
+    id: TSessionId;
     constructor create(const sid: TSessionId='');
     destructor Destroy; override;
+    procedure init;
     procedure keepAlive();
     procedure setTTL(t:Tdatetime);
     property v[k: TSessionId]: String read getVar write setVar; default;
@@ -195,8 +205,8 @@ type
     destructor Destroy; override;
     procedure clearSession(sId: TSessionId);
     procedure destroySession(sId: TSessionId);
-    function  getSession: Tsession; OverLoad;
-    function  initNewSession(peerIp: String = ''): TSessionId;
+    function  createSession(sId: TSessionId = ''): Tsession;
+    function  initNewSession(peerIp: String = ''; sid: TSessionId = ''): TSessionId;
     function  getSession(sId: TSessionId): Tsession; OverLoad;
     function  noSession(sId: TSessionId): Boolean;
     procedure keepAlive(sId: TSessionId);
@@ -243,8 +253,32 @@ implementation
 
 uses
   windows, dateUtils, forms, ansiStrings,
-  RDFileUtil, RDUtils,
+  RDFileUtil, RDUtils, Base64,
   utilLib, hfsVars;
+
+class function ThttpClient.createURL(url:string):ThttpClient;
+begin
+if startsText('https://', url)
+and not httpsCanWork() then
+  exit(NIL);
+result:=ThttpClient.Create(NIL);
+result.URL:=url;
+end;
+
+constructor ThttpClient.create(AOwner: TComponent);
+begin
+inherited;
+followRelocation:=TRUE;
+agent:=HFS_HTTP_AGENT;
+SslContext := TSslContext.Create(NIL);
+end; // create
+
+destructor ThttpClient.destroy;
+begin
+SslContext.free;
+SslContext:=NIl;
+inherited;
+end;
 
 constructor TperIp.create();
 begin
@@ -590,11 +624,9 @@ function Ttpl.getTxtByExt(fileExt:string):string;
 begin result:=getTxt('file.'+fileExt) end;
 
 procedure Ttpl.clear();
-var
-  p: PtplSection;
 begin
   srcU := '';
-  for p in sections.values do
+  for var p in sections.values do
     dispose(p);
   sections.clear();
   freeAndNIL(strTable);  // mod by mars
@@ -663,7 +695,6 @@ var
   var
     ss: TStringDynArray;
     s: string;
-    i, si: integer;
     base: TtplSection;
     till: pchar;
     append: boolean;
@@ -694,7 +725,7 @@ var
   // handle the main section specific case
   if ss = NIL then addString('', ss);
   // assign to every name the same txt
-  for i:=0 to length(ss)-1 do
+  for var i: Integer :=0 to length(ss)-1 do
     begin
     s:=trim(ss[i]);
     sect:=getSection(s, FALSE);
@@ -837,26 +868,36 @@ begin result:=(cur+8 > bound) end;
 function Ttlv.getTheRest(): RawByteString;
 begin result:=substr(whole, cur, bound) end;
 
-class function Tsession.getNewSID():string;
-begin result:=floatToStr(random()) end;
+class function Tsession.getNewSID():TSessionId;
+begin result:=sanitizeSID(base64EncodeString(str_(now())+str_(random()))) end;
+
+class function Tsession.sanitizeSID(s:TSessionId):TSessionId;
+begin result:=reReplace(s, '[\D\W]', '', '!') end;
 
 constructor Tsession.create(const sid:string='');
 begin
 id:=sid;
-if id = '' then
+if Length(id) < 10 then
   id:=getNewSID();
 //sessions.Add(id, self);
+init;
+end;
+
+procedure Tsession.init;
+begin
 created:=now();
 ttl:=1; // days
+user := '';
+ip := '';
+redirect := '';
 keepAlive();
 end;
 
 destructor Tsession.Destroy;
 var
-  o: Tobject;
   cd: TconnDataMain;
 begin
-for o in srv.conns do
+for var o in srv.conns do
   begin
   cd:=ThttpConn(o).data;
   if cd.sessionID = self.id then
@@ -904,23 +945,26 @@ begin
   FreeAndNil(fS);
 end;
 
-function Tsessions.getSession(sId: String): Tsession;
+function Tsessions.getSession(sId: TSessionId): Tsession;
 begin
   if not fS.TryGetValue(sId, Result) then
     Result := NIL;
 end;
 
-function Tsessions.getSession: Tsession;
+function Tsessions.createSession(sId: TSessionId = ''): Tsession;
 begin
-  result := Tsession.create;
+  result := Tsession.create(sid);
   fS.Add(result.id, result);
 end;
 
-function Tsessions.initNewSession(peerIp: String = ''): TSessionId;
+function Tsessions.initNewSession(peerIp: String = ''; sid: TSessionId = ''): TSessionId;
 var
   s: Tsession;
 begin
-  s := getSession;
+  s := getSession(sid);
+  if s = NIL then
+    s := createSession(sid);
+  s.init;
   Result := s.id;
   s.ip := peerIp;
 end;
@@ -966,16 +1010,15 @@ end;
 
 procedure Tsessions.checkExpired;
 var
-  sess: Tsession;
   now_: TDateTime;
   sId: TSessionId;
 begin
   now_ := now();
-  for sess in self.fS.Values do
+  for var sess in self.fS.Values do
+   if now_ > sess.expires then
    begin
     sId := sess.id;
-    if now_ > sess.expires then
-      sess.free;
+    sess.free;
     self.fS.Items[sId] := NIL;
     self.fS.Remove(sId);
    end;

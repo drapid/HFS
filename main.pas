@@ -704,6 +704,7 @@ type
     function  recalculateGraph(): Boolean;
     procedure remove(node:Ttreenode=NIL); OverLoad;
  public
+    procedure statusBarHttpGetUpdate(sender:TObject; buffer:pointer; Len:integer);
     function  getLP: TLoadPrefs;
     procedure remove(f: TFile=NIL); OverLoad;
     function  setCfg(cfg:string; alreadyStarted:boolean=TRUE):boolean;
@@ -833,15 +834,15 @@ var
 
 function deleteAccount(name:string):boolean;
 var
-  i, j, n: integer;
+  n: integer;
 begin
 n:=length(accounts);
 // search
-for i:=0 to n-1 do
+for var i:=0 to n-1 do
   if sameText(name, accounts[i].user) then // found
     begin
     // shift
-    for j:=i to n-2 do
+    for var j:=i to n-2 do
       accounts[j]:=accounts[j+1];
     // shrink
     setLength(accounts, n-1);
@@ -994,11 +995,11 @@ end; // getBaseTrayIcon
 
 procedure drawTrayIconString(cnv:Tcanvas; s:string);
 var
-  x, i, idx: integer;
+  x, idx: integer;
 begin
 x:=10;
   if length(s) > 0 then
-for i:=length(s) downto 1 do
+for var i:=length(s) downto 1 do
 	begin
   if s[i] = '%' then idx:=10
   else idx:=ord(s[i])-ord('0');
@@ -1048,10 +1049,8 @@ if mainFrm.beepChk.checked then MessageBeep(MB_OK);
 end; // flash
 
 function localDNSget(ip:string):string;
-var
-  i: integer;
 begin
-for i:=0 to length(address2name) div 2-1 do
+for var i: integer :=0 to length(address2name) div 2-1 do
   if addressmatch(address2name[i*2+1], ip) then
     begin
     result:=address2name[i*2];
@@ -1108,7 +1107,6 @@ procedure updateDynDNS();
       (code:'badagent'; msg:MSG_DDNS_badagent)
     );
   var
-    i: integer;
     code: string;
   begin
   s:=trim(s);
@@ -1121,7 +1119,7 @@ procedure updateDynDNS();
   result:='successful';
   code:=trim(lowercase(getTill(' ',s)));
   if stringExists(code, ['good','nochg']) then exit;
-  for i:=1 to length(ERRORS) do
+  for var i: integer :=1 to length(ERRORS) do
     if code = ERRORS[i].code then
       begin
       result:='error: '+ERRORS[i].msg;
@@ -1186,10 +1184,8 @@ postVars:=THashedStringList.create();
 end; // constructor
 
 destructor TconnData.destroy;
-var
-  i: integer;
 begin
-for i:=0 to vars.Count-1 do
+for var i: integer :=0 to vars.Count-1 do
   if assigned(vars.Objects[i]) and (vars.Objects[i] <> currentCFGhashed) then
     begin
     vars.Objects[i].free;
@@ -1331,7 +1327,6 @@ var
   cur, n: Ttreenode;
   found: boolean;
   f: Tfile;
-  i, j: integer;
 
   function workDots():boolean;
   label REMOVE;
@@ -1385,7 +1380,7 @@ if parent.isTemp() then
   end;
 
 cur:=parent.node;   // we'll move using treenodes
-for i:=0 to length(parts)-1 do
+for var i: integer :=0 to length(parts)-1 do
   begin
   s:=parts[i];
   if s = '' then exit; // no support for null filenames
@@ -1406,7 +1401,7 @@ for i:=0 to length(parts)-1 do
     if f.isRealFolder() then // but real folders have not all the stuff loaded and ready. we have another way to walk.
       begin
         if length(parts) > i+1 then
-          for j:=i+1 to length(parts)-1 do
+          for var j: integer :=i+1 to length(parts)-1 do
             s:=s+'\'+parts[j];
         workTheRestByReal(s, f);
       end;
@@ -1429,11 +1424,11 @@ end; // fileExistsByURL
 
 function getAccountList(users:boolean=TRUE; groups:boolean=TRUE):TstringDynArray;
 var
-  i, n: integer;
+  n: integer;
 begin
 setLength(result, length(accounts));
 n:=0;
-for i:=0 to length(result)-1 do
+for var i: Integer :=0 to length(result)-1 do
   with accounts[i] do
     if group and groups
     or not group and users
@@ -1452,14 +1447,14 @@ resourcestring
   MSG2 = 'You can edit the address.'#13'Masks and ranges are allowed.';
   MSG_IP_BANNED = 'This IP address is already banned';
 var
-  i: integer;
   comm: string;
+  l: Integer;
 begin
 result:=FALSE;
 mainfrm.setFocus();
 if not InputQuery('IP mask',MSG2,ip) then exit;
 
-for i:=0 to length(banlist)-1 do
+for var i: Integer :=0 to length(banlist)-1 do
   if banlist[i].ip = ip then
     begin
     msgDlg(MSG_IP_BANNED, MB_ICONWARNING);
@@ -1469,13 +1464,13 @@ for i:=0 to length(banlist)-1 do
 comm:='';
 if not InputQuery('Ban comment','A comment for this ban...',comm) then exit;
 
-i:=length(banlist);
-setlength(banlist, i+1);
-banlist[i].ip:=ip;
-banlist[i].comment:=comm;
+l:=length(banlist);
+setlength(banlist, l+1);
+banlist[l].ip:=ip;
+banlist[l].comment:=comm;
 
-i:=countConnectionsByIP(ip);
-if (i > 0) and (msgDlg(format(MSG,[i]), MB_ICONQUESTION+MB_YESNO) = IDYES) then
+l:=countConnectionsByIP(ip);
+if (l > 0) and (msgDlg(format(MSG,[l]), MB_ICONQUESTION+MB_YESNO) = IDYES) then
   kickByIP(ip);
 result:=TRUE;
 end; // banAddress
@@ -1493,11 +1488,10 @@ end;
 function createFingerprint(const fn:string):string;
 var
   b: TBytes;
-  i: Integer;
 begin
   result := '';
   b := getFileMD5(fn, prog);
-  for i:=0 to 15 do
+  for var i: Integer :=0 to 15 do
     result:=result+intToHex(byte(b[i]), 2);
 end; // createFingerprint
 
@@ -1694,7 +1688,7 @@ var
   end; // handleItem
 
 var
-  i, n: integer;
+  n: integer;
   f: Tfile;
   lp: TLoadPrefs;
 begin
@@ -1763,7 +1757,7 @@ try
     listing.sort(mainfrm.foldersBeforeChk.checked, mainfrm.linksBeforeChk.checked, cd, if_(recur or (otpl = filelistTpl), '?', diffTpl['sort by']) ); // '?' is just a way to cause the sort to fail in case the sort key is not defined by the connection
 
     n:=length(listing.dir);
-    for i:=0 to n-1 do
+    for var i: Integer :=0 to n-1 do
       begin
       f:=listing.dir[i];
       if f.size > 0 then
@@ -1794,7 +1788,7 @@ try
       '%total-size%', smartsize(totalBytes)
     ]);
 
-    for i:=0 to length(listing.dir)-1 do
+    for var i: Integer :=0 to length(listing.dir)-1 do
       begin
       application.ProcessMessages();
       if cd.conn.state = HCS_DISCONNECTED then
@@ -1863,17 +1857,15 @@ setClip( xtpl(v, [old, defaultIP]) );
 end; // setDefaultIP
 
 function name2mimetype(fn:string; default:string):string;
-var
-  i: integer;
 begin
 result:=default;
-for i:=0 to length(mimeTypes) div 2-1 do
+for var i: Integer :=0 to length(mimeTypes) div 2-1 do
   if fileMatch(mimeTypes[i*2], fn) then
     begin
     result:=mimeTypes[i*2+1];
     exit;
     end;
-for i:=0 to length(DEFAULT_MIME_TYPES) div 2-1 do
+for var i: Integer :=0 to length(DEFAULT_MIME_TYPES) div 2-1 do
   if fileMatch(DEFAULT_MIME_TYPES[i*2], fn) then
     begin
     result:=DEFAULT_MIME_TYPES[i*2+1];
@@ -1946,12 +1938,11 @@ var
 
   procedure addUploadSymbols();
   var
-    i: integer;
     files: string;
   begin
   if sectionName <> 'upload' then exit;
   files:='';
-  for i:=1 to 10 do
+  for var i: Integer :=1 to 10 do
     files:=files+ xtpl(tpl2use['upload-file'], ['%idx%',intToStr(i)]);
   addArray(md.table, ['%upload-files%', files]);
   end; // addUploadSymbols
@@ -1959,12 +1950,11 @@ var
   procedure addUploadResultsSymbols();
   var
     files: string;
-    i: integer;
   begin
   if sectionName <> 'upload-results' then exit;
   files:='';
     if length(data.uploadResults) > 0 then
-  for i:=0 to length(data.uploadResults)-1 do
+  for var i: Integer :=0 to length(data.uploadResults)-1 do
     with data.uploadResults[i] do
       files:=files+xtpl(tpl2use[ if_(reason='','upload-success','upload-failed') ],[
         '%item-name%', htmlEncode(macroQuote(fn)),
@@ -2334,11 +2324,9 @@ finally
 end; // add2log
 
 function isBanned(address:string; out comment:string):boolean; overload;
-var
-  i:integer;
 begin
 result:=TRUE;
-for i:=0 to length(banlist)-1 do
+for var i: Integer :=0 to length(banlist)-1 do
   if addressMatch(banlist[i].ip, address) then
     begin
     comment:=banlist[i].comment;
@@ -2375,10 +2363,8 @@ end; // getAcceptOptions
 function startServer():boolean;
 
   procedure tryPorts(list:array of string);
-  var
-    i: integer;
   begin
-  for i:=0 to length(list)-1 do
+  for var i: Integer :=0 to length(list)-1 do
     begin
     srv.port:=trim(list[i]);
     if srv.start(listenOn) then exit;
@@ -2454,13 +2440,11 @@ var
   cd: TconnData;
 
   procedure extra();
-  var
-    i: integer;
   begin
   // apache log standard for "nothing" is "-", but "-" is a valid filename
   res:='';
   if cd.uploadResults = NIL then exit;
-  for i:=0 to length(cd.uploadResults)-1 do
+  for var i: Integer :=0 to length(cd.uploadResults)-1 do
     with cd.uploadResults[i] do
       if reason = '' then
         res:=res+fn+'|';
@@ -2516,20 +2500,20 @@ var
 
   procedure doTheTranche();
   var
-    i, b: integer;
+    b: integer;
     fn, s: string;
     sa: RawByteString;
     anyChange: boolean;
   begin
   // leave only the files' name
-  for i:=trancheStart to trancheEnd do
+  for var i: Integer :=trancheStart to trancheEnd do
     files[i]:=copy(files[i],length(lastPath)+1,MAXINT);
   // comments file
   try
     fn:=lastPath+COMMENTS_FILE;
     ss.loadFromFile(fn);
     anyChange:=FALSE;
-    for i:=trancheStart to trancheEnd do
+    for var i: Integer :=trancheStart to trancheEnd do
       begin
       b:=ss.indexOfName(files[i]);
       if b < 0 then continue;
@@ -2556,7 +2540,7 @@ var
      else
       s := UnUTF(sa);
     anyChange:=FALSE;
-    for i:=trancheStart to trancheEnd do
+    for var i: Integer :=trancheStart to trancheEnd do
       begin
       b:=findNameInDescriptionFile(s, files[i]);
       if b = 0 then continue;
@@ -3040,6 +3024,7 @@ var
   function sessionSetup():boolean;
   var
 //    idx: Integer;
+    sid: TSessionId;
     s: Tsession;
   begin
     result:=TRUE;
@@ -3047,15 +3032,18 @@ var
       Exit;
     data.usr:='';
     data.pwd:='';
-    if (data.sessionID = '') then
-       data.sessionID:=conn.getCookie(SESSION_COOKIE);
-    if (data.sessionID = '') then
-       data.sessionID:=data.urlvars.Values[SESSION_COOKIE];
     if sessions.noSession(data.sessionID) then
+     begin
+      sid := conn.getCookie(SESSION_COOKIE);
+      if (sid = '') then
+        sid:=data.urlvars.Values[SESSION_COOKIE];
+      data.sessionID := Tsession.sanitizeSID(sid);
+      if sessions.noSession(data.sessionID) then
       begin
-      data.sessionID:= sessions.initNewSession(conn.address);
+      data.sessionID:= sessions.initNewSession(conn.address, data.sessionID);
       conn.setCookie(SESSION_COOKIE, data.sessionID, ['path','/'], 'HttpOnly'); // the session is site-wide, even if this request was related to a folder
       end;
+     end;
     s := sessions[data.sessionID];
     if Assigned(s) then
      begin
@@ -3234,9 +3222,6 @@ var
     function accessGranted(forceFile:Tfile=NIL):boolean;
     resourcestring
       FAILED = 'Login failed';
-    var
-      m: TStringDynArray;
-//      fTemp: Tfile;
     begin
     result:=FALSE;
     if assigned(forceFile) then f:=forceFile;
@@ -3247,16 +3232,17 @@ var
       exit;
       end;
     result:=f.accessFor(data);
-    // ok, you are referring a section of the template, which virtually resides in the root because of the url starting with /~
-    // but you don't have access rights to the root. We'll let you pass if it's actually a section and you are using it from a folder that you have access to.
-    if not result and (f = rootFile)
-    and ((mode='section') or ansiStartsStr('~', urlCmd) and tpl.sectionExist(copy(urlCmd,2,MAXINT)))
-    and (0 < reMatch(conn.getHeader('Referer'), '://([^@]*@)?'+data.getSafeHost(data)+'(/.*)', 'i', 1, @m)) then
+    // sections are accessible. You can implement protection in place, if needed.
+    if not result  and (f = rootFile)
+    and ((mode='section') or startsStr('~', urlCmd) and tpl.sectionExist(copy(urlCmd,2,MAXINT))) then
       begin
-      result:=true;
-      specialGrant:=result;
+      result:=TRUE;
+      specialGrant:=TRUE;
       end;
-    if result then exit;
+    if result then
+      exit;
+    if f.isFolder() and sessionRedirect() then // forbidden folder, but we were asked to go elsewhere
+      exit;
     conn.reply.realm:=f.getShownRealm();
     runEventScript('unauthorized');
     getPage('login', data, f);
@@ -3544,8 +3530,8 @@ var
       if data.passwordValidation(acc.pwd) then
         begin
         s:='ok';
-        sessions.getSession(data.sessionID).user:=acc.user;
-        sessions.getSession(data.sessionID).redirect:=getAccountRedirect(acc);
+        sessions[data.sessionID].user:=acc.user;
+        sessions[data.sessionID].redirect:=getAccountRedirect(acc);
         end
       else
         begin
@@ -5193,14 +5179,22 @@ while cfg > '' do
     if h = 'port' then
       if srv.active then changePort(l)
       else port:=l;
-    if h = 'ip' then savedip:=l;
-    if h = 'custom-ip' then customIPs:=split(';',l);
-    if h = 'listen-on' then listenOn:=l;
-    if h = 'dynamic-dns-updater' then dyndns.url:=decodeB64utf8(l);
-    if h = 'dynamic-dns-user' then dyndns.user:=l;
-    if h = 'dynamic-dns-host' then dyndns.host:=l;
-    if h = 'login-realm' then loginRealm:=l;
-    if h = 'easy' then setEasyMode(yes);
+    if h = 'ip' then savedip:=l
+     else
+    if h = 'custom-ip' then customIPs:=split(';',l)
+     else
+    if h = 'listen-on' then listenOn:=l
+     else
+    if h = 'dynamic-dns-updater' then dyndns.url:=decodeB64utf8(l)
+     else
+    if h = 'dynamic-dns-user' then dyndns.user:=l
+     else
+    if h = 'dynamic-dns-host' then dyndns.host:=l
+     else
+    if h = 'login-realm' then loginRealm:=l
+     else
+    if h = 'easy' then setEasyMode(yes)
+     else
     if h = 'keep-bak-updating' then keepBakUpdatingChk.checked:=yes;
 		if h = 'encode-non-ascii' then encodenonasciiChk.checked:=yes;
 		if h = 'encode-spaces' then encodespacesChk.checked:=yes;
@@ -5312,7 +5306,8 @@ while cfg > '' do
     if h = 'only-1-instance' then only1instanceChk.checked:=yes;
 		if h = 'graph-rate' then setGraphRate(int);
 		if h = 'graph-size' then graph.size:=int;
-    if h = 'forwarded-mask' then forwardedMask:=l;
+    if h = 'forwarded-mask' then forwardedMask:=ifThen(l='127.0.0.1','::1;127.0.0.1',l)
+     else
     if h = 'delete-partial-uploads' then deletePartialUploadsChk.checked:=yes;
     if h = 'rename-partial-uploads' then renamePartialUploads:=l;
     if h = 'do-not-log-address' then dontLogAddressMask:=l;
@@ -8932,7 +8927,7 @@ end;
 
 procedure TmainFrm.SetURL1Click(Sender: TObject);
 resourcestring
-  MSG = 'Please insert an URL for the link'
+  INS_URL_MSG = 'Please insert an URL for the link'
     +#13
     +#13'Do not forget to specify http:// or whatever.'
     +#13'%%ip%% will be translated to your address';
@@ -8948,7 +8943,7 @@ and not ansiStartsText('mailto:', s)
 and not ansiContainsStr(s, '://')
 and not ansiContainsStr(s, '/') then
   s:='mailto:'+s;
-if not inputquery('Set URL', MSG, s) then exit;
+if not inputquery('Set URL', INS_URL_MSG, s) then exit;
 for i:=0 to filesBox.SelectionCount-1 do
   with nodeToFile(filesBox.Selections[i]) do
     if FA_LINK in flags then
@@ -9577,7 +9572,6 @@ end; // pointToCharPoint
 
 function Tmainfrm.ipPointedInLog():string;
 var
-  i: integer;
   s: string;
   pt: Tpoint;
 begin
@@ -9585,14 +9579,10 @@ result:='';
 pt:=pointToCharPoint(logBox, logRightClick);
 if pt.x < 0 then
   pt:=logbox.caretpos;
-if pt.y >= logbox.lines.count then exit;
+if pt.y >= logbox.lines.count then
+  exit;
 s:=logbox.lines[pt.y];
-if pt.x > length(s) then exit;
-i:=pt.x;
-while (i > 1) and (s[i] <> ' ') do dec(i);
-inc(i);
-s:=copy(s,i, posEx(' ',s,i));
-s:=trim(getTill(':',getTill('@',s)));
+s:=reGet(s, '^\S+ +(\S+@)?(\S+):\d+ ', 2);
 if checkAddressSyntax(s,FALSE) then
   result:=s;
 end; // ipPointedInLog
@@ -10378,6 +10368,14 @@ with sender as ThttpCli do
   end;
 end; // progFrmHttpGetUpdate
 
+procedure TmainFrm.statusBarHttpGetUpdate(sender:Tobject; buffer:pointer; len:integer);
+resourcestring
+  DNLDN = 'Downloading %d%%';
+begin
+with sender as ThttpCli do
+  setStatusBarText( format(DNLDN, [safeDiv(RcvdCount*100, contentLength)]) );
+end; // statusBarHttpGetUpdate
+
 function purgeFilesCB(f:Tfile; childrenDone:boolean; par, par2: IntPtr):TfileCallbackReturn;
 begin
 result:=[];
@@ -11027,7 +11025,7 @@ ipsEverConnected.delimiter:=';';
 logMaxLines:=2000;
 trayShows:='downloads';
 flashOn:='download';
-forwardedMask:='127.0.0.1';
+forwardedMask:='::1;127.0.0.1';
 runningOnRemovable:=DRIVE_REMOVABLE = GetDriveType(PChar(exePath[1]+':\'));
 etags.values['exe']:= MD5PassHS(dateToHTTPr(getMtimeUTC(paramStr(0))));
 

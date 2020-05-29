@@ -1,2 +1,2 @@
-@copy hfs.exe "HFS308_RD.exe"
-upx.exe -9 --lzma "HFS308_RD.exe"
+@copy hfs.exe "HFS309_RD.exe"
+upx.exe -9 --lzma "HFS309_RD.exe"
