@@ -2,7 +2,6 @@
 + replace shellExtDlg.gif with transparent png (english system)
 + expiring links
 * dismiss regexp lib http://docwiki.embarcadero.com/Libraries/Rio/en/System.RegularExpressions.TRegEx
-+ ipv6
 + load *.events
 + url auth limited to resource
 + global limit speed for downloads (browsing excluded)
@@ -25,6 +24,7 @@
 + macros missing to cache a folder: {.reply|content=|var=|code=|filename=|mime=.}
 - unexpected scripting behavior http://www.rejetto.com/forum/index.php/topic,9728.msg1054517.html#msg1054517
     in handleItem() translate only symbols, and run all macros at the end
+document: {.exec|out|timeout|exitcode.}
 document: [+section]
 document: {.set item|diff template.}
 document: single line diff templates

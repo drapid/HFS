@@ -508,7 +508,8 @@ var
     vars: Tstrings;
     s: string;
   begin
-  if not satisfied(md.cd) then exit;
+  if not satisfied(md.cd) then
+    exit;
   try
     result:=md.cd.conn.request.url;
     if pars.count < 2 then exit;
@@ -1147,7 +1148,8 @@ var
 
   if varname = '' then
     begin
-    if anyCharIn('/\',fn) then result:=macroQuote(result);
+    if anyCharIn('/\',fn) then
+      result:=macroQuote(result);
     exit;
     end;
   if ansiStartsStr(ENCODED_TABLE_HEADER, result) then

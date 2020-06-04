@@ -20,11 +20,12 @@ This file is part of HFS ~ HTTP File Server.
 {$INCLUDE defs.inc }
 
 unit utilLib;
+{$I NoRTTI.inc}
 
 interface
 
 uses
-  types, windows, graphics, dialogs, registry, classes, dateUtils,
+  types, Windows, graphics, dialogs, registry, classes, dateUtils,
   comCtrls, shlobj, shellapi, activex, comobj, forms, stdctrls, controls, psAPI,
   menus, math, iniFiles, richedit, sysutils, strutils,
 //  Vcl.Imaging.gifimg,
@@ -99,6 +100,7 @@ function safeDiv(a,b:real; default:real=0):real; overload;
 function safeDiv(a,b:int64; default:int64=0):int64; overload;
 function safeMod(a,b:int64; default:int64=0):int64;
 function smartsize(size:int64):string;
+function httpGetStr(url:string; from:int64=0; size:int64=-1):string;
 function httpGet(const url:string; from:int64=0; size:int64=-1): RawByteString;
 function httpGetFile(url, filename:string; tryTimes:integer=1; notify:TdocDataEvent=NIL):boolean;
 function httpFileSize(url:string):int64;
@@ -293,6 +295,16 @@ function bmp2ico24(bitmap: Tbitmap): HICON;
 function strSHA256(s:string):string;
 function strMD5(s:string):string;
 
+function b64utf8(const s:string): RawByteString;
+function b64utf8W(const s:string): UnicodeString;
+function decodeB64utf8(const s: RawByteString):string; OverLoad;
+function decodeB64utf8(const s: String):string; OverLoad;
+function decodeB64(const s: String): RawByteString; OverLoad;
+function decodeB64(const s: RawByteString): RawByteString; OverLoad;
+function b64U(const b: RawByteString): UnicodeString;
+function b64R(const b: RawByteString): RawByteString;
+
+
 implementation
 
 uses
@@ -302,6 +314,7 @@ uses
   {$IFDEF HAS_FASTMM}
   fastmm4,
   {$ENDIF HAS_FASTMM}
+  Base64,
   RDUtils, RDFileUtil, RnQCrypt,
   HFSJclNTFS, hfsJclOthers,
   hfsVars, parserLib, newuserpassDlg, winsock;
@@ -1134,7 +1147,7 @@ begin
   setLength(path, 1000);
   setLength(path, getTempPath(length(path), @path[1]));
   setLength(result, 1000);
-  if windows.getTempFileName(pchar(path), 'hfs.', 0, @result[1]) = 0 then
+  if Windows.getTempFileName(pchar(path), 'hfs.', 0, @result[1]) = 0 then
     result := ''
    else
     setLength(result, StrLen(PChar(@result[1])));
@@ -1144,7 +1157,7 @@ function saveTempFile(data:string):string;
 begin
   result:=getTempFilename();
   if result > '' then
-    saveFile2(result, data);
+    saveFile2(result, UTF8ToStr(data));
 end; // saveTempFile
 
 function loadregistry(const key, value: String; root: HKEY=0): string;
@@ -1830,6 +1843,30 @@ mainfrm.setStatusBarText(MSG_DNL_OK);
 result:=TRUE;
 end; // httpsCanWork
 
+function httpGetStr(url:string; from:int64=0; size:int64=-1):string;
+var
+  reply: Tstringstream;
+begin
+if size = 0 then
+  exit('');
+reply:=TStringStream.Create('');
+with ThttpClient.createURL(url) do
+  try
+    rcvdStream:=reply;
+    if (from <> 0) or (size > 0) then
+      contentRangeBegin:=intToStr(from);
+    if size > 0 then
+      contentRangeEnd:=intToStr(from+size-1);
+    get();
+    result:=reply.dataString;
+    if sameText('utf-8', reGet(ContentType, '; *charset=(.+) *($|;)')) then
+      Result:=UTF8ToString(result);
+  finally
+    reply.free;
+    Free;
+    end
+end; // httpGetStr
+
 function httpGet(const url:string; from:int64=0; size:int64=-1): RawByteString;
 var
   fs: TMemoryStream;
@@ -1898,9 +1935,10 @@ end; // httpFileSize
 function httpGetFile(url, filename:string; tryTimes:integer=1; notify:TdocDataEvent=NIL):boolean;
 var
   httpCli: ThttpClient;
-  supposed: integer;
+  supposed: int64;
   reply: Tfilestream;
 begin
+  supposed := 0;
   httpCli := ThttpClient.createURL(url);
   if Assigned(httpCli) then
 with httpCli do
@@ -2254,7 +2292,7 @@ end; // createShellLink
 function readShellLink(linkFN:WideString):string;
 var
   ShellObject: IUnknown;
-  pfd: _WIN32_FIND_DATA;
+  pfd: _WIN32_FIND_DATAW;
 begin
   shellObject := CreateComObject(CLSID_ShellLink);
   if (shellObject as IPersistFile).Load(PWChar(linkFN), 0) <> S_OK then
@@ -3403,8 +3441,8 @@ begin
       exit;
 // in case the pic was not found, it automatically adds it to the pool
   png := stringToPNG(s);
+  bmp := TBitmap.Create;
   try
-    bmp := TBitmap.Create;
     bmp.Assign(png);
     result := mainfrm.images.addMasked(bmp, bmp.TransparentColor);
     etags.values['icon.'+intToStr(result)] := MD5PassHS(s);
@@ -3794,6 +3832,30 @@ begin result:= SHA256PassLS(UTF8Encode(s)) end;
 function strMD5(s:string):string;
 begin Result := LowerCase(MD5PassHS(UTF8Encode(s))); end;
 
+
+function b64utf8(const s:string): RawByteString;
+begin result:=Base64EncodeString(UTF8encode(s)); end;
+
+function b64utf8W(const s:string): UnicodeString;
+begin result:=Base64EncodeString(UTF8encode(s)); end;
+
+function b64U(const b: RawByteString): UnicodeString;
+begin result:=Base64EncodeString(b); end;
+
+function b64R(const b: RawByteString): RawByteString;
+begin result:=Base64EncodeString(b); end;
+
+function decodeB64utf8(const s: RawByteString):string; OverLoad;
+begin result:=UnUTF(Base64DecodeString(s)); end;
+
+function decodeB64utf8(const s: String):string; OverLoad;
+begin result:=UnUTF(Base64DecodeString(s)); end;
+
+function decodeB64(const s: String): RawByteString; OverLoad;
+begin result:=Base64DecodeString(s); end;
+
+function decodeB64(const s: RawByteString): RawByteString; OverLoad;
+begin result:=Base64DecodeString(s); end;
 
 var
   TZinfo:TTimeZoneInformation;

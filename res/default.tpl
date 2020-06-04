@@ -1,4 +1,4 @@
-Welcome! This is the default template for HFS 2.4m
+Welcome! This is the default template for HFS 2.4
 template revision TR3.
 
 Here below you'll find some options affecting the template.
@@ -123,7 +123,7 @@ COMMENT with the ones above you can disable some features of the template. They 
 		</button>
 
 		{.if|{.get|can archive.}|
-		<button id='archiveBtn' onclick='ask("{.!Download these files as a single archive?.}", function() { submit({ selection: getSelectedItemsName() }, "{.get|url|mode=archive|recursive.}") })'>
+		<button id='archiveBtn' onclick='ask("{.!Download these files as a single archive?.}", ()=> submit({ files: getSelectedItemsName() }, "{.get|url|mode=archive|recursive.}") )'>
 			<i class="fa fa-file-archive"></i>
 			<span>{.!Archive.}</span>
 		</button>
@@ -311,17 +311,18 @@ a { text-decoration:none; color:#357; border:1px solid transparent; padding:0 0.
 #folder-path button { padding: .4em .6em; border-radius:.7em; }
 #folder-path button:first-child { padding: .2em .4em;} #folder-path i.fa { font-size:135% }
 button i.fa { font-size:110% }
-.item { margin-bottom:.3em; padding:.3em  .8em; border-top:1px solid #ddd;  }
+.item { margin-bottom:.3em; padding:.3em; border-top:1px solid #ddd;  }
 .item:hover { background:#f8f8f8; }
 .item-props { float:right; font-size:90%; margin-left:12px; margin-top:.2em; }
 .item-link { float:left; word-break:break-word; /* fix long names without spaces on mobile */ }
 .item img { vertical-align: text-bottom; margin:0 0.2em; }
 .item .fa-lock { margin-right: 0.2em; }
 .item .clearer { clear:both }
-.comment { color:#666; padding:.1em .5em .2em; background-color: #f5f5f5; border-radius: 1em; margin-top: 0.1em; }
-.comment>i { margin-right:0.5em; }
+.comment { color:#666; padding:.1em 1.8em .2em; border-radius: 1em; margin-top: 0.1em; 
+	background-color:rgba(0,0,0,.04); /* dynamically darker, as also hover is darker */  } 
+.comment>i:first-child { margin-right:0.5em; margin-left:-1.4em; }
 .item-size { margin-left:.3em }
-.selector { float:left; width: 1.2em; height:1.2em; margin-right: .5em;}
+.selector { float:left; width: 1.2em; height:1.2em; margin-right: .5em; filter:grayscale(1); }
 .item-menu { padding:0.1em 0.3em; border-radius:0.6em; position: relative; top: -0.1em;}
 .dialog-content h1 { margin:0; }
 .dialog-content .buttons { margin-top:1.5em }
@@ -469,7 +470,7 @@ z-index:1; /* without this .item-menu will be over*/ }
 {.!max s dl msg.}
 <br>({.disconnection reason.})
 
-[unauthorized]
+[unauth]
 <h1>{.!Unauthorized.}</h1>
 {.!Either your user name and password do not match, or you are not permitted to access this resource..}
 
@@ -667,6 +668,7 @@ function submit(data, url) {
 				f.append("<input type='hidden' name='"+k+"' value='"+v2+"' />")
         	})
     }
+	showLoading()
     f.submit()
 }//submit
 
@@ -702,9 +704,8 @@ function dialog(content, options) {
     ).click(function(ev){
         ev.stopImmediatePropagation()
     })
-	setTimeout(function(){
-		ret.find(':input:not(:disabled):first').focus() 
-	})
+	setTimeout(()=>
+		ret.find(':input:not(:disabled):first').focus() )
     return ret
 } // dialog
 
@@ -787,10 +788,8 @@ function getSelectedItemsName() {
 }//getSelectedItemsName
 
 function deleteFiles(files) {
-	ask("{.!confirm.}", function(){
-		showLoading()
-		return submit({ action:'delete', selection:files })
-	})
+	ask("{.!confirm.}", ()=> 
+		submit({ action:'delete', files }))
 }
 
 function moveFiles(files) {
@@ -984,8 +983,8 @@ function newQ(){
 function changeSort(){
     dialog([
         $('<h3>').text('{.!Sort by.}'),
-        $('<div class="buttons">').html(objToArr(sortOptions, function(label,code){
-            return $('<button>')
+        $('<div class="buttons">').html(objToArr(sortOptions, (label,code)=>
+            $('<button>')
 				.text(label)
 				.prepend(urlParams.sort===code ? '<i class="fa fa-sort-alt-'+(urlParams.rev?'down':'up')+'"></i> ' : '')
                 .click(function(){
@@ -993,7 +992,7 @@ function changeSort(){
 					urlParams.sort = code||undefined
                     location.search = encodeURL(urlParams)
 				})
-		}))
+		))
 	])
 }//changeSort
 

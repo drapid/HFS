@@ -25,6 +25,7 @@ HTTP Server Lib
 {$I- }
 
 unit HSlib;
+{$I NoRTTI.inc}
 
 interface
 
@@ -102,11 +103,12 @@ type
     procedure setBody(const b: RawByteString);
     procedure setBodyU(const b: String);
     function  getBodyU: String;
+    procedure setHeader(const h: RawByteString);
     procedure setHeaderU(const h: String);
     function  getHeaderU: String;
    public
     mode: ThttpReplyMode;
-    contentType: string;       // ContentType header (optional)
+    contentType: RawByteString;       // ContentType header (optional)
     bodyMode :(
       RBM_FILE,         // variable body specifies a file
 //      RBM_STRING,       // variable body specifies byte content
@@ -119,8 +121,8 @@ type
     isBodyUTF8: Boolean;   // Is body UTF8 string
     firstByte, lastByte: int64;  // body interval for partial replies (206)
     realm,           // this will appear in the authentication dialog
-    reason,          // customized reason phrase
     url: string;     // used for redirections
+    reason: RawByteString;          // customized reason phrase
     resumeForbidden: boolean;
     procedure headerAdd(const h: String); OverLoad;
     procedure headerAdd(const h: RawByteString); OverLoad;
@@ -128,7 +130,7 @@ type
     procedure ClearAdditionalHeaders;
     property Body: RawByteString read bodyBr write setBody;
     property BodyU: String read getBodyU write setBodyU;
-    property header: RawByteString read fHeader;
+    property header: RawByteString read fHeader write setHeader;
     property headerU: String read getHeaderU write setHeaderU;
    end;
 
@@ -206,9 +208,10 @@ type
     procedure notify(ev:ThttpEvent);
     procedure tryNotify(ev:ThttpEvent);
     procedure calculateSpeed();
-	  procedure sendheader(h:string='');
-		function  replyHeader_mode(mode:ThttpReplyMode):string;
-		function  replyHeader_code(code:integer):string;
+	  procedure sendheader(const h:string); OverLoad;
+	  procedure sendheader(const h: RawByteString=''); OverLoad;
+		function  replyHeader_mode(mode:ThttpReplyMode): RawByteString;
+		function  replyHeader_code(code:integer): RawByteString;
     function  getDontFree():boolean;
     procedure processInputBuffer();
     procedure clearRequest();
@@ -230,9 +233,11 @@ type
     procedure disconnect();
 //    procedure addHeader(s:string; overwrite:boolean=TRUE); OverLoad; // append an additional header line
     procedure addHeader(const s:RawByteString; overwrite:boolean=TRUE); OverLoad; // append an additional header line
+    procedure addHeader(const s: String; overwrite:boolean=TRUE); OverLoad;
     procedure addHeader(const h, v:RawByteString; overwrite:boolean=TRUE); OverLoad; // append an additional header line
     procedure addHeader(const h, v: String; overwrite:boolean=TRUE); OverLoad;
-    function  setHeaderIfNone(s:string):boolean; // set header if not already existing
+    function  setHeaderIfNone(const s:string):boolean; OverLoad;// set header if not already existing
+    function  setHeaderIfNone(const s:RawByteString):boolean; OverLoad;// set header if not already existing
     procedure removeHeader(name: RawByteString);
     function  getHeader(h:string):string;  // extract the value associated to the specified header field
     function  getCookie(k:string):string;
@@ -355,6 +360,7 @@ uses
   AnsiClasses, RDUtils, Base64;
 
 const
+  HEADER_LIMITER: RawByteString = CRLFA+CRLFA;
   MAX_REQUEST_LENGTH = 64*1024;
   MAX_INPUT_BUFFER_LENGTH = 256*1024;
   // used as body content when the user did not specify any
@@ -409,9 +415,7 @@ end; // isLocalIP
 function min(a,b:integer):integer;
 begin if a < b then result:=a else result:=b end;
 
-// this table is to be used by ipos(), to be calculated once
-var
-  upcaseTab: array [char] of char;
+
 
 function nonQuotedPos(ss, s: string; ofs: integer=1; quote: string='"'; unquote: string='"'):integer; OverLoad;
 var
@@ -513,7 +517,7 @@ while i<=length(url) do
   begin
     if (url[i] = '%') and (i+2 <= length(url)) then
       try
-        c := AnsiChar(strToInt( '$'+url[i+1]+url[i+2] ));
+        c := AnsiChar(strToIntA(RawByteString('$')+url[i+1]+url[i+2] ));
         inc(i,2); // three chars for one
       except
         c := url[i];
@@ -626,10 +630,23 @@ if int >= 0 then
   result:=name+': '+intToStr(int)+CRLF;
 end;
 
+{
 function replyHeader_Str(const name:string; const str:string):string;
 begin
 result:='';
 if str > '' then result:=name+': '+str+CRLF;
+end;
+}
+function replyHeader_Str(const name:RawByteString; const str:RawByteString): RawByteString; OverLoad;
+begin
+result:='';
+if str > '' then result:=name+': '+str+CRLFA;
+end;
+
+function replyHeader_Str(const name:RawByteString; const str:String): RawByteString; OverLoad;
+begin
+result:='';
+if str > '' then result:=name+': '+ StrToUTF8(str)+CRLFA;
 end;
 
 procedure THTTPReply.setBody(const b: RawByteString);
@@ -662,6 +679,12 @@ end;
 procedure THTTPReply.setHeaderU(const h: String);
 begin
   fHeader := UTF8Encode(h);
+  includeTrailingString(fHeader, CRLFA);
+end;
+
+procedure THTTPReply.setHeader(const h: RawByteString);
+begin
+  fHeader := h;
   includeTrailingString(fHeader, CRLFA);
 end;
 
@@ -1170,7 +1193,9 @@ procedure ThttpConn.processInputBuffer();
 
   function parseHeader():boolean;
   var
-    r, s: string;
+//    r, s: string;
+    h, h2: String;
+    r, sR: RawByteString;
     u: String;
     i : integer;
   begin
@@ -1186,53 +1211,53 @@ procedure ThttpConn.processInputBuffer();
   post.header:='';
   post.mode:=PM_NONE;
 
-  s:=uppercase(chop(i, 1, r));
-  if s='GET' then request.method:=HM_GET else
-  if s='POST' then request.method:=HM_POST else
-  if s='HEAD' then request.method:=HM_HEAD else;
+  sR:=uppercase(chop(i, 1, r));
+  if sR='GET' then request.method:=HM_GET else
+  if sR='POST' then request.method:=HM_POST else
+  if sR='HEAD' then request.method:=HM_HEAD else;
 
-  request.url:=chop(' ', r);
+  request.url:= UnUTF(chop(RawByteString(' '), r));
 
-  s:=uppercase(chopLine(r));
+  sR:=uppercase(chopLine(r));
   // if 'HTTP/' is not found, chop returns S
-  if chop('HTTP/',s) = '' then request.ver:=s;
+  if chop(RawByteString('HTTP/'),sR) = '' then request.ver:=sR;
 
-  request.headers.text:=r;
+  request.headers.text:=UnUTF(r);
 
-  s:=getHeader('Range');
-  if ansiStartsText('bytes=',s) then
+  h:=getHeader('Range');
+  if ansiStartsText('bytes=', h) then
     begin
-    delete(s,1,6);
-    r:=chop('-',s);
+    delete(h,1,6);
+    h2:=chop('-',h);
     try
-      if r>'' then request.firstByte:=strToInt64(r);
-      if s>'' then request.lastByte:=strToInt64(s);
+      if h2>'' then request.firstByte:=strToInt64(h2);
+      if h>'' then request.lastByte:=strToInt64(h);
     except end;
     end;
 
-  s:=getHeader('Authorization');
-  if AnsiStartsText('Basic',s) then
+  h:=getHeader('Authorization');
+  if AnsiStartsText('Basic', h) then
     begin
-    delete(s,1,6);
+    delete(h,1,6);
 //    s:= base64decode(s);
-    u := UnUTF(Base64DecodeString(s));
+    u := UnUTF(Base64DecodeString(h));
 
     request.user:=trim(chop(':',u));
     request.pwd:=u;
     end;
 
-  s := getHeader('Connection');
+  h := getHeader('Connection');
   persistent := srv.persistentConnections and
-    (ansiStartsText('Keep-Alive',s) or (request.ver >= '1.1') and (ipos('close',s)=0));
+    (ansiStartsText('Keep-Alive', h) or (request.ver >= '1.1') and (ipos('close', h)=0));
 
-  s := getHeader('Content-Type');
-  if ansiStartsText('application/x-www-form-urlencoded', s) then
+  h := getHeader('Content-Type');
+  if ansiStartsText('application/x-www-form-urlencoded', h) then
     post.mode := PM_URLENCODED
-  else if ansiStartsText('multipart/form-data', s) then
+  else if ansiStartsText('multipart/form-data', h) then
     begin
       post.mode := PM_MULTIPART;
-      chop('boundary=', s);
-      post.boundary := '--'+UTF8Encode(s);
+      chop('boundary=', h);
+      post.boundary  := '--'+UTF8Encode(h);
     end;
   post.length := StrToInt64Def(getHeader('Content-Length'), 0);
   // the browser may not support 2GB+ files. This workaround works only for files under 4GB.
@@ -1294,7 +1319,7 @@ procedure ThttpConn.processInputBuffer();
       break;
       end;
     // was it the end of the post section?
-    if copy(buffer, i+length(post.boundary), 4) = '--'+CRLF then
+    if copy(buffer, i+length(post.boundary), 4) = RawByteString('--')+CRLFA then
       begin
       handleLeftData(i);
       chop(RawByteString('--'+CRLFA), buffer);
@@ -1304,11 +1329,11 @@ procedure ThttpConn.processInputBuffer();
       break;
       end;
     // we wait for the header to be complete
-    if posEx(CRLFA+CRLFA, buffer, i+length(post.boundary)) = 0 then break;
+    if posEx(HEADER_LIMITER, buffer, i+length(post.boundary)) = 0 then break;
     handleLeftData(i);
     post.filename:='';
     post.data:='';
-    post.header:=chop(CRLFA+CRLFA, buffer);
+    post.header:=chop(HEADER_LIMITER, buffer);
     chopLine(post.header);
     // parse the header part
     s:=post.header;
@@ -1324,18 +1349,20 @@ procedure ThttpConn.processInputBuffer();
         begin
         c:=chop(nonQuotedPos(RawByteString(';'), l), l);
         k:=trim(chop(RawByteString('='), c));
-        cU:=ansiDequotedStr(UnUTF(c),'"');
+        cU:=UnUTF(ansiDequotedStr(c,'"'));
         if sameText(k, RawByteString('filename')) then
           begin
           delete(cU, 1, lastDelimiter('/\',cU));
           post.filename:=cU;
-          end;
+          end
+         else
         if sameText(k, RawByteString('name')) then
           post.varname:=cU;
         end;
       end;
     lastPostItemPos:=bytesPosted-length(buffer);
-    if post.filename = '' then continue;
+    if post.filename = '' then
+      continue;
     firstPostFile:=FALSE;
     tryNotify(HE_POST_FILE);
     until false;
@@ -1364,7 +1391,7 @@ procedure ThttpConn.processInputBuffer();
     i, sepLen: integer;
   begin
   // try to identify header length and position
-  i:=pos(CRLFA+CRLFA, buffer);
+  i:=pos(HEADER_LIMITER, buffer);
   sepLen:=4;
   if i <= 0 then
     begin
@@ -1401,16 +1428,16 @@ procedure ThttpConn.processInputBuffer();
   handlePostData();
   end; // handleHeaderData
 
-  function replyHeader_OK(contentLength:int64=-1):string;
+  function replyHeader_OK(contentLength:int64=-1): RawByteString;
   begin
   result:=replyheader_code(200)
-    +format('Content-Length: %d'+CRLF, [contentLength]);
+    +format(RawByteString('Content-Length: %d')+CRLFA, [contentLength]);
   end; // replyHeader_OK
 
-  function replyHeader_PARTIAL( firstB, lastB, totalB:int64):string;
+  function replyHeader_PARTIAL( firstB, lastB, totalB:int64): RawByteString;
   begin
   result:=replyheader_code(206)
-    +format('Content-Range: bytes %d-%d/%d'+CRLF+'Content-Length: %d'+CRLF,
+    +format(RawByteString('Content-Range: bytes %d-%d/%d')+CRLFA+RawByteString('Content-Length: %d')+CRLFA,
           [firstB, lastB, totalB, lastB-firstB+1 ])
   end; // replyheader_PARTIAL
 
@@ -1419,7 +1446,7 @@ if buffer = '' then exit;
 if state = HCS_IDLE then
   begin
   state:=HCS_REQUESTING;
-  reply.contentType:='text/html';
+  reply.contentType:='text/html; charset=utf-8';
   notify(HE_REQUESTING);
   end;
 case state of
@@ -1437,7 +1464,7 @@ notify(HE_REQUESTED);
 if not initInputStream() then
   begin
   reply.mode:=HRM_INTERNAL_ERROR;
-  reply.contentType:='text/html';
+  reply.contentType:='text/html; charset=utf-8';
   notify(HE_CANT_OPEN_FILE);
   end;
 notify(HE_STREAM_READY);
@@ -1453,9 +1480,9 @@ case reply.mode of
   HRM_DENY: sendHeader( replyheader_mode(reply.mode) );
   HRM_UNAUTHORIZED:
     sendHeader(replyheader_mode(reply.mode)
-      +replyHeader_Str('WWW-Authenticate','Basic realm="'+reply.realm+'"') );
+      +replyHeader_Str(RawByteString('WWW-Authenticate'),'Basic realm="'+reply.realm+'"') );
   HRM_REDIRECT, HRM_MOVED:
-    sendHeader(replyheader_mode(reply.mode)+'Location: '+reply.url );
+    sendHeader(replyheader_mode(reply.mode)+'Location: '+ StrToUTF8(reply.url) );
   HRM_REPLY, HRM_REPLY_HEADER:
     if stream = NIL then
       sendHeader( replyHeader_code(404) )
@@ -1690,11 +1717,24 @@ begin srv.notify(ev, self) end;
 procedure ThttpConn.tryNotify(ev:ThttpEvent);
 begin try srv.notify(ev, self) except end end;
 
-procedure ThttpConn.sendheader(h: string='');
+procedure ThttpConn.sendheader(const h: string);
 begin
   state:=HCS_REPLYING_HEADER;
   if reply.header = '' then
     reply.headerU := h;
+  reply.headerAdd(reply.fAdditionalHeaders);
+
+  try
+     sock.sendStr(reply.header+CRLFA);
+   except
+  end;
+end; // sendHeader
+
+procedure ThttpConn.sendheader(const h: RawByteString='');
+begin
+  state:=HCS_REPLYING_HEADER;
+  if reply.header = '' then
+    reply.header := h;
   reply.headerAdd(reply.fAdditionalHeaders);
 
   try
@@ -1722,14 +1762,14 @@ case code of
   end;
 end; // replycode2reason
 
-function ThttpConn.replyHeader_code(code:integer):string;
+function ThttpConn.replyHeader_code(code:integer): RawByteString;
 begin
 if reply.reason = '' then reply.reason:=replycode2reason(code);
-result:=format('HTTP/1.1 %d %s'+CRLF, [code,reply.reason])
-  + replyHeader_Str('Content-Type',reply.contentType)
+result:=format(RawByteString('HTTP/1.1 %d %s')+CRLFA, [code,reply.reason])
+  + replyHeader_Str(RawByteString('Content-Type'),reply.contentType)
 end;
 
-function ThttpConn.replyHeader_mode(mode:ThttpReplyMode):string;
+function ThttpConn.replyHeader_mode(mode:ThttpReplyMode): RawByteString;
 begin result:=replyHeader_code(HRM2CODE[mode]) end;
 
 function getNameOf(const s:string):string; // colon included
@@ -1758,7 +1798,19 @@ begin
 end; // namePos
 
 // return true if the operation succeded
-function ThttpConn.setHeaderIfNone(s:string):boolean;
+function ThttpConn.setHeaderIfNone(const s:string):boolean;
+var
+  name: RawByteString;
+begin
+  name := StrToUTF8(getNameOf(s));
+if name = '' then
+  raise Exception.Create('Missing colon');
+result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
+if result then
+  addHeader(s, FALSE); // with FALSE it's faster
+end; // setHeaderIfNone
+
+function ThttpConn.setHeaderIfNone(const s: RawByteString):boolean;
 var
   name: RawByteString;
 begin
@@ -1778,14 +1830,14 @@ begin
   s := reply.fAdditionalHeaders;
   if s = '' then
     Exit;
-  includeTrailingString(name, ':');
+  includeTrailingString(name, RawByteString(':'));
 // see if it already exists
   i:=1;
   repeat
     i := namePos(name, s, i);
   if i = 0 then break;
   // yes it does
-  eol:=posEx(#10, s, i);
+  eol:=posEx(RawByteString(#10), s, i);
   if eol = 0 then // this never happens, unless the string is corrupted. Just to be sounder.
     eol:=length(s);
   delete(s, i, eol-i+1); // remove it
@@ -1798,21 +1850,32 @@ begin
 if overwrite then
   removeHeader(getNameOf(s));
 //appendStr(reply.additionalHeaders, s+CRLF);
-reply.fAdditionalHeaders := reply.fAdditionalHeaders + s + CRLF;
+reply.fAdditionalHeaders := reply.fAdditionalHeaders + s + CRLFA;
+end; // addHeader
+
+procedure ThttpConn.addHeader(const s: String; overwrite:boolean=TRUE);
+begin
+if overwrite then
+  removeHeader(getNameOf(s));
+//appendStr(reply.additionalHeaders, s+CRLF);
+reply.fAdditionalHeaders := reply.fAdditionalHeaders + StrToUTF8(s) + CRLFA;
 end; // addHeader
 
 procedure ThttpConn.addHeader(const h, v:RawByteString; overwrite:boolean=TRUE);
 begin
   if overwrite then
     removeHeader(h);
-  reply.fAdditionalHeaders := reply.fAdditionalHeaders + h + ': ' + v + CRLF;
+  reply.fAdditionalHeaders := reply.fAdditionalHeaders + h + ': ' + v + CRLFA;
 end; // addHeader
 
 procedure ThttpConn.addHeader(const h, v:String; overwrite:boolean=TRUE);
+var
+  hr: RawByteString;
 begin
+  hr :=  StrToUTF8(h);
   if overwrite then
-    removeHeader(h);
-  reply.fAdditionalHeaders := reply.fAdditionalHeaders + StrToUTF8(h) + ': ' + StrToUTF8(v) + CRLF;
+    removeHeader(hr);
+  reply.fAdditionalHeaders := reply.fAdditionalHeaders + hr + ': ' + StrToUTF8(v) + CRLFA;
 end; // addHeader
 
 function ThttpConn.getDontFree():boolean;

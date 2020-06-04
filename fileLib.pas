@@ -493,7 +493,7 @@ this would let us have "=" inside the names, but names cannot be assigned
   comments:=THashedStringList.create();
   try
     comments.caseSensitive:=FALSE;
-    try comments.loadFromFile(folder.resource+'\'+COMMENTS_FILE);
+    try comments.loadFromFile(folder.resource+'\'+COMMENTS_FILE, TEncoding.UTF8);
     except end;
     if lpion in loadPrefs then
       loadIon(folder.resource, comments);
@@ -867,7 +867,7 @@ try
       if fileExists(resource+'\..\'+COMMENTS_FILE) then
        begin
         comments.CaseSensitive:=FALSE;
-        comments.LoadFromFile(resource+'\..\'+COMMENTS_FILE);
+        comments.LoadFromFile(resource+'\..\'+COMMENTS_FILE, TEncoding.UTF8);
         result:=comments.values[name];
        end;
     except end

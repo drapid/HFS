@@ -19,6 +19,7 @@ This file is part of HFS ~ HTTP File Server.
 }
 {$INCLUDE defs.inc }
 unit classesLib;
+{$I NoRTTI.inc}
 
 interface
 
@@ -154,7 +155,7 @@ type
 
   ThttpClient = class(TSslHttpCli)
     constructor Create(AOwner: TComponent); override;
-    destructor destroy;
+    destructor Destroy; OverRide;
     class function createURL(url:string):ThttpClient;
     end;
 
@@ -253,7 +254,7 @@ implementation
 
 uses
   windows, dateUtils, forms, ansiStrings,
-  RDFileUtil, RDUtils, Base64,
+  RDFileUtil, RDUtils,
   utilLib, hfsVars;
 
 class function ThttpClient.createURL(url:string):ThttpClient;
@@ -505,7 +506,7 @@ begin
         f := copy(sr.name, 1, length(sr.name)-4)
        else
         f := UnUTF(l);
-      add(path+lowercase(f)+'='+h);
+      add(path+lowercase(f)+'='+UnUTF(h));
     end;
   until findnext(sr) <> 0;
 sysutils.findClose(sr);
@@ -869,10 +870,11 @@ function Ttlv.getTheRest(): RawByteString;
 begin result:=substr(whole, cur, bound) end;
 
 class function Tsession.getNewSID():TSessionId;
-begin result:=sanitizeSID(base64EncodeString(str_(now())+str_(random()))) end;
+begin result:=sanitizeSID(b64U(str_(now())+str_(random()))) end;
 
 class function Tsession.sanitizeSID(s:TSessionId):TSessionId;
-begin result:=reReplace(s, '[\D\W]', '', '!') end;
+//begin result:=reReplace(s, '[\D\W]', '', '!') end;
+begin result:=reReplace(s, '[^0-9a-zA-Z]', '', '!') end;
 
 constructor Tsession.create(const sid:string='');
 begin

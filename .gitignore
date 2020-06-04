@@ -18,3 +18,16 @@ hfs.tpl
 hfs_project.tvsconfig
 data.res
 macros-log.html
+#################
+## Delphi
+#################
+*.dcu
+*.local
+*.identcache
+*.stat
+*.dproj.local
+*.bak
+*.ddp
+*.~*
+*.drc
+*.rsm

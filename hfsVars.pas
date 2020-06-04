@@ -1,4 +1,5 @@
 unit hfsVars;
+{$I NoRTTI.inc}
 
 interface
 uses
@@ -11,6 +12,7 @@ var
   ip2obj: THashedStringList;
   sessions: Tsessions;
   etags: THashedStringList;
+  cfgLoaded: boolean;
   addToFolder: string; // default folder where to add items from the command line
   lastDialogFolder: string;  // stores last for open dialog, to make it persistent
   clock: integer;       // program ticks (tenths of second)
@@ -47,7 +49,7 @@ var
   addingItemsCounter: integer = -1; // -1 is disabled
   stopAddingItems, queryingClose: boolean;
   port: string;
-  tpl_help: string;
+//  tpl_help: string;
   lastWindowRect: Trect;
   defaultTpl, dmBrowserTpl, filelistTpl: Ttpl;
   tplEditor: string;
@@ -74,7 +76,7 @@ var
   loginRealm: string;
   serializedConnColumns: string;
   VFScounterMod: boolean; // if any counter has changed
-  imagescache: array of string;
+  imagescache: array of RawByteString;
   logFontName: string;
   logFontSize: integer;
   forwardedMask: string;
