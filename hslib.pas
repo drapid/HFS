@@ -1,5 +1,5 @@
 {
-Copyright (C) 2002-2014 Massimo Melina (www.rejetto.com)
+Copyright (C) 2002-2020 Massimo Melina (www.rejetto.com)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@ Copyright (C) 2002-2014 Massimo Melina (www.rejetto.com)
 HTTP Server Lib
 
 ==== TO DO
+* https
 * upload bandwidth control (can it be done without multi-threading?)
 
 }
@@ -179,6 +180,7 @@ type
     P_requestCount: integer;
     P_destroying: boolean;  // destroying is in progress
     P_sndBuf: integer;
+    P_v6: boolean;
     persistent: boolean;
     disconnecting: boolean; // disconnected() has been called
     lockCount: integer;     // prevent freeing of the object
@@ -238,6 +240,7 @@ type
     procedure addHeader(const h, v: String; overwrite:boolean=TRUE); OverLoad;
     function  setHeaderIfNone(const s:string):boolean; OverLoad;// set header if not already existing
     function  setHeaderIfNone(const s:RawByteString):boolean; OverLoad;// set header if not already existing
+    function  setHeaderIfNone(const name: RawByteString; const s:string):boolean; OverLoad;
     procedure removeHeader(name: RawByteString);
     function  getHeader(h:string):string;  // extract the value associated to the specified header field
     function  getCookie(k:string):string;
@@ -247,6 +250,7 @@ type
     function  initInputStream():boolean;
     property address:string read P_address;      // other peer ip address
     property port:string read P_port;            // other peer port
+    property v6:boolean read P_v6;
     property requestCount:integer read P_requestCount;
     property bytesToSend:int64 read getBytesToSend;
     property bytesToPost:int64 read getBytesToPost;
@@ -319,7 +323,7 @@ const
   MINIMUM_CHUNK_SIZE = 2*1024;
   MAXIMUM_CHUNK_SIZE = 1024*1024;
   HRM2CODE: array [ThttpReplyMode] of integer = (200, 200, 403, 401, 404, 400,
-  	500, 0, 0, 405, 302, 503, 413, 301, 304 );
+  	500, 0, 0, 405, 302, 429, 413, 301, 304 );
   METHOD2STR: array [ThttpMethod] of string = ('UNK','GET','POST','HEAD');
   HRM2STR: array [ThttpReplyMode] of string = ('Head+Body', 'Head only', 'Deny',
     'Unauthorized', 'Not found', 'Bad request', 'Internal error', 'Close',
@@ -376,7 +380,7 @@ const
     '',
     '405 - Method not allowed',
     '<html><head><meta http-equiv="refresh" content="url=%url%" /></head><body onload=''window.location="%url%"''>302 - <a href="%url%">Redirection to %url%</a></body></html>',
-    '503 - Server is overloaded, retry later',
+    '429 - Server is overloaded, retry later',
     '413 - The request has exceeded the max length allowed',
     '301 - Moved permanently to <a href="%url%">%url%</a>',
     '' // RFC2616: The 304 response MUST NOT contain a message-body
@@ -951,7 +955,6 @@ end; // timerEvent
 procedure ThttpSrv.notify(ev:ThttpEvent; conn:ThttpConn);
 begin
 if not assigned(onEvent) then exit;
-//if assigned(sock) then sock.pause();
 if assigned(conn) then
   begin
   inc(conn.lockCount);
@@ -1061,6 +1064,7 @@ limiters:=TObjectList.create;
 limiters.ownsObjects:=FALSE;
 P_address:=sock.GetPeerAddr();
 P_port:=sock.GetPeerPort();
+P_v6 := sock.SocketFamily = sfIPv6;
 state:=HCS_IDLE;
 srv.conns.add(self);
 clearRequest();
@@ -1329,7 +1333,8 @@ procedure ThttpConn.processInputBuffer();
       break;
       end;
     // we wait for the header to be complete
-    if posEx(HEADER_LIMITER, buffer, i+length(post.boundary)) = 0 then break;
+    if posEx(HEADER_LIMITER, buffer, i+length(post.boundary)) = 0 then
+      break;
     handleLeftData(i);
     post.filename:='';
     post.data:='';
@@ -1342,9 +1347,11 @@ procedure ThttpConn.processInputBuffer();
       l:=chopLine(s);
       if l = '' then continue;
       k:=chop(RawByteString(':'), l);
-      if not sameText(k, RawByteString('Content-Disposition')) then continue; // we are not interested in other fields
+      if not sameText(k, RawByteString('Content-Disposition')) then // we are not interested in other fields
+        continue;
       k:=trim(chop(';', l));
-      if not sameText(k, RawByteString('form-data')) then continue;
+      if not sameText(k, RawByteString('form-data')) then
+        continue;
       while l > '' do
         begin
         c:=chop(nonQuotedPos(RawByteString(';'), l), l);
@@ -1756,6 +1763,7 @@ case code of
   404: result:='Not Found';
   405: result:='Method Not Allowed';
   413: result:='Payload Too Large';
+  429: result:='Too Many Requests';
   500: result:='Internal Server Error';
   503: result:='Service Unavailable';
   else result:='';
@@ -1820,6 +1828,16 @@ if name = '' then
 result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
 if result then
   addHeader(s, FALSE); // with FALSE it's faster
+end; // setHeaderIfNone
+
+// return true if the operation succeded
+function ThttpConn.setHeaderIfNone(const name: RawByteString; const s:string):boolean;
+begin
+if name = '' then
+  raise Exception.Create('Missing colon');
+result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
+if result then
+  addHeader(name, StrToUTF8(s), FALSE); // with FALSE it's faster
 end; // setHeaderIfNone
 
 procedure ThttpConn.removeHeader(name: RawByteString);

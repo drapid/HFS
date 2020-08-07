@@ -1,5 +1,5 @@
 {
-Copyright (C) 2002-2012  Massimo Melina (www.rejetto.com)
+Copyright (C) 2002-2020  Massimo Melina (www.rejetto.com)
 
 This file is part of HFS ~ HTTP File Server.
 
@@ -30,6 +30,22 @@ uses
   hslib, hfsGlobal;
 
 type
+  Tip2av = Tdictionary<string,Tdatetime>;
+  TantiDos = class
+    const MAX_CONCURRENTS = 3;
+  class var
+    folderConcurrents: integer;
+    ip2availability: Tip2av;
+    class constructor Create;
+  protected
+    accepted: boolean;
+    Paddress: string;
+  public
+    constructor create;
+    destructor Destroy; override;
+    function accept(conn:ThttpConn; address:string=''):boolean;
+    end;
+
   TfastStringAppend = class
   protected
     buff: string;
@@ -90,7 +106,7 @@ type
   PtplSection = ^TtplSection;
   TtplSection = record
     name, txt: string;
-    nolog, nourl, cache: boolean;
+    nolog, public, noList, cache: boolean;
     ts: Tdatetime;
     end;
 
@@ -109,9 +125,9 @@ type
     sections: Tstr2section;
     function  getTxt(section:string):string;
     function  newSection(section:string):PtplSection;
-    procedure fromString(txt: String);
+    procedure fromString(const txt: String);
     function  toS: String;
-    procedure fromRaw(txt: RawByteString);
+    procedure fromRaw(const txt: RawByteString);
     function  toRaw: RawByteString;
     procedure setOver(v:Ttpl);
     procedure clear();
@@ -248,6 +264,7 @@ type
     function passwordValidation(const pwd: String):boolean;
     procedure setSessionVar(k, v: String);
     procedure logout();
+    function allowRecur: Boolean;
   end;
 
 implementation
@@ -256,6 +273,73 @@ uses
   windows, dateUtils, forms, ansiStrings,
   RDFileUtil, RDUtils,
   utilLib, hfsVars;
+
+
+class constructor TantiDos.Create;
+begin
+  ip2availability := NIL;
+  folderConcurrents := 0;
+end;
+
+constructor TantiDos.create();
+begin
+accepted:=FALSE;
+end;
+
+function TantiDos.accept(conn:ThttpConn; address:string=''):boolean;
+
+  procedure reject();
+  resourcestring
+    MSG_ANTIDOS_REPLY = 'Please wait, server busy';
+  begin
+  conn.reply.mode:=HRM_OVERLOAD;
+  conn.addHeader(ansistring('Refresh: '+intToStr(1+random(2)))); // random for less collisions
+  conn.reply.body:=UTF8Encode(MSG_ANTIDOS_REPLY);
+  end;
+
+begin
+if address= '' then
+  address:=conn.address;
+if ip2availability = NIL then
+  ip2availability:=Tip2av.create();
+try
+  if ip2availability[address] > now() then // this specific address has to wait?
+    begin
+    reject();
+    exit(FALSE);
+    end;
+except
+  end;
+if folderConcurrents >= MAX_CONCURRENTS then   // max number of concurrent folder loading, others are postponed
+  begin
+  reject();
+  exit(FALSE);
+  end;
+inc(folderConcurrents);
+Paddress:=address;
+ip2availability.AddOrSetValue(address, now()+1/HOURS);
+accepted:=TRUE;
+Result:=TRUE;
+end;
+
+destructor TantiDos.Destroy;
+var
+  pair: Tpair<string,Tdatetime>;
+  t: Tdatetime;
+begin
+if not accepted then
+  exit;
+t:=now();
+if folderConcurrents = MAX_CONCURRENTS then // serving multiple addresses at max capacity, let's give a grace period for others
+  ip2availability[Paddress]:=t + 1/SECONDS
+else
+  ip2availability.Remove(Paddress);
+dec(folderConcurrents);
+// purge leftovers
+ for pair in ip2availability do
+  if pair.Value < t then
+    ip2availability.Remove(pair.Key);
+end;
 
 class function ThttpClient.createURL(url:string):ThttpClient;
 begin
@@ -274,11 +358,11 @@ agent:=HFS_HTTP_AGENT;
 SslContext := TSslContext.Create(NIL);
 end; // create
 
-destructor ThttpClient.destroy;
+destructor ThttpClient.Destroy;
 begin
 SslContext.free;
 SslContext:=NIl;
-inherited;
+inherited destroy;
 end;
 
 constructor TperIp.create();
@@ -606,7 +690,7 @@ begin
   if sections.containsKey(section) then
    if not sections.TryGetValue(section, result) then
      result:=NIL;
-if inherit and assigned(over) and ((result = NIL) or (trim(result.txt) = '')) then
+if inherit and assigned(over) and (result = NIL) then
   result:=over.getSection(section);
 end; // getSection
 
@@ -622,7 +706,7 @@ else
 end; // getTxt
 
 function Ttpl.getTxtByExt(fileExt:string):string;
-begin result:=getTxt('file.'+fileExt) end;
+begin result:=getTxt('file'+fileExt) end;
 
 procedure Ttpl.clear();
 begin
@@ -633,7 +717,7 @@ begin
   freeAndNIL(strTable);  // mod by mars
 end;
 
-procedure Ttpl.fromRaw(txt: RawByteString);
+procedure Ttpl.fromRaw(const txt: RawByteString);
 var
   s: String;
 begin
@@ -642,7 +726,7 @@ begin
   appendString(s);
 end; // fromString
 
-procedure Ttpl.fromString(txt: String);
+procedure Ttpl.fromString(const txt: String);
 begin
   clear;
 
@@ -694,11 +778,52 @@ var
 
   procedure saveInSection();
   var
+    base: TtplSection;
+
+    function parseFlagsAndAcceptSection(flags:TStringDynArray):boolean;
+    var
+      f, k, v, s: string;
+      i: integer;
+    begin
+    for f in flags do
+      begin
+      i:=pos('=',f);
+      if i = 0 then
+        begin
+        if f='no log' then
+          base.nolog:=TRUE
+        else if f='public' then
+          base.public:=TRUE
+        else if f='no list' then
+          base.noList:=TRUE
+        else if f='cache' then
+          base.cache:=TRUE;
+        Continue;
+        end;
+      k:=copy(f,1,i-1);
+      v:=copy(f,i+1,MAXINT);
+      if k = 'build' then
+        begin
+        s:=chop('-',v);
+        if (v > '') and (VERSION_BUILD > v) // max
+        or (s > '') and (VERSION_BUILD < s) then // min
+          exit(FALSE);
+        end
+      else if k = 'ver' then
+        if fileMatch(v, VERSION) then continue
+        else exit(FALSE)
+      else if k = 'template' then
+        if fileMatch(v, getTill(#13,getTxt('template id'))) then continue
+        else exit(FALSE)
+      end;
+    result:=TRUE;
+    end;
+
+  var
     ss: TStringDynArray;
     s: string;
-    base: TtplSection;
     till: pchar;
-    append: boolean;
+    append, prepend, add: boolean;
     sect, from: PtplSection;
   begin
   till:=pred(bos);
@@ -707,44 +832,49 @@ var
   if till^ = #10 then dec(till);
   if till^ = #13 then dec(till);
 
+  base:=default(TtplSection);
   base.txt:=getStr(ptxt, till);
-  // there may be flags after |
-  s:=cur_section;
-  cur_section:=chop('|', s);
-  base.nolog:=ansiPos('no log', s) > 0;
-  base.nourl:=ansiPos('private', s) > 0;
-  base.cache:=ansiPos('cache', s) > 0;
   base.ts:=now();
+  ss:=split('|',cur_section);
+  cur_section:=popString(ss);
+  if not parseFlagsAndAcceptSection(ss) then
+    exit;
 
-  s:=cur_section;
-  append:=ansiStartsStr('+', s);
-  if append then
-    delete(s,1,1);
+  prepend:=startsStr('^', cur_section);
+  append:=ansiStartsStr('+', cur_section);
+  add:=prepend or append;
+  if add then
+    delete(cur_section,1,1);
 
   // there may be several section names separated by =
-  ss:=split('=', s);
+  ss:=split('=', cur_section);
   // handle the main section specific case
-  if ss = NIL then addString('', ss);
+  if ss = NIL then
+    addString('', ss);
   // assign to every name the same txt
-  for var i: Integer :=0 to length(ss)-1 do
+  for var si in ss do
     begin
-    s:=trim(ss[i]);
+    s:=trim(si);
     sect:=getSection(s, FALSE);
     from:=NIL;
     if sect = NIL then // not found
       begin
-      if append then
+      if add then
         from:=getSection(s);
       sect:=newSection(s);
       end
     else
-      if append then
+      if add then
         from:=sect;
     if from<>NIL then
       begin // inherit from it
-      sect.txt:=from.txt+base.txt;
+      if append then
+        sect.txt:=from.txt+base.txt
+      else
+        sect.txt:=base.txt+CRLF+from.txt;
       sect.nolog:=from.nolog or base.nolog;
-      sect.nourl:=from.nourl or base.nourl;
+      sect.public:=from.public or base.public;
+      sect.noList:=from.noList or base.noList;
       continue;
       end;
     sect^:=base;
@@ -840,10 +970,7 @@ end; // down
 function Ttlv.up():boolean;
 begin
 if stackTop = 0 then
-  begin
-  result:=false;
-  exit;
-  end;
+  exit(FALSE);
 dec(stackTop);
 bound:=stack[stackTop];
 dec(stackTop);
@@ -1044,6 +1171,11 @@ begin
   Result := (postVars.values['password'] = pwd)
          or goodPassword(pwd, 'passwordSHA256', strSHA256)
          or goodPassword(pwd, 'passwordMD5', strMD5)
+end;
+
+function TconnDataMain.allowRecur: Boolean;
+begin
+  Result := (urlvars.indexOf('recursive') >= 0) or (urlvars.values['search'] > '');
 end;
 
 procedure TconnDataMain.setSessionVar(k, v: String);

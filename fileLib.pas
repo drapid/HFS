@@ -44,7 +44,7 @@ type
 
   TfileAction = (FA_ACCESS, FA_DELETE, FA_UPLOAD);
 
-  TLoadPrefs = set of (lpION, lpHideProt, lpSysAttr, lpHdnAttr, lpSnglCmnt, lpFingerPrints);
+  TLoadPrefs = set of (lpION, lpHideProt, lpSysAttr, lpHdnAttr, lpSnglCmnt, lpFingerPrints, lpRecurListing, lpOEMForION);
 
   Tfile = class (Tobject)
   private
@@ -122,8 +122,10 @@ type
    end; // Tfile
 
   TfileListing = class
+    actualCount: integer;
    public
     dir: array of Tfile;
+    timeout: TDateTime;
     ignoreConnFilter: boolean;
     constructor create();
     destructor Destroy; override;
@@ -133,11 +135,16 @@ type
   end;
 
 function nodeToFile(n:TtreeNode):Tfile;
-function isCommentFile(lp: TLoadPrefs; fn: string): boolean;
-function isFingerprintFile(lp: TLoadPrefs; const fn: string): boolean;
-function hasRightAttributes(lp: TLoadPrefs; const fn: string): boolean; overload;
-function hasRightAttributes(lp: TLoadPrefs; attr:integer): boolean; overload;
+function isCommentFile(const lp: TLoadPrefs; const fn: string): boolean;
+function isFingerprintFile(const lp: TLoadPrefs; const fn: string): boolean;
+function hasRightAttributes(const lp: TLoadPrefs; const fn: string): boolean; overload;
+function hasRightAttributes(const lp: TLoadPrefs; attr:integer): boolean; overload;
 function findNameInDescriptionFile(const txt, name:string):integer;
+
+function getAFolderPage(folder:Tfile; cd:TconnDataMain; otpl: TTpl;
+                 const lp: TLoadPrefs;
+                 sysIcons, isPwdInPages, isMacrosLog: Boolean): String;
+function loadMD5for(fn: string): string;
 
 const
   FILEACTION2STR: array [TfileAction] of string = ('Access', 'Delete', 'Upload');
@@ -150,7 +157,8 @@ implementation
 uses
   strutils, iniFiles, Classes,
   RegExpr,
-  main, utilLib, RDUtils, RDFileUtil, hfsGlobal, scriptLib, hfsVars;
+  main,
+  utilLib, RDUtils, RDFileUtil, hfsGlobal, scriptLib, hfsVars;
 
 constructor TfileListing.create();
 begin
@@ -277,7 +285,7 @@ case v[1] of
 qsort( 0, length(dir)-1 );
 end; // sort
 
-function loadDescriptionFile(fn:string):string;
+function loadDescriptionFile(const lp: TLoadPrefs; const fn:string):string;
 var
   sa: RawByteString;
 begin
@@ -285,13 +293,13 @@ begin
   sa := loadFile(fn);
   if sa = '' then
     sa := loadFile(fn+'\descript.ion');
-  if (sa > '') and mainfrm.oemForIonChk.checked then
+  if (sa > '') and (lpOEMForION in lp) then
     Result := sa
    else
     Result := UnUTF(sa);
 end; // loadDescriptionFile
 
-function escapeIon(s:string):string;
+function escapeIon(const s:string):string;
 begin
 // this escaping method (and also the 2-bytes marker) was reverse-engineered from Total Commander
 result:=escapeNL(s);
@@ -309,12 +317,12 @@ if ansiEndsStr(#4#$C2, s) then
 result:=s;
 end; // unescapeIon
 
-procedure loadIon(path:string; comments:TstringList);
+procedure loadIon(const lp: TLoadPrefs; const path:string; comments:TstringList);
 var
   s, l, fn: string;
 begin
 //if not mainfrm.supportDescriptionChk.checked then exit;
-s:=loadDescriptionFile(path);
+s:=loadDescriptionFile(lp, path);
 while s > '' do
   begin
   l:=chopLine(s);
@@ -324,28 +332,28 @@ while s > '' do
   end;
 end; // loadIon
 
-function isCommentFile(lp: TLoadPrefs; fn:string):boolean;
+function isCommentFile(const lp: TLoadPrefs; const fn:string):boolean;
 begin
 result:=(fn=COMMENTS_FILE)
   or (lpSnglCmnt in lp) and isExtension(fn, COMMENT_FILE_EXT)
   or (lpION in lp) and sameText('descript.ion',fn)
 end; // isCommentFile
 
-function isFingerprintFile(lp: TLoadPrefs; const fn:string):boolean;
+function isFingerprintFile(const lp: TLoadPrefs; const fn:string):boolean;
 begin
   result := (lpFingerPrints in lp)and isExtension(fn, '.md5')
 end; // isFingerprintFile
 
-function hasRightAttributes(lp: TLoadPrefs; attr:integer):boolean; overload;
+function hasRightAttributes(const lp: TLoadPrefs; attr:integer):boolean; overload;
 begin
 result:=((lpHdnAttr in lp)or (attr and faHidden = 0))
   and ((lpSysAttr in lp) or (attr and faSysFile = 0));
 end; // hasRightAttributes
 
-function hasRightAttributes(lp: TLoadPrefs; const fn: string):boolean; overload;
+function hasRightAttributes(const lp: TLoadPrefs; const fn: string):boolean; overload;
 begin result:=hasRightAttributes(lp, GetFileAttributes(pChar(fn))) end;
 
-function getFiles(mask:string):TStringDynArray;
+function getFiles(const mask:string):TStringDynArray;
 var
   sr: TSearchRec;
 begin
@@ -361,16 +369,13 @@ end; // getFiles
 function TfileListing.fromFolder(loadPrefs: TLoadPrefs; folder: Tfile; cd: TconnDataMain;
   recursive:boolean=FALSE; limit:integer=-1; toSkip:integer=-1; doClear:boolean=TRUE):integer;
 var
-  actualCount: integer;
   seeProtected, noEmptyFolders, forArchive: boolean;
   filesFilter, foldersFilter, urlFilesFilter, urlFoldersFilter: string;
 
   procedure recurOn(f:Tfile);
   begin
   if not f.isFolder() then exit;
-  setLength(dir, actualCount);
   toSkip:=fromFolder(loadPrefs, f, cd, TRUE, limit, toSkip, FALSE);
-  actualCount:=length(dir);
   end; // recurOn
 
   procedure addToListing(f:Tfile);
@@ -378,14 +383,18 @@ var
     if noEmptyFolders and f.isEmptyFolder(loadPrefs, cd)
        and not accountAllowed(FA_UPLOAD, cd, f) then
       exit; // upload folders should be listed anyway
-  application.ProcessMessages();
+//  application.ProcessMessages();
   if cd.conn.state = HCS_DISCONNECTED then exit;
 
   if toSkip > 0 then dec(toSkip)
   else
     begin
     if actualCount >= length(dir) then
-      setLength(dir, actualCount+100);
+      begin
+      setLength(dir, actualCount+1000);
+      if actualCount > 0 then
+        mainfrm.setStatusBarText(format('Listing files: %s',[dotted(actualCount)]));
+      end;
     dir[actualCount]:=f;
     inc(actualCount);
     end;
@@ -496,7 +505,7 @@ this would let us have "=" inside the names, but names cannot be assigned
     try comments.loadFromFile(folder.resource+'\'+COMMENTS_FILE, TEncoding.UTF8);
     except end;
     if lpion in loadPrefs then
-      loadIon(folder.resource, comments);
+      loadIon(loadPrefs, folder.resource, comments);
     i:=if_((filesFilter='\') or (urlFilesFilter='\'), faDirectory, faAnyFile);
     setBit(i, faSysFile, lpSysAttr in loadPrefs);
     setBit(i, faHidden, lpHdnAttr in loadPrefs);
@@ -507,6 +516,8 @@ this would let us have "=" inside the names, but names cannot be assigned
         repeat
         application.ProcessMessages();
         cd.lastActivityTime:=now();
+        if (timeout > 0) and (cd.lastActivityTime > timeout) then
+          break;
         // we don't list these entries
         if (sr.name = '.') or (sr.name = '..')
         or isCommentFile(loadPrefs, sr.name) or isFingerprintFile(loadPrefs, sr.name) or sameText(sr.name, DIFF_TPL_FILE)
@@ -622,7 +633,8 @@ this would let us have "=" inside the names, but names cannot be assigned
 
 begin
 result:=toSkip;
-if doClear then dir:=NIL;
+if doClear then
+  actualCount:=0;
 
 if not folder.isFolder()
 or not folder.accessFor(cd)
@@ -640,7 +652,6 @@ if assigned(cd) then
     toSkip:=max(0, pred(strToIntDef(par('page'), 1))*limit);
   end;
 
-actualCount:=length(dir);
 folder.getFiltersRecursively(filesFilter, foldersFilter);
 if assigned(cd) and not ignoreConnFilter then
   begin
@@ -664,7 +675,10 @@ try
   if folder.isRealFolder() and not (FA_HIDDENTREE in folder.flags) and allowedTo(folder) then
     includeFilesFromDisk();
   includeItemsFromVFS();
-finally setLength(dir, actualCount) end;
+finally
+  if doClear then
+    setLength(dir, actualCount)
+  end;
 result:=toSkip;
 end; // fromFolder
 
@@ -874,7 +888,7 @@ try
   finally
     if result = '' then
       begin
-      loadIon(resource+'\..', comments);
+      loadIon(loadPrefs, resource+'\..', comments);
       result:=comments.values[name];
       end;
     if result > '' then
@@ -919,7 +933,7 @@ if not (lpION in loadPrefs) then exit;
 
 path:=extractFilePath(resource)+'descript.ion';
 try
-  s:=loadDescriptionFile(path);
+  s:=loadDescriptionFile(loadPrefs, path);
   cmt:=escapeIon(cmt); // that's how multilines are handled in this file
   i:=findNameInDescriptionFile(s, name);
   if i = 0 then // not found
@@ -1445,5 +1459,326 @@ end; // getFiltersRecursively
 function nodeToFile(n:TtreeNode):Tfile; inline;
 begin if n = NIL then result:=NIL else result:=Tfile(n.data) end;
 
+function loadMD5for(fn:string):string;
+begin
+if getMtimeUTC(fn+'.md5') < getMtimeUTC(fn) then result:=''
+else result:=trim(getTill(' ',UnUTF(loadfile(fn+'.md5'))))
+end; // loadMD5for
+
+function getAFolderPage(folder:Tfile; cd:TconnDataMain; otpl: TTpl;
+                 const lp: TLoadPrefs;
+                 sysIcons, isPwdInPages, isMacrosLog: Boolean):string;
+var
+  baseurl, list, fileTpl, folderTpl, linkTpl: string;
+  table: TStringDynArray;
+  ofsRelItemUrl, ofsRelUrl, numberFiles, numberFolders, numberLinks: integer;
+  img_file: boolean;
+  totalBytes: int64;
+  fast: TfastStringAppend;
+  buildTime: Tdatetime;
+  listing: TfileListing;
+  diffTpl: Ttpl;
+  hasher: Thasher;
+  fullEncode, recur, oneAccessible: boolean;
+  md: TmacroData;
+
+  procedure applySequential();
+  const
+    PATTERN = '%sequential%';
+  var
+    idx, p: integer;
+    idxS: string;
+  begin
+  idx:=0;
+  p:=1;
+    repeat
+    p:=ipos(PATTERN, result, p);
+    if p = 0 then exit;
+    inc(idx);
+    idxS:=intToStr(idx);
+    delete(result, p, length(PATTERN)-length(idxS));
+    moveChars(idxS[1], result[p], length(idxS));
+    until false;
+  end; // applySequential
+
+  procedure handleItem(f:Tfile);
+  var
+    type_, s, url, fingerprint, itemFolder: string;
+    nonPerc: TStringDynArray;
+  begin
+    if not f.isLink and ansiContainsStr(f.resource, '?') then
+      exit; // unicode filename?   //mod by mars
+
+//    if f.size > 0 then
+//      inc(totalBytes, f.size);
+
+  // build up the symbols table
+  md.table:=table;
+  nonPerc:=NIL;
+  if f.icon >= 0 then
+    begin
+    s:='~img'+intToStr(f.icon);
+    addArray(nonPerc, ['~img_folder', s, '~img_link', s]);
+    end;
+  if f.isFile() then
+    if img_file and (sysIcons or (f.icon >= 0)) then
+      addArray(nonPerc, ['~img_file', '~img'+intToStr(f.getSystemIcon())]);
+
+  if recur or (itemFolder = '') then
+    itemFolder:=f.getFolder();
+  if recur then
+    url:=substr(itemFolder, ofsRelItemUrl)
+  else
+    url:='';
+  addArray(md.table, [
+    '%item-folder%', itemFolder,
+    '%item-relative-folder%', url
+  ]);
+
+  if not f.accessFor(cd) then
+    s:=diffTpl['protected']
+  else
+    begin
+    s:='';
+    if f.isFileOrFolder() then
+      oneAccessible:=TRUE;
+    end;
+  addArray(md.table, [
+    '%protected%', s
+  ]);
+
+  // url building
+  fingerprint:='';
+  if (lpFingerPrints in lp) and f.isFile() then
+    begin
+    s:=loadMD5for(f.resource);
+    if s = '' then
+      s:=hasher.getHashFor(f.resource);
+    if s > '' then
+      fingerprint:='#!md5!'+s;
+    end;
+  if f.isLink() then
+    begin
+    url:=f.resource;
+    s:=url;
+    end
+  else
+    if isPwdInPages and (cd.usr > '') then
+      begin
+      s:=f.fullURL(cd.getSafeHost(cd), cd.usr, cd.pwd )+fingerprint;
+      url:=s
+      end
+    else
+      begin
+      if recur then
+        s:=copy(f.url(fullEncode), ofsRelUrl, MAXINT)+fingerprint
+      else
+        s:=f.relativeURL(fullEncode)+fingerprint;
+      url:=baseurl+s;
+      end;
+
+  if not f.isLink() then
+    begin
+    s:=macroQuote(s);
+    url:=macroQuote(url);
+    end;
+
+  addArray(md.table, [
+    '%item-url%', s,
+    '%item-full-url%', url
+  ]);
+
+  // select appropriate template
+  if f.isLink() then
+    begin
+    s:=linkTpl;
+    inc(numberLinks);
+    type_:='link';
+    end
+  else if f.isFolder() then
+    begin
+    s:=folderTpl;
+    inc(numberFolders);
+    type_:='folder';
+    end
+  else
+    begin
+    s := diffTpl.getTxtByExt(ExtractFileExt(f.name));
+    if s = '' then s:=fileTpl;
+    inc(numberFiles);
+    type_:='file';
+    end;
+
+  addArray(md.table, [
+    '%item-type%', type_
+  ]);
+
+  s:=xtpl(s, nonPerc);
+  md.f:=f;
+  tryApplyMacrosAndSymbols(s, md, FALSE);
+  fast.append(s);
+  end; // handleItem
+
+  function shouldRecur(cd: TconnDataMain): Boolean;
+  begin
+    Result := (lpRecurListing in lp) and cd.allowRecur;
+
+  end;
+var
+  n: integer;
+  f: Tfile;
+//  lp: TLoadPrefs;
+  useList: boolean;
+  mainSection: PtplSection;
+  antiDos: TantiDos;
+begin
+  result := '';
+  if (folder = NIL) or not folder.isFolder() then
+    exit;
+
+  diffTpl:=Ttpl.create();
+  folder.lock();
+try
+  buildTime := now();
+  cd.conn.setHeaderIfNone('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=-1');
+  recur := shouldRecur(cd);
+  baseurl := protoColon()+cd.getSafeHost(cd)+folder.url(TRUE);
+
+  if cd.tpl = NIL then
+    diffTpl.over := otpl
+  else
+    begin
+    diffTpl.over := cd.tpl;
+    cd.tpl.over := otpl;
+    end;
+
+  if otpl <> filelistTpl then
+    diffTpl.fullTextS := folder.getRecursiveDiffTplAsStr();
+  mainSection:=diffTpl.getSection('');
+  if mainSection = NIL then
+    exit;
+  useList:=not mainSection.noList;
+
+  antiDos:=TantiDos.create();
+  if useList and not antiDos.accept(cd.conn, cd.address) then
+    exit(cd.conn.reply.body);
+
+  fullEncode:=FALSE;
+  ofsRelUrl:=length(folder.url(fullEncode))+1;
+  ofsRelItemUrl:=length(folder.pathTill())+1;
+  // pathTill() is '/' for root, and 'just/folder', so we must accordingly consider a starting and trailing '/' for the latter case (bugfix by mars)
+  if not folder.isRoot() then
+    inc(ofsRelItemUrl, 2);
+
+  ZeroMemory(@md, sizeOf(md));
+  md.cd:=cd;
+  md.tpl:=diffTpl;
+  md.folder:=folder;
+  md.archiveAvailable:=folder.hasRecursive(FA_ARCHIVABLE) and not folder.isDLforbidden();
+  md.hideExt:=folder.hasRecursive(FA_HIDE_EXT);
+
+  result:=diffTpl['special:begin'];
+  tryApplyMacrosAndSymbols(result, md, FALSE);
+
+  if useList then
+    begin
+      // cache these values
+      fileTpl:=xtpl(diffTpl['file'], table);
+      folderTpl:=xtpl(diffTpl['folder'], table);
+      linkTpl:=xtpl(diffTpl['link'], table);
+      // this may be heavy to calculate, only do it upon request
+      img_file:=pos('~img_file', fileTpl) > 0;
+
+      // build %list% based on dir[]
+      numberFolders:=0; numberFiles:=0; numberLinks:=0;
+      totalBytes:=0;
+      oneAccessible:=FALSE;
+      fast:=TfastStringAppend.Create();
+      listing:=TfileListing.create();
+      hasher:=Thasher.create();
+      if lpFingerPrints in lp then
+        hasher.loadFrom(folder.resource);
+      try
+        listing.fromFolder(lp, folder, cd, recur );
+        listing.sort(mainfrm.foldersBeforeChk.checked, mainfrm.linksBeforeChk.checked, cd, if_(recur or (otpl = filelistTpl), '?', diffTpl['sort by']) ); // '?' is just a way to cause the sort to fail in case the sort key is not defined by the connection
+
+        n:=length(listing.dir);
+        for var i: Integer :=0 to n-1 do
+          begin
+          f:=listing.dir[i];
+          if f.size > 0 then
+            inc(totalBytes, f.size);
+          if f.isLink() then
+            inc(numberLinks)
+          else if f.isFolder() then
+            inc(numberFolders)
+          else
+            inc(numberFiles);
+          end;
+        {TODO this symbols will be available when executing macros in handleItem. Having
+          them at this stage is useful only in case immediate calculations are required.
+          This may happen seldom, but maybe some template is using it since we got this here.
+          Each symbols is an extra iteration on the template piece and we may be tempted
+          to consider for optimizations. To not risk legacy problems we should consider
+          treating table symbols with a regular expression and a Tdictionary instead.
+        }
+        table:=toSA([
+          '%upload-link%', if_(accountAllowed(FA_UPLOAD, cd, folder), diffTpl['upload-link']),
+          '%files%', diffTpl[if_(n>0, 'files','nofiles')],
+          '%number%', intToStr(n),
+          '%number-files%', intToStr(numberFiles),
+          '%number-folders%', intToStr(numberFolders),
+          '%number-links%', intToStr(numberlinks),
+          '%total-bytes%', intToStr(totalBytes),
+          '%total-kbytes%', intToStr(totalBytes div KILO),
+          '%total-size%', smartsize(totalBytes)
+        ]);
+
+        for var i: Integer :=0 to length(listing.dir)-1 do
+          begin
+            if i mod 42 = 0 then
+              application.ProcessMessages();
+          if cd.conn.state = HCS_DISCONNECTED then
+            exit;
+          cd.lastActivityTime:=now();
+          handleItem(listing.dir[i])
+          end;
+        list:=fast.reset();
+      finally
+        listing.free;
+        fast.free;
+        hasher.free;
+        end;
+
+      if cd.conn.state = HCS_DISCONNECTED then
+        exit;
+
+      // build final page
+      if not oneAccessible then
+        md.archiveAvailable:=FALSE;
+    end
+   else
+    list := '';
+
+  md.table:=table;
+  addArray(md.table, [
+    '%list%',list
+  ]);
+  result:=mainSection.txt;
+  md.f:=NIL;
+  md.afterTheList:=TRUE;
+  try tryApplyMacrosAndSymbols(result, md)
+  finally md.afterTheList:=FALSE end;
+  applySequential();
+  // ensure this is the last symbol to be translated
+  result:=xtpl(result, [
+    '%build-time%', floatToStrF((now()-buildTime)*SECONDS, ffFixed, 7,3)
+  ]);
+finally
+  freeAndNIL(antiDos);
+  folder.unlock();
+  diffTpl.free;
+  end;
+end; // getAFolderPage
 
 end.

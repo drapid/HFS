@@ -67,12 +67,20 @@ function max(a,b:integer):integer;
 begin if a > b then result:=a else result:=b end;
 
 constructor TprogressForm.create;
+var
+  coef: Real;
 begin
-  frm:=Tform.create(NIL);
+  frm:=Tform.create(Application.MainForm);
   frm.Position:=poScreenCenter;
-  frm.Width := trunc(200 * frm.CurrentPPI / 96);
+
+  if frm.currentPPI = 96 then
+    coef := 1
+   else
+    coef := frm.currentPPI / 96;
+
+  frm.Width := trunc(coef * 200);
   frm.BorderStyle:=bsNone;
-  frm.BorderWidth:= trunc(15 * frm.CurrentPPI / 96);
+  frm.BorderWidth:= trunc(coef * 15);
   frm.Height:= trunc(25 * frm.CurrentPPI / 96)+frm.BorderWidth*2;
   frm.OnResize:=onResize;
   //frm.FormStyle:=fsStayOnTop;
@@ -80,12 +88,12 @@ begin
   msgPnl:=Tpanel.create(frm);
   msgPnl.Parent:=frm;
   msgPnl.align:=alTop;
-  msgPnl.height:= trunc(20 * frm.CurrentPPI / 96);
+  msgPnl.height:= trunc(coef * 20);
   msgPnl.BevelOuter:=bvLowered;
 
   prog:=TProgressBar.Create(frm);
   prog.Parent:=frm;
-  prog.BorderWidth:=trunc(3 * frm.CurrentPPI / 96);;
+  prog.BorderWidth:=trunc(coef * 3);
   prog.Min:=0;
   prog.max:=100; // resolution
   prog.Align:=alClient;
@@ -99,7 +107,7 @@ begin
   cancelBtn:=TbitBtn.create(frm);
   cancelBtn.parent:=btnPnl;
   cancelBtn.Kind:=bkCancel;
-  cancelBtn.top:=trunc(10 * frm.CurrentPPI / 96);;
+  cancelBtn.top:=trunc(coef * 10);
   cancelBtn.OnClick:=onCancel;
 
   btnPnl.Height:=cancelBtn.Height+cancelBtn.top*2;
@@ -146,10 +154,16 @@ function TprogressForm.getCaption():string;
 begin result:=msgPnl.caption end;
 
 procedure TprogressForm.setCaption(x:string);
+var
+  coef: Real;
 begin
+if frm.currentPPI = 96 then
+  coef := 1
+ else
+  coef := frm.currentPPI / 96;
 msgPnl.caption:=x;
-frm.Width:=max(200,
-  frm.Canvas.TextWidth(x)+(msgPnl.BorderWidth+frm.BorderWidth)*2+20 );
+frm.Width:=max(trunc(200 * coef),
+  frm.Canvas.TextWidth(x)+(msgPnl.BorderWidth+frm.BorderWidth)*2+trunc(coef * 20) );
 end;
 
 procedure TprogressForm.setGlobalPos(x:real);

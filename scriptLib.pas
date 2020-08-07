@@ -1,5 +1,5 @@
 {
-Copyright (C) 2002-2012  Massimo Melina (www.rejetto.com)
+Copyright (C) 2002-2020  Massimo Melina (www.rejetto.com)
 
 This file is part of HFS ~ HTTP File Server.
 
@@ -78,7 +78,7 @@ result:=saveFileU(MACROS_LOG_FILE, s, True);
 end; // macrosLog
 
 procedure resetLog();
-begin deleteFile(MACROS_LOG_FILE) end;
+begin saveFileA(MACROS_LOG_FILE, '') end;
 
 function expandLinkedAccounts(account:Paccount):TStringDynArray;
 var
@@ -166,15 +166,17 @@ var
   procedure deprecatedMacro(what:string=''; instead:string='');
   begin mainfrm.add2log('WARNING, deprecated macro: '+first(what, name)+nonEmptyConcat(' - Use instead: ',instead), NIL, clRed) end;
 
+  procedure unsatisfied(b:boolean=TRUE);
+  begin
+  if b then
+    macroError('cannot be used here')
+  end;
+
   function satisfied(p:pointer):boolean;
   begin
   result:=assigned(p);
-  if not result then
-    macroError('cannot be used here');
+  unsatisfied(not result);
   end;
-
-  procedure unsatisfied(b:boolean=TRUE);
-  begin if b then macroError('cannot be used here') end;
 
   function parEx(idx: integer; const name: string=''; doTrim: boolean=TRUE): string; overload;
   var
@@ -311,9 +313,9 @@ var
     result:=staticVars;
     delete(varname,1,length(G_VAR_PREFIX));
     end
-  else if satisfied(md.cd) then
+  else if assigned(md.cd) then
     result:=md.cd.vars
-  else if satisfied(md.tempVars) then
+  else if assigned(md.tempVars) then
     result:=md.tempVars
   else
     raise Exception.create('no namespace available');
@@ -342,7 +344,7 @@ var
   if not satisfied(space) then exit;
   i:=space.indexOfName(varname);
   if i < 0 then
-    if value = '' then exit // all is good the way it is
+    if value = '' then exit(TRUE) // all is good the way it is
     else i:=space.add(varname+'='+value)
   else
     if value > '' then // in case of empty value, there's no need to assign, because we are going to delete it (after we cleared the bound object)
@@ -708,16 +710,40 @@ var
 
   procedure inc_(v:integer=+1);
   begin
-  result:='';
-  try setVar(p, intToStr(strToIntDef(getVar(p),0)+v*parI(1,1))) except end;
+  try
+    setVar(p, intToStr(strToIntDef(getVar(p),0)+v*parI(1,1)));
+    result:='';
+  except
+    end;
   end; // inc_
 
   procedure convert();
+  var
+    dst, s: string;
+    c: ansichar;
   begin
-  if sameText(p, 'ansi') and sameText(par(1), 'utf-8') then
-    result:=ansiToUTF8(par(2))
-  else if sameText(p, 'utf-8') and sameText(par(1), 'ansi') then
-    result:=utf8ToAnsi(par(2))
+  dst:=par(1);
+  s:=par(2);
+  if sameText(p, 'ansi') and sameText(dst, 'utf-8') then
+    result:=string(ansiToUTF8(ansistring(s)))
+  else if sameText(p, 'utf-8') then
+    if sameText(dst, 'ansi') then
+      result:=utf8ToAnsi(ansistring(s))
+    else if dst='dec' then
+      begin
+      result:='';
+      for c in UTF8encode(s) do
+        result:=result+intToStr(ord(c))+',';
+      setLength(result, length(result)-1);
+      end
+    else if dst='hex' then
+      begin
+      result:='';
+      for c in UTF8encode(s) do
+        result:=result+intToHex(ord(c));
+      end;
+  if isFalse(par('macros')) then
+    result:=noMacrosAllowed(result);
   end; // convert
 
   procedure encodeuri();
@@ -979,9 +1005,9 @@ var
     i: integer;
   begin
   code:=macroDequote(par(pars.count-1));
+  lines:=TStringList.create();
   with TfastStringAppend.create do
     try
-      lines:=TStringList.create();
       lines.text:= getVar(par('var'));
       for line in lines do
         begin
@@ -1239,31 +1265,33 @@ var
   end; // replace
 
   procedure dialog();
+  type
+      t_s2c = record s: String; val: byte; end;
   const
-    STR2CODE: array [1..7] of string = (
-      'okcancel=1',
-      'yesno=4',
-      'yesnocancel=3',
-      'error=16',
-      'question=32',
-      'warning=48',
-      'information=64'
+    STR2CODE: array [1..7] of t_s2c = (
+      (s:'okcancel=1'; val: 1),
+      (s:'yesno=4'; val: 4),
+      (s:'yesnocancel=3'; val: 3),
+      (s:'error=16'; val: 16),
+      (s:'question=32'; val: 32),
+      (s:'warning=48'; val: 48),
+      (s:'information=64'; val: 64)
     );
   var
-    i, j, code: integer;
+    code: integer;
     decode: TStringDynArray;
-    s: string;
+    d2: string;
     buttons, icon: boolean;
   begin
   decode:=split(' ',par(1));
   code:=0;
-  for i:=0 to length(decode)-1 do
-    for j:=1 to length(STR2CODE) do
-      begin
-      s:=STR2CODE[j];
-      if ansiStartsStr(decode[i], s) then
-        inc(code, strToIntDef(substr(s, 1+pos('=',s)), 0));
-      end;
+  for var d in decode do
+   begin
+    d2 := d + '=';
+    for var s in STR2CODE do
+      if ansiStartsStr(d2, s.s) then
+        inc(code, s.val);
+   end;
   buttons:=code AND 15 > 0;
   icon:=code SHR 4 > 0;
   if not icon and buttons then
@@ -1394,19 +1422,20 @@ var
   if not satisfied(space) then exit;
   // set the table variable as text
   v:=par(1);
-  space.values[p]:=nonEmptyConcat('', space.values[p], CRLF)+v;
   // access the table object
   i:=space.indexOfName(p);
-  h:=space.objects[i] as THashedStringList;
-  if h = NIL then
+  if i < 0 then
     begin
     h:=ThashedStringList.create();
-    space.objects[i]:=h;
-    end;
+    space.AddPair(p, v, h);
+    end
+  else
+    h:=space.objects[i] as THashedStringList;
   // fill the object
   k:=chop('=',v);
   v:=macroDequote(v);
   h.values[k]:=v;
+  space.values[p]:=h.text;
   end; // setTable
 
   procedure disconnect();
@@ -1499,7 +1528,8 @@ var
     exit;
     end;
   a:=findEnabledLinkedAccount(a, split(';',s));
-  if assigned(a) then result:=a.user;
+  if assigned(a) then
+    result:=a.user;
   end; // memberOf
 
   procedure canArchive(f:Tfile);
@@ -1887,10 +1917,7 @@ try
       end;
 
     if not mainfrm.enableMacrosChk.checked then
-      begin
-      result:=fullMacro;
-      exit;
-      end;
+      exit(fullMacro);
 
     if pars.count = 0 then exit;
     // extract first parameter as 'name'
@@ -1983,10 +2010,16 @@ try
       disconnect()
      else
     if name = 'stop server' then
-      stopServer()
+      begin
+      stopServer();
+      exit('');
+      end
      else
     if name = 'start server' then
-      startServer()
+      begin
+      startServer();
+      exit('');
+      end
      else
     if name = 'focus' then
       begin
@@ -2046,13 +2079,20 @@ try
       result := Base64EncodeString(UTF8Encode(p))
      else
     if name = 'base64decode' then
-      result := UnUTF(Base64DecodeString(RawByteString(p)))
+      begin
+        result := UnUTF(Base64DecodeString(RawByteString(p)));
+        if isFalse(par('macros')) then
+          result:=noMacrosAllowed(result);
+      end
      else
     if name = 'md5' then
       result:= MD5PassHS(AnsiString(p))
      else
     if name = 'sha1' then
-        result:=SHA1toHex(sha1OfStr(p))
+      result:=SHA1toHex(sha1OfStr(p))
+     else
+    if name = 'sha256' then
+      result:=strSHA256(p)
      else
     if name = 'vfs select' then
       if pars.count = 0 then
@@ -2089,84 +2129,89 @@ try
     if pars.Count < 1 then exit; // from here, only macros with parameters
 
     if name = 'var domain' then
-      vardomain();
-
+      vardomain()
+     else
     if name = 'dir' then
-      dir();
-
+      dir()
+     else
     if name = 'no pipe' then
-      result:=xtpl(substr(fullMacro, '|'), ['|','{:|:}']);
-
+      result:=xtpl(substr(fullMacro, '|'), ['|','{:|:}'])
+     else
     if name = 'pipe' then
-      result:=xtpl(substr(fullMacro, '|'), ['{:|:}','|']);
-
+      result:=xtpl(substr(fullMacro, '|'), ['{:|:}','|'])
+     else
     if name = 'add to log' then
       begin
       try s:=getVar(parEx('var'))
       except s:=p end;
       mainfrm.add2log(s, md.cd, stringToColorEx(par(1,'color'), clDefault));
       result:='';
-      end;
-
+      end
+     else
     if name = 'mkdir' then
       begin
       s:=trim(uri2diskMaybeFolder(p));
       spaceIf(not directoryExists(s) and forceDirectory(s));
-      end;
-
+      end
+     else
     if name = 'chdir' then
       begin
       IOresult;
       setCurrentDir(p);
       spaceIf(IOresult=0);
-      end;
-
+      end
+     else
     if name = 'encodeuri' then
-      encodeuri();
-
+      encodeuri()
+     else
     if name = 'decodeuri' then
-      result := decodeURL(p);
+      result:=noMacrosAllowed(decodeURL(p))
+     else
     if name = 'set cfg' then
-      trueIf(mainfrm.setcfg(p));
-
+      trueIf(mainfrm.setcfg(p))
+     else
     if name = 'dialog' then
-      dialog();
-
+      dialog()
+     else
     if name = 'any macro marker' then
-      trueIf(anyMacroMarkerIn(first(loadfile(uri2diskMaybe(p)), p)));
-
+      trueIf(anyMacroMarkerIn(first(loadfile(uri2diskMaybe(p)), p)))
+     else
     if name = 'random' then
-      result:=randomFrom(listToArray(pars));
-
+      result:=randomFrom(listToArray(pars))
+     else
     if name = 'random number' then
+     begin
       if pars.count = 1 then
         result:=intToStr(random(1+parI(0)))
       else
         result:=intToStr(parI(0)+random(1+parI(1)-parI(0)));
-
+     end else
     if name = 'force ansi' then
+     begin
       if satisfied(md.tpl) then //and md.tpl.utf8 then
 //        result:=noMacrosAllowed(UTF8toAnsi(p))
         result:=noMacrosAllowed(AnsiString(p))
       else
         result:=p;
-
+     end else
     if name = 'maybe utf8' then
+     begin
       if satisfied(md.tpl) then
         result:= p;
-
+     end else
     if name = 'after the list' then
+     begin
       if md.afterTheList then
         result:=macroDequote(p)
       else
         result:=MARKER_OPEN+fullMacro+MARKER_CLOSE;
-
+     end else
     if name = 'breadcrumbs' then
-      breadcrumbs();
-
+      breadcrumbs()
+     else
     if name = 'filename' then
-      result:=substr(p, lastDelimiter('\/:',p)+1);
-
+      result:=substr(p, lastDelimiter('\/:',p)+1)
+     else
     if name = 'filepath' then
       begin
       i:=lastDelimiter('\/:',p);
@@ -2174,8 +2219,8 @@ try
         result:=''
       else
         result:=substr(p, 1, i);
-      end;
-
+      end
+     else
     if name = 'not' then
       trueIf(isFalse(p))
      else
@@ -2190,43 +2235,46 @@ try
       load(p, par(1,'var'))
      else
     if name = 'load tpl' then
+     begin
       if satisfied(md.cd) then
         begin
         md.cd.tpl:=cachedTpls.getTplFor(p);
         result:='';
         end;
-
+     end else
     if name = 'filesize' then
       begin
       if reMatch(p, '^https?://', 'i!') > 0 then i64:=httpFileSize(p)
       else i64:=sizeOfFile(uri2diskMaybe(p));
       result:=intToStr(max(0,i64)); // we return 0 instead of -1 for non-existent files, t
-      end;
-
+      end
+     else
     if name = 'filetime' then
-      result:=floatToStr(getMtime(p));
-
+      result:=floatToStr(getMtime(p))
+     else
     if name = 'header' then
+     begin
       if satisfied(md.cd) then
         try result:=noMacrosAllowed(md.cd.conn.getHeader(p)) except end;
-
+     end else
     if name = 'urlvar' then
-      result:=urlvar(p);
-
+      result:=urlvar(p)
+     else
     if name = 'postvar' then
+     begin
       if satisfied(md.cd) then
         try
           result:=noMacrosAllowed(md.cd.postVars.values[p]);
           setVar(parEx('var'), result); // if no var is specified, it will break here, and result will have the value
           result:='';
         except end;
-
+     end else
     if name = 'section' then
-      section(1);
-
+      section(1)
+     else
     if name = 'trim' then
-      result:=p;
-
+      result:=p
+     else
     if name = 'lower' then
       result:=ansiLowercase(p)
      else
@@ -2243,8 +2291,8 @@ try
       end
      else
     if name = 'is file protected' then
-      result:=if_(filematch(PROTECTED_FILES_MASK, parVar('var',0)), '1');
-
+      result:=if_(filematch(PROTECTED_FILES_MASK, parVar('var',0)), '1')
+     else
     if name = 'get' then
       try
         if p = 'can recur' then trueIf(mainFrm.recursiveListingChk.Checked)

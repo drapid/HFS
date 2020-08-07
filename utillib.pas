@@ -1,5 +1,5 @@
 {
-Copyright (C) 2002-2012  Massimo Melina (www.rejetto.com)
+Copyright (C) 2002-2020  Massimo Melina (www.rejetto.com)
 
 This file is part of HFS ~ HTTP File Server.
 
@@ -62,6 +62,9 @@ procedure fixFontFor(frm:Tform);
 function hostFromURL(s:string):string;
 function hostToIP(name: string):string;
 function allocatedMemory():int64;
+{$IFDEF MSWINDOWS}
+function currentStackUsage: NativeUInt;
+{$ENDIF MSWINDOWS}
 {$IFDEF HFS_GIF_IMAGES}
 function stringToGif(s: RawByteString; gif:TgifImage=NIL):TgifImage;
 function gif2str(gif:TgifImage): RawByteString;
@@ -189,7 +192,7 @@ function replaceString(var ss:TStringDynArray; old, new:string):integer;
 function popString(var ss:TstringDynArray):string;
 procedure insertString(const s: String; idx: integer; var ss: TStringDynArray);
 function removeString(var a:TStringDynArray; idx:integer; l:integer=1):boolean; overload;
-function removeString(find:string; var a:TStringDynArray):boolean; overload;
+function removeString(s:string; var a:TStringDynArray; onlyOnce:boolean=TRUE; ci:boolean=TRUE; keepOrder:boolean=TRUE):boolean; overload;
 procedure removeStrings(find:string; var a:TStringDynArray);
 procedure toggleString(s:string; var ss:TStringDynArray);
 function onlyString(const s: String; ss: TStringDynArray): boolean;
@@ -747,10 +750,6 @@ begin
   until false;
 end; // removeStrings
 
-// remove first instance of the specified string
-function removeString(find:string; var a:TStringDynArray):boolean;
-begin result:=removeString(a, idxOf(find,a)) end;
-
 function removeArray(var src:TstringDynArray; toRemove:array of string):integer;
 var
   i, l, ofs: integer;
@@ -823,6 +822,35 @@ while idx+l < length(a) do
   end;
 setLength(a, idx);
 end; // removestring
+
+function removeString(s:string; var a:TStringDynArray; onlyOnce:boolean=TRUE; ci:boolean=TRUE; keepOrder:boolean=TRUE):boolean; overload;
+var i, lessen:integer;
+begin
+result:=FALSE;
+if a = NIL then
+  exit;
+lessen:=0;
+try
+  for i:=length(a)-1 to 0 do
+    if ci and sameText(a[i], s)
+    or not ci and (a[i]=s) then
+      begin
+      result:=TRUE;
+      if keepOrder then
+        removeString(a, i)
+      else
+        begin
+        inc(lessen);
+        a[i]:=a[length(a)-lessen];
+        end;
+      if onlyOnce then
+        exit;
+      end;
+finally
+  if lessen > 0 then
+    setLength(a, length(a)-lessen);
+  end;
+end;
 
 function dotted(i:int64):string;
 begin
@@ -2559,10 +2587,19 @@ try
       ReadFile(ReadPipe, Buffer[TotalBytesRead], BytesRead, BytesRead, nil );
     inc(TotalBytesRead, BytesRead);
     until (Apprunning <> WAIT_TIMEOUT) or (now() >= timeout);
-  Buffer[TotalBytesRead]:= #0;
-  buf2 := StrAlloc(ReadBuffer + 1);
-  OemToChar(PansiChar(Buffer), buf2);
-  output := strPas(buf2);
+
+  if IsTextUnicode(Buffer, TotalBytesRead, NIL) then
+    begin
+    Pchar(@Buffer[TotalBytesRead])^:= #0;
+    output:=pchar(Buffer)
+    end
+  else
+    begin
+      Buffer[TotalBytesRead]:= #0;
+      buf2 := StrAlloc(ReadBuffer + 1);
+      OemToChar(PansiChar(Buffer), buf2);
+      output := strPas(buf2);
+    end;
 finally
   GetExitCodeProcess(ProcessInfo.hProcess, exitcode);
   TerminateProcess(ProcessInfo.hProcess, 0);
@@ -2903,7 +2940,8 @@ var
   i:=mImp+dir;
     repeat
     j:=i+dir;
-    if (j > 0) and (j <= length(s)) and (s[j] in ['0'..'9','.']) then
+    if (j > 0) and (j <= length(s))
+    and (charInSet(s[j], ['0'..'9','.','E']) or (j>1) and charInSet(s[j],['+','-']) and (s[j-1]='E')) then
       i:=j
     else
       break;
@@ -2933,6 +2971,7 @@ begin
       end;
 
     if (i = 1) // a starting operator is not an operator
+    or (s[i-1]='E') // exponential syntax
     or (v <= mImpV) // left-to-right precedence
     then continue;
     // we got a better one, record it
@@ -3537,6 +3576,21 @@ begin
   result := mm.allocatedBytes;
 end; // allocatedMemory
 {$ENDIF HAS_FASTMM}
+
+{$IFDEF MSWINDOWS}
+function currentStackUsage: NativeUInt;
+//NB: Win32 uses FS, Win64 uses GS as base for Thread Information Block.
+asm
+  {$IFDEF WIN32}
+  mov eax, fs:[4]  // TIB: base of the stack
+  sub eax, esp     // compute difference in EAX (=Result)
+  {$ENDIF}
+  {$IFDEF WIN64}
+  mov rax, gs:[8]  // TIB: base of the stack
+  sub rax, rsp     // compute difference in RAX (=Result)
+  {$ENDIF}
+{$ENDIF}
+end;
 
 function removeStartingStr(ss,s:string):string;
 begin

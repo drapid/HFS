@@ -7,8 +7,8 @@ uses
 
 const
 {$I RnQBuiltTime.inc}
-  VERSION = '2.4.0 beta10 RD';
-  VERSION_BUILD = '312';
+  VERSION = '2.4.0 RC7 RD';
+  VERSION_BUILD = '319';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
@@ -134,7 +134,9 @@ resourcestring
   MSG_ENABLED =   'Option enabled';
   MSG_DISABLED = 'Option disabled';
   MSG_COMM_ERROR = 'Network error. Request failed.';
-
+  MSG_CON_PAUSED = 'paused';
+  MSG_CON_SENT = '%s / %s sent';
+  MSG_CON_RECEIVED = '%s / %s received';
 
 type
   TcharSetA = TSysCharSet; //set of char;

@@ -56,7 +56,8 @@ uses
   FileLib in 'FileLib.pas',
   hfsGlobal in 'hfsGlobal.pas',
   hfsVars in 'hfsVars.pas',
-  langLib in 'langLib.pas';
+  langLib in 'langLib.pas',
+  progFrmLib in 'progFrmLib.pas';
 
 {$R *.res}
 
