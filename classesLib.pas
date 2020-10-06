@@ -265,6 +265,8 @@ type
     procedure setSessionVar(k, v: String);
     procedure logout();
     function allowRecur: Boolean;
+    function getFilesSelection(): TStringDynArray;
+
   end;
 
 implementation
@@ -1185,6 +1187,14 @@ begin
   s := sessions.getSession(sessionId);
   s.v[k] := v;
 end;
+
+function TconnDataMain.getFilesSelection(): TStringDynArray;
+begin
+  result:=NIL;
+  for var i: integer :=0 to postvars.count-1 do
+    if sameText('selection', postvars.names[i]) then
+      addString(getTill('#', postvars.valueFromIndex[i]), result) // omit #anchors
+end; // getFilesSelection
 
 procedure TconnDataMain.logout();
 begin

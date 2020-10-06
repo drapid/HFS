@@ -3,10 +3,45 @@ unit parserLib;
 interface
 
 uses
-  strutils, sysutils, classes, types, utilLib, windows, intlist;
+  strutils, sysutils, classes, types, windows, Generics.Collections,
+  utilLib, intlist;
 
 type
-  TmacroCB = function(const fullMacro:string; pars:Tstrings; cbData:pointer):string;
+
+  TParameter = record
+    k: String;
+    v: String;
+    full: String;
+  end;
+
+  TPars2 = class
+   private
+    fD: TDictionary<String, String>;
+    fA: array of TParameter;
+    fCount: Integer;
+   public
+    constructor create;
+    destructor  destroy; OverRide;
+    procedure Add(const s: String);
+    procedure Delete(idx: Integer);
+    function  get(idx: Integer): String;
+    function  getNames(idx: Integer): String;
+    procedure setItem(idx: Integer; s: String);
+    procedure clear;
+    function  TryGetValue(const k: String; var v: String): Boolean;
+    function  ContainsKey(const k: String): Boolean;
+    function  toArray: TStringDynArray;
+    property  count: Integer read fCount;
+    property  Items[Index: Integer]: String read Get write setItem; default;
+    property  names[Index: Integer]: String read GetNames;
+    property  d: TDictionary<String, String> read fD;
+  end;
+
+
+//  TPars = TStringList;
+  TPars = TPars2;
+
+  TmacroCB = function(const fullMacro:string; pars: TPars; cbData:pointer):string;
   EtplError = class(Exception)
     pos, row, col: integer;
     code: string;
@@ -45,6 +80,139 @@ self.row:=row;
 self.col:=col;
 self.code:=code;
 end;
+
+constructor TPars2.create;
+begin
+  fCount := 0;
+  fD := TDictionary<String, String>.Create;
+  setLength(fA, 0);
+end;
+
+destructor TPars2.destroy;
+begin
+  fD.Free;
+  fD := NIL;
+  SetLength(fA, 0);
+  fCount := 0;
+end;
+
+procedure TPars2.Add(const s: String);
+var
+  i, idx: Integer;
+begin
+  idx := Length(fA);
+  SetLength(fA, idx+1);
+  fCount := idx+1;
+  fA[idx].full := s;
+  i := AnsiPos('=', s);
+  if (i > 0) then
+    begin
+      fA[idx].k := copy(s, 1, i-1);
+      fA[idx].v := copy(s, i+1, length(s))
+    end
+   else
+    begin
+//      fA[idx].k := s;
+      fA[idx].k := '';
+      fA[idx].v := '';
+    end;
+  if fA[idx].k > '' then
+    fD.AddOrSetValue(fA[idx].k, fA[idx].v);
+end;
+
+procedure TPars2.Delete(idx: Integer);
+var
+  I: Integer;
+begin
+  if idx >= fCount then
+    Exit;
+  if fA[idx].k > '' then
+    fD.Remove(fA[idx].k);
+  if idx < (fCount-1) then
+    for I := idx to fCount-2 do
+      fA[i] := fA[i+1];
+  dec(fCount);
+  SetLength(fA, fCount);
+end;
+
+function TPars2.get(idx: Integer): String;
+begin
+  Result := fA[idx].full;
+end;
+
+function TPars2.getNames(idx: Integer): String;
+begin
+  Result := fA[idx].k;
+end;
+
+procedure TPars2.setItem(idx: Integer; s: String);
+var
+  k, v: string;
+  i: Integer;
+begin
+  i := AnsiPos('=', s);
+  if (i > 0) then
+    begin
+      k := copy(s, 1, i-1);
+      v := copy(s, i+1, length(s))
+    end
+   else
+    begin
+//      k := s;
+      k := '';
+      v := '';
+    end;
+
+  if k = fA[idx].k then
+    begin
+      if k > '' then
+        fD.AddOrSetValue(k, v);
+    end
+   else
+    begin
+      if fA[idx].k > '' then
+        fD.Remove(fA[idx].k);
+      if k > '' then
+        fD.Add(k, v);
+      fA[idx].k := k;
+    end;
+
+  fA[idx].v := v;
+  fA[idx].full := s;
+end;
+
+function TPars2.TryGetValue(const k: String; var v: String): Boolean;
+begin
+  Result := fD.TryGetValue(k, v);
+end;
+
+function TPars2.ContainsKey(const k: String): Boolean;
+begin
+  Result := fD.ContainsKey(k);
+end;
+
+procedure TPars2.clear;
+begin
+  fCount := 0;
+  SetLength(fA, 0);
+  fD.clear;
+end;
+
+function TPars2.ToArray: TStringDynArray;
+var
+  i: integer;
+begin
+  if Length(fA) = 0 then
+    Exit(NIL);
+  try
+    setLength(result, Length(fA));
+      for i:=0 to Length(fA)-1 do
+        result[i] := fA[i].full;
+  except
+    result:=NIL
+    end
+end; // ToArray
+
 
 procedure applyMacrosAndSymbols2(var txt:string; cb:TmacroCB; cbData:pointer; var idsStack:TparserIdsStack; recurLevel:integer=0);
 const
@@ -106,7 +274,7 @@ const
 
   procedure handleMacros();
   var
-    pars: Tstrings;
+    pars: TPars;
 
     function expand(from,to_:integer):integer;
     var
@@ -147,7 +315,7 @@ const
           continue;
           end;
         end;
-      // ok, that's a valid SEP, so we collect this as a parameter 
+      // ok, that's a valid SEP, so we collect this as a parameter
       pars.add(substr(fullMacro, i, o-1));
       i:=o+length(MARKER_SEP);
       until false;
@@ -158,7 +326,9 @@ const
     s:=cb(fullMacro, pars, cbData);
     idsStack[recurLevel]:=fullmacro; // keep track of what we recur on
     try
-      try applyMacrosAndSymbols2(s, cb, cbData, idsStack, recurLevel) except end;
+      try
+        applyMacrosAndSymbols2(s, cb, cbData, idsStack, recurLevel)
+      except end;
     finally idsStack[recurLevel]:='' end;
     result:=replace(txt, s, from, to_);
     end; // expand
@@ -178,7 +348,7 @@ const
   begin
   setLength(stack, length(txt) div length(MARKER_OPEN)); // it will never need more than this
   Nstack:=0;
-  pars:=TstringList.create;
+  pars := TPars.Create;
   try
     i:=1;
     row:=1;

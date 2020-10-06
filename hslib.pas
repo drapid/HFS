@@ -1677,7 +1677,7 @@ end; // initInputStream
 
 function ThttpConn.sendNextChunk(max:integer=MAXINT):integer;
 var
-  n: int64;
+  n, toSend: int64;
   buf: RawByteString;
 begin
   result := 0;
@@ -1694,8 +1694,9 @@ begin
     n := MINIMUM_CHUNK_SIZE;
   if n > max then
     n := max;
-  if n > bytesToSend then
-    n := bytesToSend;
+  toSend := bytesToSend;
+  if n > toSend then
+    n := toSend;
   if n = 0 then
     exit;
   setLength(buf, n);

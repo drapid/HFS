@@ -2835,14 +2835,6 @@ var
       end;
   end; // sessionSetup
 
-  function getFilesSelection():TStringDynArray;
-  begin
-  result:=NIL;
-  for var i: integer :=0 to data.postvars.count-1 do
-    if sameText('selection', data.postvars.names[i]) then
-      addString(getTill('#', data.postvars.valueFromIndex[i]), result) // omit #anchors
-  end; // getFilesSelection
-
   procedure serveTar();
   var
     tar: TtarStream;
@@ -2893,7 +2885,7 @@ var
       ft: Tfile;
     begin
     selection:=FALSE;
-    for var s in getFilesSelection() do
+    for var s in data.getFilesSelection() do
         begin
         selection:=TRUE;
         if dirCrossing(s) then 
@@ -3113,7 +3105,7 @@ var
     doneRes:=NIL;
     errors:=NIL;
     done:=NIL;
-    for asUrl in getFilesSelection() do
+    for asUrl in data.getFilesSelection() do
 
       begin
         s:=uri2disk(asUrl, f);
@@ -6011,10 +6003,10 @@ var
 
         if userSocketBuffer > 0 then
           data.conn.sndBuf:=userSocketBuffer
-        else
+        else if highSpeedChk.checked then
           begin
           size:=minmax(8192, MEGA, round(data.averageSpeed));
-          if highSpeedChk.checked and (safeDiv(0.0+size, data.conn.sndbuf, 2) > 2) then
+          if safeDiv(0.0+size, data.conn.sndbuf, 2) > 2 then
             data.conn.sndBuf:=size;
           end;
         end;

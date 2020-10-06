@@ -49,9 +49,11 @@ procedure resetLog();
 implementation
 
 uses
-  windows, utilLib, parserLib, graphics, classes, sysutils, StrUtils,
-  comctrls, math, controls, forms, clipbrd, MMsystem, contnrs, base64, OverbyteIcsSha1,
-  main, hfsVars,
+  windows, graphics, classes, sysutils, StrUtils,
+  comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
+  Generics.Collections,
+  base64, OverbyteIcsSha1,
+  utilLib, parserLib, main, hfsVars,
   RnQtrayLib, RDFileUtil, RDUtils, RnQCrypt;
 
 const
@@ -154,7 +156,7 @@ if isMacroQuoted(s) then
   result:=copy(s, length(MARKER_QUOTE)+1, length(s)-length(MARKER_QUOTE)-length(MARKER_UNQUOTE) );
 end; // macroDequote
 
-function cbMacros(const fullMacro:string; pars:Tstrings; cbData:pointer):string;
+function cbMacros(const fullMacro:string; pars: TPars; cbData:pointer):string;
 var
   md: ^TmacroData;
   name, p: string;
@@ -178,21 +180,48 @@ var
   unsatisfied(not result);
   end;
 
-  function parEx(idx: integer; const name: string=''; doTrim: boolean=TRUE): string; overload;
-  var
-    i: integer;
+  function parEx(const name: string; doTrim: boolean=TRUE): string; overload;
   begin
     result:='';
     if name > '' then
       begin
-      i:=pars.IndexOfName(name);
-      if i >= 0 then
-        begin
-        result:=pars.valueFromIndex[i];
-        if doTrim then
-          result:=trim(result);
-        exit;
-        end;
+//      i:=pars.IndexOfName(name);
+        if pars.TryGetValue(name, Result) then
+          if doTrim then
+            Exit(trim(result))
+           else
+            exit;
+      end;
+    raise Exception.create('invalid parameter index');
+  end; // parEx
+
+  function tryParToInt(const name: string; var val: Integer): Boolean;
+  var
+    s: String;
+  begin
+    result := false;
+    if name > '' then
+      begin
+        if pars.TryGetValue(name, s) then
+         begin
+          Result := TryStrToInt(s, val);
+         end;
+      end;
+  end; // parEx
+
+  function parExI(idx: integer; const name: string=''; doTrim: boolean=TRUE): string; overload;
+//  var
+//    i: integer;
+  begin
+    result:='';
+    if name > '' then
+      begin
+//      i:=pars.IndexOfName(name);
+        if pars.TryGetValue(name, Result) then
+          if doTrim then
+            Exit(trim(result))
+           else
+            exit;
       end;
     if (idx < 0) // no numeric index accept
     or (idx >= pars.count) // invalid index
@@ -204,24 +233,18 @@ var
       result := trim(result);
   end; // parEx
 
-  function parEx(name:string; doTrim:boolean=TRUE):string; overload;
-  begin result := parEx(-1, name, doTrim) end;
-
   function parExNE(idx: integer; const name: string=''; doTrim: boolean=TRUE): string; overload;
-  var
-    i: integer;
+//  var
+//    i: integer;
   begin
     result:='';
     if name > '' then
       begin
-      i := pars.IndexOfName(name);
-      if i >= 0 then
-        begin
-        result := pars.valueFromIndex[i];
-        if doTrim then
-          result:=trim(result);
-        exit;
-        end;
+        if pars.TryGetValue(name, Result) then
+          if doTrim then
+            Exit(trim(result))
+           else
+            exit;
       end;
     if (idx < 0) // no numeric index accept
     or (idx >= pars.count) // invalid index
@@ -235,7 +258,15 @@ var
 
   function parExNE(name: string; doTrim: boolean=TRUE):string; overload; // No Exception
   begin
-    result := parExNE(-1, name, doTrim)
+    Result := '';
+    if name > '' then
+      begin
+        if pars.TryGetValue(name, Result) then
+          if doTrim then
+            Exit(trim(result))
+           else
+            exit;
+      end;
   end;
 
   function par(idx:integer; name:string=''; doTrim:boolean=TRUE):string; overload;
@@ -251,14 +282,16 @@ var
 
   function par(name:string=''; doTrim:boolean=TRUE; defval:string=''):string; overload;
   begin
-    try
-      if defval = '' then
-        Result := parExNE(-1, name, doTrim)
-       else
-        Result := parEx(-1, name, doTrim)
-     except
-      result := defval
-    end
+    result := defval;
+
+    if name > '' then
+      begin
+        if pars.TryGetValue(name, Result) then
+          if doTrim then
+            Exit(trim(result))
+           else
+            exit;
+      end;
   end;
 
   function parI(idx:integer):int64; overload;
@@ -280,15 +313,20 @@ var
   begin result:=strToFloatDef(par(name), def) end;
 
   // note this function works on N parameters
-  function parExist(names: array of string):boolean;
+  function parExist(names: array of string):boolean; OverLoad;
   var
     i: integer;
   begin
     result := FALSE;
     for i:=0 to length(names)-1 do
-      if pars.indexOfName(names[i]) < 0 then
+      if not pars.ContainsKey(names[i]) then
         exit;
     result := TRUE;
+  end; // parExist
+
+  function parExist(name: string): boolean; OverLoad;
+  begin
+    result := pars.ContainsKey(name);
   end; // parExist
 
   procedure trueIf(condition:boolean);
@@ -327,7 +365,7 @@ var
   // if par with name exists, then it's a var name, otherwise it's a constant value at specified index
   function parVar(parname:string; idx:integer):string; overload;
   begin
-  if parExist([parname]) then
+  if parExist(parname) then
     result:=getVar(par(parname))
   else
     result:=pars[idx];
@@ -408,17 +446,23 @@ var
 
   // find the delimiters
   s:=macroDequote(par(2));
-  if pars[0] = '' then i:=1
-  else i:=pos_(caseSens, pars[0], s); // we don' trim this, so you can use blank-space as delimiter
-  if i = 0 then exit;
-  j:=pos_(caseSens, pars[1], s, i+1);
-  if j = 0 then j:=length(s)+1;
+    var p0 := pars[0];
+    if p0 = '' then
+      i:=1
+     else
+      i := pos_(caseSens, p0, s); // we don' trim this, so you can use blank-space as delimiter
+    if i = 0 then
+      exit;
+    var p1 := pars[1];
+    j:=pos_(caseSens, p1, s, i+1);
+    if j = 0 then
+      j:=length(s)+1;
 
   // apply what2inc
   if what2inc and 1 = 0 then
-    inc(i, length(pars[0]));
+    inc(i, length(p0));
   if what2inc and 2 > 0 then
-    inc(j, length(pars[1]));
+    inc(j, length(p1));
 
   // end of the story
   result:=macroQuote(copy(s, i, j-i));
@@ -457,33 +501,36 @@ var
     from, upTo, l: integer;
     s, v: string;
   begin
-  v:=par('var');
-  if v = '' then
-    s:=par(2,'what')
-  else
-    s:=getVar(v);
-  l:=length(s);
-
-  from:=strToIntDef(par(0,'from'), 1);
-  if from < 0 then from:=l+from+1;
-
-  try upTo:=strToInt(parEx('to'))
-  except
-    upTo:=strToIntDef(par(1,'size'), 0);
-    if upTo = 0 then
-      upTo:=l
-    else if upTo > 0 then
-      upTo:=from+upTo-1
+    v:=par('var');
+    if v = '' then
+      s:=par(2,'what')
     else
-      upTo:=l+upTo;
-    end;
+      s:=getVar(v);
+    l:=length(s);
+
+    from:=strToIntDef(par(0,'from'), 1);
+    if from < 0 then from:=l+from+1;
+
+    if not tryParToInt('to', upTo) then
+     begin
+      upTo:=strToIntDef(par(1,'size'), 0);
+      if upTo = 0 then
+        upTo:=l
+      else if upTo > 0 then
+        upTo:=from+upTo-1
+      else
+        upTo:=l+upTo;
+     end;
     
-  result:=substr(s, from, upTo);
-  try setVar(parEx('remainder'), substr(s,1,from-1)+substr(s,upTo+1));
-  except end;
-  if v = '' then exit;
-  setVar(v, result);
-  result:='';
+    result:=substr(s, from, upTo);
+    if parExist('remainder') then
+     try
+      setVar(parEx('remainder'), substr(s,1,from-1)+substr(s,upTo+1));
+     except end;
+    if v = '' then
+      exit;
+    setVar(v, result);
+    result:='';
   end; // cut
 
   procedure minOrMax();
@@ -597,8 +644,11 @@ var
   if (s = '') and (md.cd.urlvars.indexOf(k) >= 0) then s:='1';
   try
     result := noMacrosAllowed(s);
-    setVar(parEx('var'), result); // if no var is specified, it will break here, and result will have the value
-    result:='';
+    if parExist('var') then
+     begin
+       setVar(parEx('var'), result); // if no var is specified, it will break here, and result will have the value
+       result:='';
+     end;
   except end;
   end; // urlVar
 
@@ -826,7 +876,7 @@ var
   old:=mainfrm.findFilebyURL(f.name, nodeToFile(parent), FALSE);
   if assigned(old) then
     if not old.isRoot()
-    and (not parExist(['overwrite']) or isTrue(par('overwrite'))) then
+    and (not parExist('overwrite') or isTrue(par('overwrite'))) then
       try old.node.delete() except end // delete existing one
     else
       begin
@@ -853,12 +903,13 @@ var
 
     procedure setAttr(a:TfileAttribute; parName:string);
     begin
-    try
-      if isTrue(parEx(parname)) then
-        include(f.flags, a)
-      else
-        exclude(f.flags, a);
-    except end;
+      if parExist(parname) then
+        try
+          if isTrue(parEx(parname)) then
+            include(f.flags, a)
+          else
+            exclude(f.flags, a);
+        except end;
     end; // setAttr
 
   begin
@@ -866,7 +917,10 @@ var
   f:=mainfrm.findFileByURL(p, md.folder);
   if f = NIL then exit; // doesn't exist
 
-  try f.setDynamicComment(mainFrm.getLP, macroDequote(parEx('comment'))) except end;
+  if parExist('comment') then
+   try
+     f.setDynamicComment(mainFrm.getLP, macroDequote(parEx('comment')))
+   except end;
   try
     f.name:=parEx('name');
     if assigned(f.node) then
@@ -1206,7 +1260,7 @@ var
     encode: boolean;
   begin
   result:='';
-  if not parExist(['var']) then // will we work with a variable?
+  if not parExist('var') then // will we work with a variable?
     s:=pars[1]
   else
     begin
@@ -1246,12 +1300,18 @@ var
     i: integer;
     v: string;
   begin
-    try
-      v := parEx('var');
-      result:=getVar(v);
-     except
-      result := pars[pars.count-1]
-    end;
+    if parExist('var') then
+      try
+        v := parEx('var');
+        result:=getVar(v);
+       except
+        result := pars[pars.count-1]
+      end
+     else
+      begin
+        v := '';
+        result := pars[pars.count-1];
+      end;
 
     i:=0;
     while i < pars.count-2 do
@@ -1498,7 +1558,7 @@ var
   else
     if unnamedPars < 2 then
       s:='';
-  if parExist(['out']) or parExist(['timeout']) or parExist(['exit code']) then
+  if parExist('out') or parExist('timeout') or parExist('exit code') then
     try
       spaceIf(captureExec(macroDequote(p)+nonEmptyConcat(' ', s), s, code, parF('timeout',2)));
       try setVar(parEx('exit code'), intToStr(code)) except end;
@@ -1608,8 +1668,11 @@ var
   begin
   if not satisfied(md.cd) then exit;
   result:='';
-  try md.cd.conn.setCookie(p, parEx('value'), getPairs());
-  except result:=noMacrosAllowed(md.cd.conn.getCookie(p)) end; // there was no "value" to set, so just read
+    if parExist('value') then
+      try md.cd.conn.setCookie(p, parEx('value'), getPairs());
+      except result:=noMacrosAllowed(md.cd.conn.getCookie(p)) end // there was no "value" to set, so just read
+     else
+      result := noMacrosAllowed(md.cd.conn.getCookie(p)); // there was no "value" to set, so just read
   end; // cookie
 
   procedure regexp();
@@ -2095,25 +2158,27 @@ try
       result:=strSHA256(p)
      else
     if name = 'vfs select' then
-      if pars.count = 0 then
-        try result:=selectedFile.url()
-        except result:='' end
-      else if p = 'next' then
-        if selectedFile = NIL then
-          spaceIf(FALSE)
+      begin
+        if pars.count = 0 then
+          try result:=selectedFile.url()
+          except result:='' end
+        else if p = 'next' then
+          if selectedFile = NIL then
+            spaceIf(FALSE)
+          else
+            begin
+            with mainFrm.filesBox do selected:=selected.getNext();
+            spaceIf(TRUE);
+            end
         else
-          begin
-          with mainFrm.filesBox do selected:=selected.getNext();
-          spaceIf(TRUE);
-          end
-      else
-        try
-          s:=parEx('path');
-          spaceIf(FALSE);
-          mainFrm.filesBox.selected:= mainFrm.findFilebyURL(s, NIL, FALSE).node;
-          spaceIf(TRUE);
-        except end;
-
+          try
+            s:=parEx('path');
+            spaceIf(FALSE);
+            mainFrm.filesBox.selected:= mainFrm.findFilebyURL(s, NIL, FALSE).node;
+            spaceIf(TRUE);
+          except end;
+      end
+     else
     if name = 'break' then
       begin
         result:='';
@@ -2177,7 +2242,7 @@ try
       trueIf(anyMacroMarkerIn(first(loadfile(uri2diskMaybe(p)), p)))
      else
     if name = 'random' then
-      result:=randomFrom(listToArray(pars))
+      result:=randomFrom(pars.ToArray)
      else
     if name = 'random number' then
      begin
@@ -2226,8 +2291,12 @@ try
      else
     if name = 'length' then
       begin // don't trim
-        try s:=getVar(parEx('var', FALSE))
-        except s:=pars[0] end;
+        if parExist('var') then
+         try
+           s:=getVar(parEx('var', FALSE))
+          except s:=pars[0] end
+         else
+          s:=pars[0];
         result:=intToStr(length(s));
       end
      else
@@ -2325,7 +2394,8 @@ try
       try call(getVar(p), 1) except end
      else
     if name = 'inc' then
-      inc_();
+      inc_()
+     else
     if name = 'dec' then
       inc_(-1)
      else
@@ -2520,22 +2590,23 @@ try
     if pars.count < 2 then exit; // from here, only macros with at least 2 parameters
 
     if name = 'set item' then
-      setItem();
+      setItem()
+     else
     if name = 'get item' then
-      getItem();
-
+      getItem()
+     else
     if name = 'while' then
-      while_();
-
+      while_()
+     else
     if name = 'set table' then
-      setTable();
-
+      setTable()
+     else
     if name = 'add folder' then
-      addFolder();
-
+      addFolder()
+     else
     if (name = 'save') or (name = 'append') then
-      save();
-
+      save()
+     else
     if name = 'rename' then
       begin
       spaceIf( not isExtension(par(1), '.lnk') and // security matters (by mars)
@@ -2548,75 +2619,83 @@ try
         finally
           stopOnMacroRename:=FALSE;
           end;
-      end;
-
+      end
+     else
     if name = 'move' then
       begin
       s:=uri2diskMaybeFolder(par(1));
       spaceIf((s>'') and movefile(uri2diskMaybe(p,NIL,FALSE), s));
-      end;
-
+      end
+     else
     if name = 'copy' then
-      spaceIf(copyfile(uri2diskMaybe(p), uri2diskMaybeFolder(par(1))));
-
+      spaceIf(copyfile(uri2diskMaybe(p), uri2diskMaybeFolder(par(1))))
+     else
     if name = 'from table' then
-      result:=fromTable(p, par(1));
-
+      result:=fromTable(p, par(1))
+     else
     if name = 'match' then
-      trueIf(filematch(p, par(1)));
-
+      trueIf(filematch(p, par(1)))
+     else
     if name = 'match address' then
-      trueIf(addressmatch(p, par(1)));
-
+      trueIf(addressmatch(p, par(1)))
+     else
     if name = 'regexp' then
-      regexp();
-
+      regexp()
+     else
     if name = 'pos' then
-      result:=intToStr(pos_(isTrue(par('case')), parVar('what', 0), parVar('var', 1), strToIntDef(par('from'), 1)));
-
+      result:=intToStr(pos_(isTrue(par('case')), parVar('what', 0), parVar('var', 1), strToIntDef(par('from'), 1)))
+     else
     if name = 'repeat' then
-      result:=dupeString(macroDequote(par(1)), strToIntDef(p,1));
-
+      result:=dupeString(macroDequote(par(1)), strToIntDef(p,1))
+     else
     if name = 'count substring' then
-      result:=intToStr(countSubstr(pars[0], par(1)));
-
+      result:=intToStr(countSubstr(pars[0], par(1)))
+     else
     if name = 'and' then
-      allLogic(TRUE);
-
+      allLogic(TRUE)
+     else
     if name = 'or' then
-      allLogic(FALSE);
-
+      allLogic(FALSE)
+     else
     if name = 'xor' then
-      trueIf(isTrue(p) xor isTrue(par(1)));
-
+      trueIf(isTrue(p) xor isTrue(par(1)))
+     else
     if name = 'add' then
-      result:=floatToStr(parF(0)+parF(1));
+      result:=floatToStr(parF(0)+parF(1))
+     else
     if name = 'sub' then
-      result:=floatToStr(parF(0)-parF(1));
+      result:=floatToStr(parF(0)-parF(1))
+     else
     if name = 'mul' then
-      result:=floatToStr(parF(0)*parF(1));
+      result:=floatToStr(parF(0)*parF(1))
+     else
     if name = 'div' then
-      result:=floatToStr(safeDiv(parF(0),parF(1)));
+      result:=floatToStr(safeDiv(parF(0),parF(1)))
+     else
     if name = 'mod' then
-      result:=intToStr(safeMod(parI(0),parI(1)));
+      result:=intToStr(safeMod(parI(0),parI(1)))
+     else
 
     if stringExists(name, ['min','max']) then
-      minOrMax();
-
+      minOrMax()
+     else
     if stringExists(name, ['if','if not']) then
       begin
-      try p:=getVar(parEx('var'));
-      except end;
-      if isTrue(p) xor (length(name) = 2) then result:=macroDequote(par(2))
-      else result:=macroDequote(par(1));
+        if parExist('var') then
+          try p:=getVar(parEx('var'));
+          except end;
+        if isTrue(p) xor (length(name) = 2) then
+          result:=macroDequote(par(2))
+         else
+          result:=macroDequote(par(1));
       end;
 
     if stringExists(name, ['=','>','>=','<','<=','<>','!=']) then
-      trueIf(compare(name, p, par(1)));
-
+      trueIf(compare(name, p, par(1)))
+     else
     if name = 'switch' then
-      switch();
-
+      switch()
+     else
     if name = 'set account' then
       setAccount();
     if name = 'get account' then
