@@ -119,6 +119,10 @@ object optionsFrm: ToptionsFrm
     object accountsPage: TTabSheet
       Caption = 'Accounts'
       ImageIndex = 29
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       DesignSize = (
         797
         385)
@@ -225,7 +229,7 @@ object optionsFrm: ToptionsFrm
           Top = 106
           Width = 198
           Height = 21
-          EditLabel.Width = 107
+          EditLabel.Width = 100
           EditLabel.Height = 13
           EditLabel.Caption = 'After login, redirect to'
           TabOrder = 4

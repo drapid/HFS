@@ -4,7 +4,7 @@ interface
 
 uses
   strutils, sysutils, classes, types, windows, Generics.Collections,
-  utilLib, intlist;
+  intlist;
 
 type
 
@@ -67,6 +67,8 @@ function findMacroMarker(const s:string; ofs:integer=1):integer;
 procedure applyMacrosAndSymbols(var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
 
 implementation
+uses
+  srvUtils;
 
 const
   MAX_RECUR_LEVEL = 50;

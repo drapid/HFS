@@ -24,10 +24,10 @@ unit classesLib;
 interface
 
 uses
-  iniFiles, types, strUtils, sysUtils, classes, math,
+  iniFiles, types, strUtils, sysUtils, classes,
   system.Generics.Collections,
   OverbyteIcsWSocket, OverbyteIcshttpProt,
-  hslib, hfsGlobal;
+  hslib, srvConst;
 
 type
   Tip2av = Tdictionary<string,Tdatetime>;
@@ -44,17 +44,6 @@ type
     constructor create;
     destructor Destroy; override;
     function accept(conn:ThttpConn; address:string=''):boolean;
-    end;
-
-  TfastStringAppend = class
-  protected
-    buff: string;
-    n: integer;
-  public
-    function length():integer;
-    function reset():string;
-    function get():string;
-    function append(s:string):integer;
     end;
 
   PcachedIcon = ^TcachedIcon;
@@ -97,10 +86,10 @@ type
 
   TstringToIntHash = class(ThashedStringList)
     constructor create;
-    function getInt(s:string):integer;
+    function getInt(const s:string):integer;
     function getIntByIdx(idx:integer):integer;
-    function incInt(s:string):integer;
-    procedure setInt(s:string; int:integer);
+    function incInt(const s:string):integer;
+    procedure setInt(const s:string; int:integer);
     end;
 
   PtplSection = ^TtplSection;
@@ -133,8 +122,8 @@ type
     procedure clear();
   public
     onChange: TNotifyEvent;
-    constructor create(txt: RawByteString=''; over:Ttpl=NIL); OverLoad;
-    constructor create(txt: String; over:Ttpl=NIL); OverLoad;
+    constructor create(const txt: RawByteString=''; over:Ttpl=NIL); OverLoad;
+    constructor create(const txt: String; over:Ttpl=NIL); OverLoad;
     destructor Destroy; override;
     property txt[section:string]:string read getTxt; default;
     property fullText: RawByteString read toRaw write fromRaw;
@@ -146,7 +135,7 @@ type
     function getSection(section:string; inherit:boolean=TRUE):PtplSection;
     function getSections():TStringDynArray;
     procedure appendString(txt: String);
-    function getStrByID(id:string):string;
+    function getStrByID(const id:string):string;
     function me():Ttpl;
     end; // Ttpl
 
@@ -233,7 +222,7 @@ type
 
   ThashFunc = function(s:string):string;
 
-  TconnDataMain = class  // data associated to a client connection
+  TconnDataMain = class   // data associated to a client connection
   public
     class function getSafeHost(cd:TconnDataMain):string;
   public
@@ -274,7 +263,8 @@ implementation
 uses
   windows, dateUtils, forms, ansiStrings,
   RDFileUtil, RDUtils,
-  utilLib, hfsVars;
+  utilLib, hfsGlobal, hfsVars,
+  srvUtils;
 
 
 class constructor TantiDos.Create;
@@ -305,7 +295,8 @@ if address= '' then
 if ip2availability = NIL then
   ip2availability:=Tip2av.create();
 try
-  if ip2availability[address] > now() then // this specific address has to wait?
+  if ip2availability.ContainsKey(address) then
+   if ip2availability[address] > now() then // this specific address has to wait?
     begin
     reject();
     exit(FALSE);
@@ -537,37 +528,6 @@ for i:=0 to n-1 do
     end;
 end; // purge
 
-//////////// TfastStringAppend
-
-function TfastStringAppend.length():integer;
-begin result:=n end;
-
-function TfastStringAppend.get():string;
-begin
-setlength(buff, n);
-result:=buff;
-end; // get
-
-function TfastStringAppend.reset():string;
-begin
-result:=get();
-buff:='';
-n:=0;
-end; // reset
-
-function TfastStringAppend.append(s:string):integer;
-var
-  ls, lb: integer;
-begin
-  ls := system.length(s);
-  lb := system.length(buff);
-  if n+ls > lb then
-    setlength(buff, lb+ls+20000);
-  MoveChars(s[1], buff[n+1], ls);
-  inc(n, ls);
-  result:=n;
-end; // append
-
 //////////// Thasher
 
 procedure Thasher.loadFrom(path:string);
@@ -616,17 +576,17 @@ end; // create
 function TstringToIntHash.getIntByIdx(idx:integer):integer;
 begin if idx < 0 then result:=0 else result:=integer(objects[idx]) end;
 
-function TstringToIntHash.getInt(s:string):integer;
+function TstringToIntHash.getInt(const s:string):integer;
 begin result:=getIntByIdx(indexOf(s)) end;
 
-procedure TstringToIntHash.setInt(s:string; int:integer);
+procedure TstringToIntHash.setInt(const s:string; int:integer);
 begin
 beginUpdate();
 objects[add(s)]:=Tobject(int);
 endUpdate();
 end; // setInt
 
-function TstringToIntHash.incInt(s:string):integer;
+function TstringToIntHash.incInt(const s:string):integer;
 var
   i: integer;
 begin
@@ -640,14 +600,14 @@ end; // autoupdatedFiles_getCounter
 
 //////////// Ttpl
 
-constructor Ttpl.create(txt: RawByteString=''; over:Ttpl=NIL);
+constructor Ttpl.create(const txt: RawByteString=''; over:Ttpl=NIL);
 begin
 sections:=Tstr2section.Create();
 fullText:=txt;
 self.over:=over;
 end;
 
-constructor Ttpl.create(txt: String; over:Ttpl=NIL);
+constructor Ttpl.create(const txt: String; over:Ttpl=NIL);
 begin
 sections:=Tstr2section.Create();
 fullTextS:=txt;
@@ -660,7 +620,7 @@ fullText:=''; // this will cause the disposing
 inherited;
 end; // destroy
 
-function Ttpl.getStrByID(id:string):string;
+function Ttpl.getStrByID(const id:string):string;
 begin
 if strTable = NIL then
   begin

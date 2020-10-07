@@ -3,20 +3,18 @@ unit hfsGlobal;
 
 interface
 uses
-  graphics, Types, SysUtils;
+  graphics, Types, SysUtils, srvConst;
 
 const
 {$I RnQBuiltTime.inc}
-  VERSION = '2.4.0 RC7 RD';
-  VERSION_BUILD = '319';
+  VERSION = '2.4.0 RC8 RD';
+  VERSION_BUILD = '320';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
   CRLFA = RawByteString(#13#10);
   TAB = #9;
   BAK_EXT = '.bak';
-  CORRUPTED_EXT = '.corrupted';
-  COMMENT_FILE_EXT = '.comment';
   VFS_FILE_IDENTIFIER = 'HFS.VFS';
   CFG_KEY = 'Software\rejetto\HFS';
   CFG_FILE = 'hfs.ini';
@@ -24,19 +22,12 @@ const
   IPS_FILE = 'hfs.ips.txt';
   VFS_TEMP_FILE = '~temp.vfs';
   HFS_HTTP_AGENT = 'HFS/'+VERSION;
-  COMMENTS_FILE = 'hfs.comments.txt';
-  DESCRIPT_ION = 'descript.ion';
-  DIFF_TPL_FILE = 'hfs.diff.tpl';
-  FILELIST_TPL_FILE = 'hfs.filelist.tpl';
   EVENTSCRIPTS_FILE = 'hfs.events';
   MACROS_LOG_FILE = 'macros-log.html';
   PREVIOUS_VERSION = 'hfs.old.exe';
   SESSION_COOKIE = 'HFS_SID_';
   PROTECTED_FILES_MASK = 'hfs.*;*.htm*;descript.ion;*.comment;*.md5;*.corrupted;*.lnk';
   G_VAR_PREFIX = '#';
-  HOURS = 24;
-  MINUTES = HOURS*60;
-  SECONDS = MINUTES*60; // Tdatetime * SECONDS = time in seconds
   ETA_FRAME = 5; // time frame for ETA (in seconds)
   DOWNLOAD_MIN_REFRESH_TIME :Tdatetime = 1/(5*SECONDS); // 5 Hz
   BYTES_GROUPING_THRESHOLD :Tdatetime = 1/SECONDS; // group bytes in log
@@ -44,8 +35,6 @@ const
   STATUSBAR_REFRESH = 10; // tenth of second
   MAX_RECENT_FILES = 5;
   MANY_ITEMS_THRESHOLD = 1000;
-  KILO = 1024;
-  MEGA = KILO*KILO;
   COMPRESSION_THRESHOLD = 10*KILO; // if more than X bytes, VFS files are compressed
   STARTING_SNDBUF = 32000;
   YESNO :array [boolean] of string=('no','yes');
@@ -139,25 +128,12 @@ resourcestring
   MSG_CON_RECEIVED = '%s / %s received';
 
 type
-  TcharSetA = TSysCharSet; //set of char;
-  TcharSetW = set of Char deprecated 'Holds Char values in the ordinal range of 0..255 only.'; //set of char;
 
 //  Pboolean = ^boolean;
-
-  Paccount = ^Taccount;
-	Taccount = record   // user/pass profile
-    user, pwd, redir, notes: string;
-    wasUser: string; // used in user renaming panel
-    enabled, noLimits, group: boolean;
-    link: TStringDynArray;
-   end;
-  Taccounts = array of Taccount;
 
   TfilterMethod = function(self:Tobject):boolean;
 
   Thelp = ( HLP_NONE, HLP_TPL );
-
-  TdownloadingWhat = ( DW_UNK, DW_FILE, DW_FOLDERPAGE, DW_ICON, DW_ERROR, DW_ARCHIVE );
 
   TpreReply =  (PR_NONE, PR_BAN, PR_OVERLOAD);
 

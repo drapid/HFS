@@ -57,7 +57,8 @@ uses
   hfsGlobal in 'hfsGlobal.pas',
   hfsVars in 'hfsVars.pas',
   langLib in 'langLib.pas',
-  progFrmLib in 'progFrmLib.pas';
+  progFrmLib in 'progFrmLib.pas',
+  serverLib in 'serverLib.pas';
 
 {$R *.res}
 

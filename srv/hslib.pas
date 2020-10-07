@@ -33,8 +33,8 @@ interface
 uses
   classes, messages, winprocs, forms, extctrls, sysutils,
   contnrs, strUtils, winsock, inifiles, types,
-  OverbyteIcsWSocket, //OverbyteIcsWSockets,
-  hfsGlobal;
+  OverbyteIcsWSocket //OverbyteIcsWSockets,
+  ;
 
 const
   VERSION = '2.11.0';
@@ -361,7 +361,8 @@ implementation
 
 uses
   Windows, AnsiStrings,
-  AnsiClasses, RDUtils, Base64;
+  AnsiClasses, RDUtils, Base64,
+  srvConst;
 
 const
   HEADER_LIMITER: RawByteString = CRLFA+CRLFA;
@@ -913,7 +914,7 @@ procedure ThttpSrv.timerEvent(sender:Tobject);
       if c = NIL then continue;
 
       try
-        chunkSize:=ifThen(c.paused, 0, MAXINT);
+        chunkSize:= RDUtils.ifThen(c.paused, 0, MAXINT);
         if not c.ignoreSpeedLimit then
           for i:=0 to c.limiters.Count-1 do
             with c.limiters[i] as TspeedLimiter do

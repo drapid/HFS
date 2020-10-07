@@ -35,7 +35,7 @@ uses
   regexpr,
   rnqTraylib,
   // rejetto libs
-  fileLib, hfsGlobal,
+  fileLib, srvConst, hfsGlobal, serverLib,
   HSlib, monoLib, progFrmLib, classesLib;
 
 
@@ -96,11 +96,6 @@ type
 
   TtreeNodeDynArray = array of TtreeNode;
 
-  TstringIntPairs = array of record
-    str:string;
-    int:integer;
-    end;
-    
   TmainFrm = class(TForm)
     filemenu: TPopupMenu;
     newfolder1: TMenuItem;
@@ -703,8 +698,10 @@ type
     function  recalculateGraph(): Boolean;
     procedure remove(node:Ttreenode=NIL); OverLoad;
  public
+    fileSrv: TFileServer;
     procedure statusBarHttpGetUpdate(sender:TObject; buffer:pointer; Len:integer);
     function  getLP: TLoadPrefs;
+    function  getSP: TShowPrefs;
     procedure remove(f: TFile=NIL); OverLoad;
     function  setCfg(cfg:string; alreadyStarted:boolean=TRUE):boolean;
     function  getCfg(exclude:string=''): string;
@@ -712,7 +709,6 @@ type
     function  addFile(f:Tfile; parent:Ttreenode=NIL; skipComment:boolean=FALSE):Tfile; OverLoad;
     function  addFile(f:Tfile; parent: TTreeNode; skipComment: boolean; var newNode: TTreeNode): Tfile; OverLoad;
     procedure add2log(lines:string; cd:TconnDataMain=NIL; clr:Tcolor= Graphics.clDefault);
-    function  findFilebyURL(url:string; parent:Tfile=NIL; allowTemp:boolean=TRUE):Tfile;
     function  ipPointedInLog():string;
     procedure saveVFS(fn:string='');
     function  finalInit():boolean;
@@ -731,16 +727,7 @@ type
   end; // Tmainfrm
 
   TFileHlp = class helper for Tfile
-    class var userPwdHashCache:Tstr2str;
-    public
-     function pathTill(root:Tfile=NIL; delim:char='\'):string;
-     function url(fullEncode:boolean=FALSE):string;
-//     function fullURL(userpwd:string=''; ip:string=''):string;
-     function  fullURL(ip, user, pwd:string):string; overload;
-     function  fullURL(ip:string=''):string; overload;
      function getShownRealm():string;
-     function getSystemIcon(): integer;
-     function parentURL():string;
   end;
 var
   mainFrm: TmainFrm;
@@ -750,7 +737,6 @@ var
   ipsEverConnected: THashedStringList;
   easyMode: boolean = TRUE;
   rootNode: TtreeNode;
-  rootFile: Tfile;
   noReplyBan: boolean;
   externalIP: string;
   banlist: array of record ip,comment:string; end;
@@ -818,7 +804,8 @@ uses
   RDFileUtil, RDUtils,
   RnQzip, RnQCrypt, RnQNet.Uploads, RnQLangs,
   langLib,
-  newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg, parserLib,
+  newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg,
+  parserLib, srvUtils,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib, hfsVars;
 
 // global variables
@@ -1312,128 +1299,11 @@ if ip2obj.objects[i] = NIL then
 result:=ip2obj.objects[i] as TperIp;
 end; // objByIP
 
-function Tmainfrm.findFilebyURL(url:string; parent:Tfile=NIL; allowTemp:boolean=TRUE):Tfile;
-
-  procedure workTheRestByReal(rest:string; f:Tfile);
-  var
-    s: string;
-  begin
-  if not allowTemp then exit;
-
-  s:=rest; // just a shortcut
-  if dirCrossing(s) then exit;
-
-  s:=includeTrailingPathDelimiter(f.resource)+s; // we made the ".." test before, so relative paths are allowed in the VFS
-  if not fileOrDirExists(s) and fileOrDirExists(s+'.lnk') then
-    s:=s+'.lnk';
-  if not fileOrDirExists(s) or not hasRightAttributes(getLP, s) then
-    exit;
-  // found on disk, we need to build a temporary Tfile to return it
-  result:=Tfile.createTemp(s, f); // temp nodes are bound to parent's node
-  // the temp file inherits flags from the real folder
-  if FA_DONT_LOG in f.flags then
-    include(result.flags, FA_DONT_LOG);
-  if not (FA_BROWSABLE in f.flags) then
-    exclude(result.flags, FA_BROWSABLE);
-  end; // workTheRestByReal
-
-var
-  parts: TStringDynArray;
-  s: string;
-  cur, n: Ttreenode;
-  found: boolean;
-  f: Tfile;
-
-  function workDots():boolean;
-  label REMOVE;
-  var
-    i: integer;
-  begin
-  result:=FALSE;
-  i:=0;
-  while i < length(parts) do
-    begin
-    if parts[i] = '.' then
-      goto REMOVE; // 10+ years have passed since the last time i used labels in pascal. It's a thrill. 
-    if parts[i] <> '..' then
-      begin
-      inc(i);
-      continue;
-      end;
-    if i > 0 then
-      begin
-      removeString(parts, i-1, 2);
-      dec(i);
-      continue;
-      end;
-    parent:=parent.parent;
-    if parent = NIL then exit;
-    REMOVE:
-    removeString(parts, i, 1);
-    end;
-  result:=TRUE;
-  end; // workDots
-
-begin
-  result := NIL;
-  if (url = '') or anycharIn(#0, url) then exit;
-if parent = NIL then
-  parent:=rootFile;
-url:=xtpl(url, ['//', '/']);
-if url[1] = '/' then
-  begin
-  delete(url, 1,1);  // remove initial "/"
-  parent:=rootFile; // it's an absolute path, not relative
-  end;
-excludeTrailingString(url, '/');
-parts:=split('/', url);
-if not workDots() then exit;
-
-if parent.isTemp() then
-  begin
-  workTheRestByReal(url, parent);
-  exit;
-  end;
-
-cur:=parent.node;   // we'll move using treenodes
-for var i: integer :=0 to length(parts)-1 do
-  begin
-  s:=parts[i];
-  if s = '' then exit; // no support for null filenames
-  found:=FALSE;
-  // search inside the VFS
-  n:=cur.getFirstChild();
-  while assigned(n) do
-    begin
-//    found:=stringExists(n.text, s) or sameText(n.text, UTF8toAnsi(s));
-//        found := stringExists(n.text, s) or sameText(n.text, s);
-    found:=sameText(n.text, s);
-    if found then break;
-    n:=n.getNextSibling();
-    end;
-  if not found then // this piece was not found the virtual way
-    begin
-    f:=cur.data;
-    if f.isRealFolder() then // but real folders have not all the stuff loaded and ready. we have another way to walk.
-      begin
-        if length(parts) > i+1 then
-          for var j: integer :=i+1 to length(parts)-1 do
-            s:=s+'\'+parts[j];
-        workTheRestByReal(s, f);
-      end;
-    exit;
-    end;
-  cur:=n;
-  if cur = NIL then exit;
-  end;
-result:=cur.data;
-end; // findFileByURL
-
 function fileExistsByURL(url:string):boolean;
 var
   f: Tfile;
 begin
-f:=mainFrm.findFilebyURL(url);
+  f := mainFrm.fileSrv.findFilebyURL(url, mainFrm.getLP);
 result:=assigned(f);
 freeIfTemp(f);
 end; // fileExistsByURL
@@ -1557,9 +1427,32 @@ begin
   if oemForIonChk.checked then
     Include(Result, lpOEMForION);
 end;
+
+function Tmainfrm.getSP: TShowPrefs;
+begin
+  Result := [];
+
+  if useSystemIconsChk.checked then
+    Include(Result, spUseSysIcons);
+  if httpsUrlsChk.checked then
+    Include(Result, spHttpsUrls);
+  if foldersBeforeChk.checked then
+    Include(Result, spFoldersBefore);
+  if linksBeforeChk.checked then
+    Include(Result, spLinksBefore);
+
+  if noPortInUrlChk.checked then
+    Include(Result, spNoPortInUrl);
+  if encodenonasciiChk.checked then
+    Include(Result, spEncodeNonascii);
+  if encodeSpacesChk.checked then
+    Include(Result, spEncodeSpaces);
+end;
+
+
 function Tmainfrm.getFolderPage(folder:Tfile; cd:TconnData; otpl: TTpl):string;
 begin
-  Result := getAFolderPage(folder, cd, otpl, getLP, useSystemIconsChk.checked, pwdInPagesChk.Checked, macrosLogChk.Checked)
+  Result := fileSrv.getAFolderPage(folder, cd, otpl, getLP, getSP, pwdInPagesChk.Checked, macrosLogChk.Checked)
 end;
 
 function getETA(data:TconnData):string;
@@ -1714,7 +1607,7 @@ buildTime:=now();
 
 externalTpl:=assigned(tpl2use);
 if not externalTpl then
-  tpl2use:=tplFromFile(Tfile(first(f, rootFile)));
+  tpl2use:=tplFromFile(Tfile(first(f, fileSrv.rootFile)));
 if assigned(data.tpl) then
   begin
   data.tpl.over:=tpl2use.over;
@@ -2337,8 +2230,8 @@ procedure runTplImport();
 var
   f, fld: Tfile;
 begin
-f:=Tfile.create(tplFilename);
-fld:=Tfile.create(extractFilePath(tplFilename));
+f:=Tfile.create(mainFrm.filesBox, tplFilename);
+fld:=Tfile.create(mainFrm.filesBox, extractFilePath(tplFilename));
 try runScript(tpl['special:import'], NIL, tpl, f, fld);
 finally
   freeAndNIL(f);
@@ -2436,7 +2329,7 @@ var
   function calcAverageSpeed(bytes:int64):integer;
   begin result:=round(safeDiv(bytes, (now()-data.fileXferStart)*SECONDS)) end;
 
-  function runEventScript(event:string; table:array of string):string; overload;
+  function runEventScript(const event:string; table:array of string):string; overload;
   var
     md: TmacroData;
     pleaseFree: boolean;
@@ -2456,9 +2349,9 @@ var
 
       md.folder:=data.lastFile;
       if assigned(md.folder) then
-        md.f:=Tfile.createTemp(data.uploadDest, md.folder)
+        md.f:=Tfile.createTemp(mainFrm.filesBox, data.uploadDest, md.folder)
        else
-        md.f:=Tfile.createTemp(data.uploadDest)
+        md.f:=Tfile.createTemp(mainFrm.filesBox, data.uploadDest)
         ;
       md.f.size:=sizeOfFile(data.uploadDest);
       pleaseFree:=TRUE;
@@ -2480,7 +2373,7 @@ var
     end;
   end; // runEventScript
 
-  function runEventScript(event:string):string; overload;
+  function runEventScript(const event:string):string; overload;
   begin result:=runEventScript(event, []) end;
 
   procedure doLog();
@@ -2872,7 +2765,7 @@ var
         else if fIsTemp and not (FA_SOLVED_LNK in fi.flags)then
           s:=copy(fi.resource, ofs, MAXINT) // pathTill won't work this case, because f.parent is an ancestor but not necessarily the parent
         else
-          s:=fi.pathTill(f.parent); // we want the path to include also f, so stop at f.parent
+          s:= fileSrv.pathTill(fi, f.parent); // we want the path to include also f, so stop at f.parent
 
         tar.addFile(fi.resource, s);
         end
@@ -2890,7 +2783,7 @@ var
         selection:=TRUE;
         if dirCrossing(s) then 
           continue;
-        ft:=findFilebyURL(s, f);
+        ft := fileSrv.findFilebyURL(s, getLP, f);
         if ft = NIL then 
           continue;
         try
@@ -2998,7 +2891,7 @@ var
       end;
     result:=f.accessFor(data);
     // sections are accessible. You can implement protection in place, if needed.
-    if not result  and (f = rootFile)
+    if not result  and (f = fileSrv.rootFile)
     and ((mode='section') or startsStr('~', urlCmd) and tpl.sectionExist(copy(urlCmd,2,MAXINT))) then
       begin
       result:=TRUE;
@@ -3399,7 +3292,7 @@ var
     else
       data.acceptedCredentials:=TRUE;
 
-  f:=findFileByURL(url);
+  f := fileSrv.findFileByURL(url, getLP);
   urlCmd:=''; // urlcmd is only if the file doesn't exist
   if f = NIL then
     begin
@@ -3411,7 +3304,7 @@ var
     // favicon is handled as an urlCmd: we provide HFS icon.
     // a non-existent ~file will be detected a hundred lines below.
     if ansiStartsStr('~', urlCmd) or (urlCmd = 'favicon.ico') then
-      f:=findFileByURL(url);
+      f := fileSrv.findFileByURL(url, getLP);
     end;
   if f = NIL then
     begin
@@ -3424,7 +3317,7 @@ var
   if f.isFolder() and not ansiEndsStr('/',url) then
     begin
     conn.reply.mode:=HRM_MOVED;
-    conn.reply.url:=f.url(); // we use f.url() instead of just appending a "/" to url because of problems with non-ansi chars http://www.rejetto.com/forum/?topic=7837
+    conn.reply.url:= fileSrv.url(f); // we use f.url() instead of just appending a "/" to url because of problems with non-ansi chars http://www.rejetto.com/forum/?topic=7837
     exit;
     end;
   if f.isFolder() and (urlCmd = '') and (mode='') then
@@ -3478,7 +3371,7 @@ var
   // provide access to any [section] in the tpl, included [progress]
   if mode = 'section' then
     s:=first(data.urlvars.values['id'], 'no-id') // no way, you must specify the id
-  else if (f = rootFile) and (urlCmd > '') then
+  else if (f = fileSrv.rootFile) and (urlCmd > '') then
     s:=substr(urlCmd,2)
   else
     s:='';
@@ -3822,7 +3715,7 @@ case event of
     data.downloadingWhat:=DW_UNK;
     data.agent:=getAgentID(conn);
     data.fileXferStart:=now();
-    f:=findFileByURL(decodeURL(getTill('?',conn.request.url)));
+    f := fileSrv.findFileByURL(decodeURL(getTill('?',conn.request.url)), getLP);
     data.lastFile:=f; // auto-freeing
     data.uploadSrc:=conn.post.filename;
     data.uploadFailed:='';
@@ -4121,7 +4014,7 @@ try
   if stopAddingItems then break;
   if (sr.name[1] = '.')
   or isFingerprintFile(getLP, sr.name) or isCommentFile(getLP, sr.name) then continue;
-  newF:=Tfile.create(f.resource+'\'+sr.name);
+  newF:=Tfile.create(filesBox, f.resource+'\'+sr.name);
   if newF.isFolder() then include(newF.flags, FA_VIRTUAL);
   if addfileRecur(newF, newNode) = NIL then
     freeAndNIL(newF);
@@ -4140,7 +4033,7 @@ var
   name: string;
 begin
 name:=getUniqueNodeName('New link', filesBox.Selected);
-addfile(Tfile.createLink(name), filesBox.Selected).node.Selected:=TRUE;
+addfile(Tfile.createLink(filesBox, name), filesBox.Selected).node.Selected:=TRUE;
 setURL1click(sender);
 end;
 
@@ -4149,7 +4042,7 @@ var
   name: string;
 begin
 name:=getUniqueNodeName('New folder', filesBox.selected);
-with addFile(Tfile.createVirtualFolder(name), filesBox.Selected).node do
+with addFile(Tfile.createVirtualFolder(filesBox, name), filesBox.Selected).node do
   begin
   Selected:=TRUE;
   editText();
@@ -4305,11 +4198,11 @@ var
   f: Tfile;
 begin
 if quitting then exit;
-if selectedFile = NIL then f:=rootFile
+if selectedFile = NIL then f:= fileSrv.rootFile
 else f:=selectedFile;
 
 if f = NIL then urlBox.Text:=''
-else urlBox.text:=f.fullURL()
+else urlBox.text:= fileSrv.fullURL(f)
 end; // updateUrlBox
 
 procedure TmainFrm.filesBoxChange(Sender: TObject; Node: TTreeNode);
@@ -6065,7 +5958,7 @@ var
 
   if assigned(filesToAddQ) then
     begin
-    f:=findFilebyURL(addToFolder);
+    f := fileSrv.findFilebyURL(addToFolder, getLP);
     if f = NIL then
       f:=selectedFile;
     if f = NIL then
@@ -6283,7 +6176,7 @@ end; // refreshIPlist
 
 procedure TmainFrm.filesBoxDblClick(Sender: TObject);
 begin
-if assigned(selectedFile) then setClip(selectedFile.fullURL());
+if assigned(selectedFile) then setClip(fileSrv.fullURL(selectedFile));
 updateUrlBox();
 end;
 
@@ -6402,8 +6295,8 @@ end; // browse
 procedure TmainFrm.Browseit1Click(Sender: TObject);
 begin
 if selectedFile = NIL then exit;
-if selectedFile.isLink() then openURL(selectedfile.url())
-else browse(selectedfile.fullurl())
+if selectedFile.isLink() then openURL(fileSrv.url(selectedfile))
+else browse(fileSrv.fullURL(selectedfile))
 end;
 
 procedure TmainFrm.Openit1Click(Sender: TObject);
@@ -6526,7 +6419,7 @@ try
 	repeat
   fn:=chopLine(files);
   if fn = '' then continue;
-  f:=Tfile.create(fn);
+  f:=Tfile.create(filesBox, fn);
   if f.isFolder() then
     begin
     if kind = '' then
@@ -6562,7 +6455,7 @@ if upload then
   sortArray(f.accounts[FA_UPLOAD]);
   end;
 if assigned(f) and autocopyURLonadditionChk.checked then
-  setClip(f.fullURL());
+  setClip(fileSrv.fullURL(f));
 result:=f;
 end; // addFilesFromString
 
@@ -6705,7 +6598,7 @@ procedure TmainFrm.appEventsShowHint(var HintStr: String; var CanShow: Boolean; 
   if f = NIL then exit;
   parent:=f.parent;
 
-  result:=format(MSG_VFS_URL,[f.url()]);
+  result:=format(MSG_VFS_URL,[fileSrv.URL(f)]);
   if f.isRealFolder() or f.isFile() then
     result := result + #13+format(MSG_VFS_PATH,[f.resource]);
   if f.isFile() then
@@ -7225,7 +7118,7 @@ var
   a: array of string;
   pat: String;
 begin
-if quitting or (rootFile = NIL) then
+if quitting or (fileSrv.rootFile = NIL) then
   begin
   result:='';
   exit;
@@ -7240,7 +7133,7 @@ if quitting or (rootFile = NIL) then
   if ipos('%uptime%', pat)>0 then
     Result := xtpl(Result, ['%uptime%', uptimestr()]);
   if ipos('%url%', pat)>0 then
-    Result := xtpl(Result, ['%url%', rootFile.fullURL()]);
+    Result := xtpl(Result, ['%url%', fileSrv.fullURL(fileSrv.rootFile)]);
   if ipos('%hits%', pat)>0 then
     Result := xtpl(Result, ['%hits%', intToStr(hitsLogged)]);
   if ipos('%downloads%', pat)>0 then
@@ -7611,7 +7504,7 @@ while not tlv.isOver() do
         progFrm.progress:= tlv.getPerc();
         application.ProcessMessages();
         end;
-      setVFS2(data2, addFile(Tfile.create(''), node, TRUE).node );
+      setVFS2(data2, addFile(Tfile.create(filesBox, ''), node, TRUE).node );
       end;
     FK_COMPRESSED_ZLIB:
       { Explanation for the #0 workaround.
@@ -8138,7 +8031,7 @@ dlg.Options:=dlg.Options+[ofAllowMultiSelect, ofFileMustExist, ofPathMustExist];
 if dlg.Execute() then
   begin
 	for i:=0 to dlg.files.count-1 do
-    addFile(Tfile.create(dlg.files[i]), filesBox.Selected, dlg.Files.count<>1 );
+    addFile(Tfile.create(filesBox, dlg.files[i]), filesBox.Selected, dlg.Files.count<>1 );
   lastDialogFolder:=extractFilePath(dlg.fileName);
   end;
 dlg.free;
@@ -8560,11 +8453,11 @@ var
 begin
 uploadPaths:=NIL;
 if assigned(rootNode) then rootNode.delete();
-f:=Tfile.createVirtualFolder('/');
+f:=Tfile.createVirtualFolder(filesBox, '/');
 f.flags:=f.flags+[FA_ROOT, FA_ARCHIVABLE];
 f.dontCountAsDownloadMask:='*.htm;*.html;*.css';
 f.defaultFileMask:='index.html;index.htm;default.html;default.htm';
-rootFile:=f;
+fileSrv.rootFile:=f;
 addFile(f, NIL, TRUE, rootNode);
 VFSmodified:=FALSE;
 lastFileOpen:='';
@@ -8613,7 +8506,7 @@ var
 begin
 s:='';
 for i:=0 to filesBox.SelectionCount-1 do
-  s:=s+nodeTofile(filesBox.Selections[i]).fullURL()+CRLF;
+  s:=s+fileSrv.fullURL(nodeTofile(filesBox.Selections[i]))+CRLF;
 setLength(s, length(s)-2);
 setClip(s);
 end;
@@ -8641,7 +8534,7 @@ else
   else pwd:='';
   end;
 
-setClip( selectedFile.fullURL('',user,pwd) )
+setClip( fileSrv.fullURL(selectedFile,'',user,pwd) )
 end; // copyURLwithPasswordMenuClick
 
 procedure Tmainfrm.copyURLwithAddressMenuClick(sender:Tobject);
@@ -8654,7 +8547,7 @@ delete(addr, pos('&',addr), 1);
 
 s:='';
 for i:=0 to filesBox.SelectionCount-1 do
-  s:=s+nodeTofile(filesBox.Selections[i]).fullURL(addr)+CRLF;
+  s:=s+fileSrv.fullURL(nodeTofile(filesBox.Selections[i]), addr)+CRLF;
 setLength(s, length(s)-2);
 
 setClip(s);
@@ -8687,7 +8580,7 @@ try
         saveFileU(f.resource+'.md5', hash);
       end;
     if progFrm.cancelRequested then exit;
-    s:=s + f.fullURL() + nonEmptyConcat('#!md5!', hash) + CRLF;
+    s:=s + fileSrv.fullURL(f) + nonEmptyConcat('#!md5!', hash) + CRLF;
     end;
 finally progFrm.hide() end;
 setLength(s, length(s)-2);
@@ -8857,7 +8750,7 @@ try
           else
             begin
             bakIcon:=icon;
-            f:=Tfile.create(resource);
+            f:=Tfile.create(filesBox, resource);
             under:=node.Parent;
             include(f.flags, FA_VIRTUAL);
             setNilChildrenFrom(nodes, i);
@@ -9352,7 +9245,7 @@ end;
 procedure TmainFrm.Defaultpointtoaddfiles1Click(Sender: TObject);
 begin
 if selectedFile = NIL then exit;
-addToFolder:=selectedFile.url();
+addToFolder:= fileSrv.URL(selectedFile);
 msgDlg(MSG_OK);
 end;
 
@@ -10125,6 +10018,9 @@ autosaveVFS.menu:=autosaveevery1;
 params:=paramsAsArray();
 processParams_before(params, 'i');
 
+fileSrv := TFileServer.Create;
+fileSrv.onGetSP := getSP;
+
 initVFS();
 setFilesBoxExtras(winVersion <> WV_VISTA);
 
@@ -10194,7 +10090,7 @@ graph.size:=graphBox.height;
 if not quitASAP then
   begin
   if autocopyURLonStartChk.Checked then
-    setClip( rootFile.fullURL() );
+    setClip(fileSrv.fullURL(fileSrv.rootFile) );
 
 
   if reloadonstartupChk.checked then
@@ -10310,7 +10206,8 @@ var
   f: Tfile;
 begin
 f:=selectedFile;
-if f = NIL then f:=rootFile;
+if f = NIL then
+  f:= fileSrv.rootFile;
 if purgeFrm = NIL then
   application.CreateForm(TpurgeFrm, purgeFrm);
 if purgeFrm.showModal() <> mrOk then exit;
@@ -10793,68 +10690,6 @@ for I := 0 to Form.ControlCount-1 do
 end;
 
 
-function TFileHlp.pathTill(root:Tfile=NIL; delim:char='\'):string;
-var
-  f: Tfile;
-begin
-result:='';
-if self = root then exit;
-result:=name;
-f:=parent;
-if isTemp() then
-  begin
-  if FA_SOLVED_LNK in flags then
-    result:=extractFilePath(copy(lnk,length(f.resource)+2, MAXINT))+name // the path is the one of the lnk, but we have to replace the file name as the lnk can make it
-  else
-    result:=copy(resource, length(f.resource)+2, MAXINT);
-  if delim <> '\' then result:=xtpl(result, ['\', delim]);
-  end;
-while assigned(f) and (f <> root) and (f <> rootFile) do
-  begin
-  result:=f.name+delim+result;
-  f:=f.parent;
-  end;
-end; // pathTill
-
-function TFileHlp.url(fullEncode:boolean=FALSE):string;
-begin
-assert(node<>NIL, 'node can''t be NIL');
-if isLink() then result:=relativeURL(fullEncode)
-else result:='/'+encodeURLW(pathTill(rootFile,'/'), fullEncode)
-  +if_(isFolder() and not isRoot(), '/');
-end; // url
-
-function TFileHlp.fullURL(ip, user, pwd:string):string;
-var s,k,base: string;
-begin
-if userPwdHashCache = NIL then
-  userPwdHashCache:=Tstr2str.Create();
-base:=fullURL(ip)+'?';
-k:=user+':'+pwd;
-try result:=base+userPwdHashCache[k]
-except
-  s:='mode=auth&u='+encodeURLW(user);
-  s:=s+'&s2='+strSHA256(s+pwd); // sign with password
-  userPwdHashCache.add(k,s);
-  result:=base+s;
-  end;
-end; // fullURL
-
-function TFileHlp.fullURL(ip:string=''):string;
-begin
-result:=url();
-if isLink() then
-  exit;
-if assigned(srv) and srv.active
-and (srv.port <> '80') and (pos(':',ip) = 0)
-and not mainfrm.noPortInUrlChk.checked then
-  result:=':'+srv.port+result;
-if ip = '' then
-  ip:=defaultIP;
-if Pos(':',ip, Pos(':',ip)+1) > 0 then // ipv6
-  ip:='['+getTill('%',ip)+']';
-result:=protoColon()+ip+result;
-end; // fullURL
 
 function TFileHlp.getShownRealm():string;
 var
@@ -10870,45 +10705,6 @@ if mainfrm.useCommentAsRealmChk.checked then
   result:= getDynamicComment(mainfrm.getLP);
 end; // getShownRealm
 
-function TFileHlp.getSystemIcon(): integer;
-var
-  ic: PcachedIcon;
-  i: integer;
-begin
-  result := icon;
-  if result >= 0 then exit;
-  if isFile() then
-    for i:=0 to length(iconMasks)-1 do
-      if fileMatch(iconMasks[i].str, name) then
-        begin
-        result:=iconMasks[i].int;
-        exit;
-        end;
-  ic:=iconsCache.get(resource);
-  if ic = NIL then
-    begin
-    result:=getImageIndexForFile(resource);
-    iconsCache.put(resource, result, mtime);
-    exit;
-    end;
-  if mtime <= ic.time then result:=ic.idx
-  else
-    begin
-    result:=getImageIndexForFile(resource);
-    ic.time:=mtime;
-    ic.idx:=result;
-    end;
-end; // getSystemIcon
-
-function TFileHlp.parentURL():string;
-var
-  i: integer;
-begin
-result:=url(TRUE);
-i:=length(result)-1;
-while (i > 1) and (result[i] <> '/') do dec(i);
-setlength(result,i);
-end; // parentURL
 
 
 

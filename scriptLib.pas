@@ -22,7 +22,7 @@ unit scriptLib;
 interface
 
 uses
-  iniFiles, types, hfsGlobal, classesLib, fileLib, HSLib;
+  iniFiles, types, srvConst, classesLib, fileLib, HSLib;
 
 type
   TmacroData = record
@@ -53,7 +53,8 @@ uses
   comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
   Generics.Collections,
   base64, OverbyteIcsSha1,
-  utilLib, parserLib, main, hfsVars,
+  utilLib, parserLib, main, hfsVars, hfsGlobal,
+  srvUtils,
   RnQtrayLib, RDFileUtil, RDUtils, RnQCrypt;
 
 const
@@ -65,7 +66,7 @@ var
   stopOnMacroRename: boolean; // this ugly global var is used to avoid endless recursion on a renaming rename event. this method won't work on a multithreaded system, but i opted for it because otherwise the changes would have been big.
   cachedTpls: TcachedTpls;
 
-function macrosLog(textIn, textOut:string; ts:boolean=FALSE):boolean;
+function macrosLog(const textIn, textOut:string; ts:boolean=FALSE):boolean;
 var
   s: string;
 begin
@@ -161,11 +162,12 @@ var
   md: ^TmacroData;
   name, p: string;
   unnamedPars: integer; // this is a guessing of the number of unnamed parameters. just guessing because there's no true distinction between a parameter "value" named "key", and parameter "key=value"
+  lp: TLoadPrefs;
 
-  procedure macroError(msg:string);
+  procedure macroError(const msg:string);
   begin result:='<div class=macroerror>macro error: '+name+nonEmptyConcat('<br>',msg)+'</div>' end;
 
-  procedure deprecatedMacro(what:string=''; instead:string='');
+  procedure deprecatedMacro(const what:string=''; instead:string='');
   begin mainfrm.add2log('WARNING, deprecated macro: '+first(what, name)+nonEmptyConcat(' - Use instead: ',instead), NIL, clRed) end;
 
   procedure unsatisfied(b:boolean=TRUE);
@@ -256,7 +258,7 @@ var
       result := trim(result);
   end; // parExNE
 
-  function parExNE(name: string; doTrim: boolean=TRUE):string; overload; // No Exception
+  function parExNE(const name: string; doTrim: boolean=TRUE):string; overload; // No Exception
   begin
     Result := '';
     if name > '' then
@@ -269,7 +271,7 @@ var
       end;
   end;
 
-  function par(idx:integer; name:string=''; doTrim:boolean=TRUE):string; overload;
+  function par(idx:integer; const name:string=''; doTrim:boolean=TRUE):string; overload;
   begin
     if ((idx < 0) or (idx >= pars.count)) and (name = '') then
       Exit('');
@@ -280,7 +282,7 @@ var
     end
   end;
 
-  function par(name:string=''; doTrim:boolean=TRUE; defval:string=''):string; overload;
+  function par(name:string=''; doTrim:boolean=TRUE; const defval:string=''):string; overload;
   begin
     result := defval;
 
@@ -300,7 +302,7 @@ var
   function parI(idx:integer; def:int64):int64; overload;
   begin result:=strToInt64Def(par(idx), def) end;
 
-  function parI(name:string; def:int64):int64; overload;
+  function parI(const name:string; def:int64):int64; overload;
   begin result:=strToInt64Def(par(name), def) end;
 
   function parF(idx:integer):extended; overload;
@@ -309,11 +311,11 @@ var
   function parF(idx:integer; def:extended):extended; overload;
   begin result:=strToFloatDef(par(idx), def) end;
 
-  function parF(name:string; def:extended):extended; overload;
+  function parF(const name:string; def:extended):extended; overload;
   begin result:=strToFloatDef(par(name), def) end;
 
   // note this function works on N parameters
-  function parExist(names: array of string):boolean; OverLoad;
+  function parExist(const names: array of string):boolean; OverLoad;
   var
     i: integer;
   begin
@@ -324,7 +326,7 @@ var
     result := TRUE;
   end; // parExist
 
-  function parExist(name: string): boolean; OverLoad;
+  function parExist(const name: string): boolean; OverLoad;
   begin
     result := pars.ContainsKey(name);
   end; // parExist
@@ -727,14 +729,14 @@ var
         e:=excludeTrailingPathDelimiter(e);
       if e <> fld.resource then
         begin
-        fld := Tfile.createTemp(e, md.f);
+        fld := Tfile.createTemp(mainFrm.filesBox, e, md.f);
         freeIt:=TRUE;
         end
       end;
     end;
 
   if not satisfied(fld) then exit;
-  e:=htmlEncode(encodeMarkers(fld.url(TRUE)));
+  e:=htmlEncode(encodeMarkers(mainFrm.fileSrv.url(fld, TRUE)));
   d:=htmlEncode(encodeMarkers(fld.getFolder()+fld.name+'/'));
   ae:=split('/', e);
   ad:=split('/', d);
@@ -830,7 +832,7 @@ var
     i:=lastDelimiter('/',name);
     if i = 0 then exit;
     result:=FALSE;
-    parentf:=mainfrm.findFilebyURL(chop(i+1, 0, name), NIL, FALSE);
+    parentf := mainfrm.fileSrv.findFilebyURL(chop(i+1, 0, name), LP, NIL, FALSE);
     if parentf = NIL then exit;
     parent:=parentf.node; // ok, this is where we'll add the folder
     result:=TRUE;
@@ -848,7 +850,7 @@ var
     begin
     name:=par(1);
     if not validateAndExtractParent() then exit;
-    f:=Tfile.createVirtualFolder(name);
+    f:=Tfile.createVirtualFolder(mainFrm.filesBox, name);
     end
   else
     begin
@@ -863,7 +865,7 @@ var
       name:=extractFileName(fn);
 
     if not validateAndExtractParent() then exit;
-    f:=Tfile.create(fn);
+    f:=Tfile.create(mainFrm.filesBox, fn);
     f.name:=name;
     end;
 
@@ -873,7 +875,7 @@ var
     exit;
     end;
 
-  old:=mainfrm.findFilebyURL(f.name, nodeToFile(parent), FALSE);
+  old := mainfrm.fileSrv.findFilebyURL(f.name, LP, nodeToFile(parent), FALSE);
   if assigned(old) then
     if not old.isRoot()
     and (not parExist('overwrite') or isTrue(par('overwrite'))) then
@@ -914,12 +916,13 @@ var
 
   begin
   result:='';
-  f:=mainfrm.findFileByURL(p, md.folder);
+    LP := mainFrm.getLP;
+  f := mainfrm.fileSrv.findFileByURL(p, LP, md.folder);
   if f = NIL then exit; // doesn't exist
 
   if parExist('comment') then
    try
-     f.setDynamicComment(mainFrm.getLP, macroDequote(parEx('comment')))
+     f.setDynamicComment(LP, macroDequote(parEx('comment')))
    except end;
   try
     f.name:=parEx('name');
@@ -978,7 +981,7 @@ var
   var
     f: Tfile;
   begin
-  f:=mainfrm.findFileByURL(p);
+  f:=mainfrm.fileSrv.findFileByURL(p, LP);
   spaceIf(assigned(f)); // so you can know if something really has been deleted
   if f = NIL then exit; // doesn't exist
   mainFrm.remove(f);
@@ -1000,7 +1003,7 @@ var
 
   begin
   result:='';
-  f:=mainfrm.findFileByURL(p, md.folder);
+  f:=mainfrm.fileSrv.findFileByURL(p, LP, md.folder);
   if f = NIL then exit; // doesn't exist
 
   try
@@ -1008,7 +1011,7 @@ var
     if w = 'exists' then
       result:='1'
     else if w = 'comment' then
-      result:=f.getDynamicComment(mainfrm.getLP)
+      result:=f.getDynamicComment(LP)
     else if w = 'resource' then
       result:=f.resource
     else if w = 'icon' then
@@ -1614,7 +1617,7 @@ var
         end
        else
         begin
-          f := mainfrm.findFileByURL(s, md.folder);
+          f := mainfrm.fileSrv.findFileByURL(s, LP, md.folder);
           if f = NIL then
             exit;
           local:=TRUE;
@@ -1854,10 +1857,10 @@ var
 
   if assigned(md.folder) then
     if name = '%folder-item-comment%' then
-      result:= md.folder.getDynamicComment(mainfrm.getLP)
+      result:= md.folder.getDynamicComment(LP)
     else if name = '%folder-comment%' then
       begin
-      result:=md.folder.getDynamicComment(mainfrm.getLP);
+      result:=md.folder.getDynamicComment(LP);
       if result > '' then
         result:= xtpl(tpl['folder-comment'], [ '%item-comment%', result ]);
       end
@@ -1866,9 +1869,9 @@ var
     else if name = '%up%' then
       result:=if_(assigned(md.tpl) and not md.folder.isRoot(), md.tpl['up'])
     else if name = '%encoded-folder%' then
-      result:=md.folder.url(TRUE)
+      result:= mainFrm.fileSrv.url(md.folder, TRUE)
     else if name = '%parent-folder%' then
-      result:=md.folder.parentURL()
+      result:= mainFrm.fileSrv.parentURL(md.folder)
     else if name = '%folder-name%' then
       result:= md.folder.name
     else if name = '%folder-resource%' then
@@ -1913,16 +1916,16 @@ var
     else if name = '%item-modified%' then
       result:=if_(md.f.mtime=0, 'error', datetimeToStr(md.f.mtime))
     else if name = '%item-comment%' then
-      result:= md.f.getDynamicComment(mainfrm.getLP, TRUE)
+      result:= md.f.getDynamicComment(LP, TRUE)
     else if name = '%item-url%' then
-      result:=macroQuote(md.f.url())
+      result:=macroQuote(mainFrm.fileSrv.url(md.f))
   ;
 
   if assigned(md.f) and assigned(md.tpl) then
     if name = '%new%' then
       result:=if_(md.f.isNew(), md.tpl['newfile'])
     else if name = '%comment%' then
-      result:=if_(md.f.getDynamicComment(mainfrm.getLP, TRUE) > '', md.tpl['comment'])
+      result:=if_(md.f.getDynamicComment(LP, TRUE) > '', md.tpl['comment'])
   ;
 
   if assigned(md.tpl) then
@@ -2160,7 +2163,7 @@ try
     if name = 'vfs select' then
       begin
         if pars.count = 0 then
-          try result:=selectedFile.url()
+          try result:= mainFrm.fileSrv.url(selectedFile)
           except result:='' end
         else if p = 'next' then
           if selectedFile = NIL then
@@ -2174,7 +2177,7 @@ try
           try
             s:=parEx('path');
             spaceIf(FALSE);
-            mainFrm.filesBox.selected:= mainFrm.findFilebyURL(s, NIL, FALSE).node;
+            mainFrm.filesBox.selected := mainFrm.fileSrv.findFilebyURL(s, LP, NIL, FALSE).node;
             spaceIf(TRUE);
           except end;
       end

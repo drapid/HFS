@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ExtCtrls, CheckLst, types, utilLib, strutils;
+  Dialogs, StdCtrls, ExtCtrls, CheckLst, types, strutils;
 
 type
   TlistSelectFrm = class(TForm)
@@ -21,6 +21,8 @@ type
 function listSelect(title:string; var options:TstringList):boolean;
 
 implementation
+uses
+  srvUtils, utilLib;
 
 {$R *.dfm}
 

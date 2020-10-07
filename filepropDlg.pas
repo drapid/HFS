@@ -6,7 +6,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, ComCtrls, StdCtrls, ExtCtrls, CheckLst, types, Grids,
   ValEdit, strutils, math,
-  utilLib, hslib, fileLib, hfsGlobal;
+  hslib, fileLib, hfsGlobal;
 
 type
   TfilepropFrm = class(TForm)
@@ -78,7 +78,7 @@ var
 implementation
 
 uses
-  optionsDlg, RDUtils, main;
+  optionsDlg, RDUtils, main, srvConst, srvUtils, utilLib;
 
 {$R *.dfm}
 
