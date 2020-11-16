@@ -6,3 +6,4 @@ alias TEXT alias.txt
 IPservices TEXT ipservices.txt
 // jquery TEXT jquery.min.js
 jquery ZTEXT jquery.min.js.gz
+numbers IMAGE numbers.png

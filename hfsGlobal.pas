@@ -7,9 +7,6 @@ uses
 
 const
 {$I RnQBuiltTime.inc}
-  VERSION = '2.4.0 RC8 RD';
-  VERSION_BUILD = '320';
-  VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
   CRLFA = RawByteString(#13#10);
@@ -25,7 +22,6 @@ const
   EVENTSCRIPTS_FILE = 'hfs.events';
   MACROS_LOG_FILE = 'macros-log.html';
   PREVIOUS_VERSION = 'hfs.old.exe';
-  SESSION_COOKIE = 'HFS_SID_';
   PROTECTED_FILES_MASK = 'hfs.*;*.htm*;descript.ion;*.comment;*.md5;*.corrupted;*.lnk';
   G_VAR_PREFIX = '#';
   ETA_FRAME = 5; // time frame for ETA (in seconds)
@@ -41,15 +37,13 @@ const
   DEFAULT_MIME = 'application/octet-stream';
   IP_SERVICES_URL = 'http://hfsservice.rejetto.com/ipservices.php';
   SELF_TEST_URL = 'http://hfstest.rejetto.com/';
-
-  USER_ANONYMOUS = '@anonymous';
-  USER_ANYONE = '@anyone';
-  USER_ANY_ACCOUNT = '@any account';
+  LIBS_DOWNLOAD_URL = 'http://libs.rnq.ru/';
 
   ALWAYS_ON_WEB_SERVER = 'google.com';
   ADDRESS_COLOR = clGreen;
   BG_ERROR = $BBBBFF;
   ENCODED_TABLE_HEADER = 'this is an encoded table'+CRLF;
+  TRAY_ICON_SIZE = 32;
 
   DEFAULT_MIME_TYPES: array [0..25] of string = (
     '*.htm;*.html', 'text/html',
@@ -67,19 +61,6 @@ const
     '*.webp', 'image/webp'
   );
 
-  ICONMENU_NEW = 1;
-
-  ICON_UNIT = 31;
-  ICON_ROOT = 1;
-  ICON_LINK = 4;
-  ICON_FILE = 37;
-  ICON_FOLDER = 6;
-  ICON_REAL_FOLDER = 19;
-  ICON_LOCK = 12;
-  ICON_EASY = 29;
-  ICON_EXPERT = 35;
-
-  USER_ICON_MASKS_OFS = 10000;
   // messages
 resourcestring
   S_PORT_LABEL = 'Port: %s';
@@ -143,9 +124,8 @@ type
     size: int64;
     end;
 
-var
-  runningOnRemovable: boolean;
-  exePath: string;
+type
+  TTrayShows = (TS_downloads, TS_connections, TS_uploads, TS_hits, TS_ips, TS_ips_ever, TS_none);
 
 implementation
 

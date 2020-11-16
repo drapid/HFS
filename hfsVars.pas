@@ -3,15 +3,15 @@ unit hfsVars;
 
 interface
 uses
-  Graphics, Classes, Controls, Types, iniFiles, hsLib, classesLib;
+  Graphics, Classes, Controls, Types, iniFiles, hsLib, srvClassesLib, hfsGlobal;
 
 // global variables
 var
-  srv: ThttpSrv;
-  globalLimiter: TspeedLimiter;
-  ip2obj: THashedStringList;
-  sessions: Tsessions;
-  etags: THashedStringList;
+//  srv: ThttpSrv;
+//  globalLimiter: TspeedLimiter;
+//  ip2obj: THashedStringList;
+//  sessions: Tsessions;
+//  etags: THashedStringList;
   cfgLoaded: boolean;
   addToFolder: string; // default folder where to add items from the command line
   lastDialogFolder: string;  // stores last for open dialog, to make it persistent
@@ -22,11 +22,9 @@ var
   usingFreePort: boolean=TRUE; // the actual server port set was 0
   upTime: Tdatetime;           // the server is up since...
   trayed: boolean;             // true if the window has been minimized to tray
-  trayShows: string;           // describes the content of the tray icon
   flashOn: string;             // describes when to flash the taskbar
   addFolderDefault: string;    // how to default adding a folder (real/virtual)
   toDelete: Tlist;             // connections pending for deletion
-  systemimages: Timagelist;    // system icons
   speedLimitIP: real;
   maxConnections: integer;     // max number of connections (total)
   maxConnectionsIP: integer;   // ...from a single address
@@ -41,7 +39,6 @@ var
   altPressedForMenu: boolean;  // used to enable the menu on ALT key
   noDownloadTimeout: integer;  // autoclose the application after (minutes)
   connectionsInactivityTimeout: integer; // autokick connection after (seconds)
-  startingImagesCount: integer;
   lastUpdateCheck, lastFilelistTpl: Tdatetime;
   lastUpdateCheckFN: string;   // eventual temp file for saving lastUpdateCheck
   lastActivityTime: Tdatetime;  // used for the "no download timeout"
@@ -51,13 +48,10 @@ var
   port: string;
 //  tpl_help: string;
   lastWindowRect: Trect;
-  defaultTpl, dmBrowserTpl, filelistTpl: Ttpl;
   tplEditor: string;
   tplLast: Tdatetime;
   tplImport: boolean;
   eventScriptsLast, runScriptLast: Tdatetime;
-  autoupdatedFiles: TstringToIntHash;   // download counter for temp Tfile.s
-  iconsCache: TiconsCache;
   usersInVFS: TusersInVFS;    // keeps track of user/pwd in the VFS
   graphInEasyMode: boolean;
   cfgPath, tmpPath: string;
@@ -72,17 +66,13 @@ var
   selfTesting: boolean;
   tplIsCustomized: boolean;
   fakingMinimize: boolean; // user clicked the [X] but we simulate the [_]
-  sysidx2index: array of record sysidx, idx:integer; end; // maps system imagelist icons to internal imagelist
   loginRealm: string;
   serializedConnColumns: string;
   VFScounterMod: boolean; // if any counter has changed
-  imagescache: array of RawByteString;
   logFontName: string;
   logFontSize: integer;
-  forwardedMask: string;
   applicationFullyInitialized: boolean;
   lockTimerevent: boolean;
-  filesStayFlaggedForMinutes: integer;
   logRightClick: Tpoint;
   warnManyItems: boolean = TRUE;
   startupFilename: string;
@@ -122,9 +112,34 @@ var
     samplesIn, samplesOut: array [0..3000] of integer; // 1 sample, 1 pixel
     beforeRecalcMax: integer;  // countdown
     end;
-  defaultIP: string;    // the IP address to use forming URLs
   cachedIPs: String; // To optimize
 
+const
+  trayShowCode: array[TTrayShows] of string = ('downloads', 'connections', 'uploads', 'hits', 'ips', 'ips-ever', '');
+var
+ //  trayShows: string;           // describes the content of the tray icon
+  trayShows: TTrayShows;          // describes the content of the tray icon
+
+  function strToTrayShow(const s: String): TTrayShows;
+
 implementation
+
+function strToTrayShow(const s: String): TTrayShows;
+begin
+  if s = 'connections' then
+    Exit(TS_connections)
+   else if s = 'downloads' then
+    Exit(TS_downloads)
+   else if s = 'uploads' then
+    Exit(TS_uploads)
+   else if s = 'hits' then
+    Exit(TS_hits)
+   else if s = 'ips' then
+    Exit(TS_ips)
+   else if s = 'ips-ever' then
+    Exit(TS_ips_ever);
+  Result := TS_none;
+end;
+
 
 end.

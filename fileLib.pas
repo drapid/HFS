@@ -6,7 +6,7 @@ interface
 uses
   // delphi libs
   Windows, Messages, Graphics, Forms, ComCtrls, math, Types, SysUtils,
-  HSLib, classesLib;
+  HSLib, srvClassesLib;
 
 type
 
@@ -103,7 +103,7 @@ type
     function  getRecursiveFileMask():string;
     function  shouldCountAsDownload():boolean;
     function  getDefaultFile():Tfile;
-    procedure recursiveApply(callback: TfileCallback; par: NativeInt=0; par2: NativeInt=0);
+    procedure recursiveApply(callback: TfileCallback; par: IntPtr=0; par2: IntPtr=0);
     procedure getFiltersRecursively(var files,folders:string);
     function  diskfree():int64;
     function  same(f:Tfile):boolean;
@@ -159,12 +159,13 @@ implementation
 uses
   strutils, iniFiles, Classes,
   RegExpr,
-  serverLib, srvConst, srvUtils,
-  utilLib,
-  RDUtils, RDFileUtil,
-  hfsGlobal, scriptLib, hfsVars;
+  serverLib, srvConst, srvUtils, srvVars, IconsLib,
+  RDUtils, RDFileUtil, RDSysUtils,
+  parserLib
+//  hfsGlobal, scriptLib
+  ;
 
-function loadDescriptionFile(const lp: TLoadPrefs; const fn:string):string;
+function loadDescriptionFile(const lp: TLoadPrefs; const fn: string): string;
 var
   sa: RawByteString;
 begin
@@ -293,7 +294,7 @@ end; // createLink
 
 procedure Tfile.setResource(res:string);
 
-  function sameDrive(f1,f2:string):boolean;
+  function sameDrive(const f1,f2: string): boolean;
   begin
   result:=(length(f1) >= 2) and (length(f2) >= 2) and (f1[2] = ':')
     and (f2[2] = ':') and (upcase(f1[1]) = upcase(f2[1]));
@@ -644,6 +645,8 @@ procedure Tfile.setupImage(sysIcons: Boolean; pNode: TTreeNode);
 begin
   if pNode = NIL then
     pNode := node;
+  if pNode = NIL then
+    Exit;
   if icon >= 0 then
     pNode.Imageindex := icon
    else
@@ -668,7 +671,7 @@ begin
   ic:=iconsCache.get(resource);
   if ic = NIL then
     begin
-    result:=getImageIndexForFile(resource);
+    result := getImageIndexForFile(resource);
     iconsCache.put(resource, result, mtime);
     exit;
     end;
@@ -796,7 +799,10 @@ while assigned(f) do
     begin
     // maybe it refers to a file
     fn:=trim(s);
-    if fileExists(fn) then doNothing()
+    if fileExists(fn) then
+      begin
+//        doNothing()
+      end
     else if fileExists(exePath+fn) then fn:=exePath+fn
     else if fileExists(f.resource+'\'+fn) then fn:=f.resource+'\'+fn;
     if fileExists(fn) then
@@ -895,7 +901,7 @@ f:=self;
   end;
 end; // isLocked
 
-procedure Tfile.recursiveApply(callback:TfileCallback; par:NativeInt=0; par2:NativeInt=0);
+procedure Tfile.recursiveApply(callback:TfileCallback; par: IntPtr=0; par2: IntPtr=0);
 var
   f, fNext: TFile;
   r: TfileCallbackReturn;

@@ -1,4 +1,5 @@
 unit parserLib;
+{$I NoRTTI.inc}
 
 interface
 
@@ -66,9 +67,12 @@ function anyMacroMarkerIn(const s:string):boolean;
 function findMacroMarker(const s:string; ofs:integer=1):integer;
 procedure applyMacrosAndSymbols(var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
 
+function macroQuote(s:string):string;
+function macroDequote(s:string):string;
+
 implementation
 uses
-  srvUtils;
+  srvUtils, HSLib;
 
 const
   MAX_RECUR_LEVEL = 50;
@@ -422,5 +426,33 @@ begin result:=reMatch(s, '\{[.:]|[.:]\}|\|', 'm!', ofs) end;
 
 function anyMacroMarkerIn(const s:string):boolean;
 begin result:=findMacroMarker(s) > 0 end;
+
+function isMacroQuoted(const s:string):boolean;
+begin result:=ansiStartsStr(MARKER_QUOTE, s) and ansiEndsStr(MARKER_UNQUOTE, s) end;
+
+function macroQuote(s:string):string;
+var
+  t: string;
+begin
+enforceNUL(s);
+if not anyMacroMarkerIn(s) then
+  begin
+  result:=s;
+  exit;
+  end;
+// an UNQUOTE would invalidate our quoting, so let's encode any of it
+t:=MARKER_UNQUOTE;
+replace(t, '&#'+intToStr(charToUnicode(t[1]))+';', 1,1);
+result:=MARKER_QUOTE+xtpl(s, [MARKER_UNQUOTE, t])+MARKER_UNQUOTE
+end; // macroQuote
+
+function macroDequote(s:string):string;
+begin
+result:=s;
+s:=trim(s);
+if isMacroQuoted(s) then
+  result:=copy(s, length(MARKER_QUOTE)+1, length(s)-length(MARKER_QUOTE)-length(MARKER_UNQUOTE) );
+end; // macroDequote
+
 
 end.

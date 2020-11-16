@@ -27,15 +27,16 @@ interface
 uses
   // delphi libs
   Windows, Messages, SysUtils, Forms, Menus, Graphics, Controls, ComCtrls, Dialogs, math,
-  Buttons, ImgList, StdCtrls, ExtCtrls, ToolWin, ImageList, strutils, AppEvnts, types,
-  iniFiles, Classes, System.Contnrs,
+  Buttons, StdCtrls, ExtCtrls, ToolWin, ImageList, strutils, AppEvnts, types,
+  iniFiles, Classes, System.Contnrs, Winapi.CommCtrl,
   // 3rd part libs. ensure you have all of these, the same version reported in dev-notes.txt
   OverbyteIcsWSocket, OverbyteIcsHttpProt,
    //RegularExpressions,
   regexpr,
   rnqTraylib,
   // rejetto libs
-  fileLib, srvConst, hfsGlobal, serverLib,
+  hfsGlobal, fileLib, srvConst, serverLib, srvClassesLib,
+  IconsLib,
   HSlib, monoLib, progFrmLib, classesLib;
 
 
@@ -99,7 +100,6 @@ type
   TmainFrm = class(TForm)
     filemenu: TPopupMenu;
     newfolder1: TMenuItem;
-    images: TImageList;
     Remove1: TMenuItem;
     topToolbar: TToolBar;
     startBtn: TToolButton;
@@ -161,7 +161,6 @@ type
     usesystemiconsChk: TMenuItem;
     N13: TMenuItem;
     Officialwebsite1: TMenuItem;
-    numbers: TImageList;
     showmaintrayiconChk: TMenuItem;
     Speedlimit1: TMenuItem;
     N10: TMenuItem;
@@ -641,6 +640,8 @@ type
     procedure updateBtnClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure AnyAddressV6Click(Sender: TObject);
+    procedure FormAfterMonitorDpiChanged(Sender: TObject; OldDPI,
+      NewDPI: Integer);
   private
     function searchLog(dir:integer):boolean;
     function  getGraphPic(cd:TconnData=NIL): RawByteString;
@@ -670,7 +671,8 @@ type
     procedure copyURLwithPasswordMenuClick(sender:Tobject);
     procedure updateTrayTip();
     procedure updateCopyBtn();
-    procedure setTrayShows(s:string);
+//    procedure setTrayShows(s:string);
+    procedure setTrayShows(s: TTrayShows);
     procedure addTray();
     procedure refreshConn(conn:TconnData);
     function  getVFS(node:Ttreenode=NIL): RawByteString;
@@ -742,7 +744,6 @@ var
   banlist: array of record ip,comment:string; end;
   trayMsg: string; // template for the tray hint
   customIPservice: string;
-  accounts: Taccounts;
   tplFilename: string; // when empty, we are using the default tpl
   trayNL: string = #13;
   mimeTypes, address2name, IPservices: TstringDynArray;
@@ -774,8 +775,6 @@ procedure repaintTray();
 function paramsAsArray():TStringDynArray;
 procedure processParams_before(var params:TStringDynArray; allowed:string='');
 function loadCfg(var ini,tpl:string):boolean;
-function idx_img2ico(i:integer):integer;
-function idx_ico2img(i:integer):integer;
 function idx_label(i:integer):string;
 function conn2data(i:integer):TconnData; inline; overload;
 function uptimestr():string;
@@ -801,11 +800,12 @@ uses
   AnsiStrings, MMsystem, UITypes, system.Generics.Collections,
   clipbrd, dateutils, shlobj, shellapi, winsock,
   OverbyteIcsZLibHigh, OverbyteIcsUtils,
-  RDFileUtil, RDUtils,
+  RDFileUtil, RDUtils, RDSysUtils,
   RnQzip, RnQCrypt, RnQNet.Uploads, RnQLangs,
   langLib,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg,
-  parserLib, srvUtils,
+  parserLib, srvUtils, srvVars,
+  hfs.tray,
   purgeDlg, filepropDlg, runscriptDlg, scriptLib, hfsVars;
 
 // global variables
@@ -942,79 +942,37 @@ while i < srv.conns.count do
 result:=length(ips);
 end; // countIPs
 
-function idx_img2ico(i:integer):integer;
-begin
-if (i < startingImagesCount) or (i >= USER_ICON_MASKS_OFS) then result:=i
-else result:=i-startingImagesCount+USER_ICON_MASKS_OFS
-end;
-
-function idx_ico2img(i:integer):integer;
-begin
-if i < USER_ICON_MASKS_OFS then result:=i
-else result:=i-USER_ICON_MASKS_OFS+startingImagesCount
-end;
-
 function idx_label(i:integer):string;
 begin result:=intToStr(idx_img2ico(i)) end;
 
-function getBaseTrayIcon(perc:real=0):Tbitmap;
-var
-  x: integer;
-  h, h2: Integer;
-begin
-  Result := Tbitmap.create();
-  Result.PixelFormat := pf32bit;
-  Result.SetSize(mainfrm.images.Width, mainfrm.images.Height);
-mainfrm.images.GetBitmap( if_(assigned(srv) and srv.active,24,30), result);
-if perc > 0 then
-  begin
-    h := Result.Height;
-  x:=round((h-2)*perc);
-    h2 := h div 2 + 1;
-  result.canvas.Brush.color:=clYellow;
-  result.Canvas.FillRect(rect(1, h2, x+1, h-1));
-  result.canvas.Brush.color:=clGreen;
-  result.Canvas.FillRect(rect(x+1,h2,h-1, h-1));
-  end;
-end; // getBaseTrayIcon
-
-procedure drawTrayIconString(cnv:Tcanvas; s:string);
-var
-  x, idx: integer;
-begin
-x:=10;
-  if length(s) > 0 then
-for var i:=length(s) downto 1 do
-	begin
-  if s[i] = '%' then idx:=10
-  else idx:=ord(s[i])-ord('0');
-  mainfrm.numbers.draw(cnv, x, 8, idx);
-  dec(x,mainfrm.numbers.Width);
-  end;
-end; // drawTrayIconString
 
 procedure repaintTray();
 var
   bmp: Tbitmap;
-  s: string;
+  n: Integer;
 begin
-if quitting or (mainfrm = NIL) then exit;
-bmp:=getBaseTrayIcon();
-s:=trayShows;
-  if s = 'connections' then s:=intTostr(srv.conns.count)
-   else if s = 'downloads' then s:=intToStr(downloadsLogged)
-   else if s = 'uploads' then s:=intToStr(uploadsLogged)
-   else if s = 'hits' then s:=intToStr(hitsLogged)
-   else if s = 'ips' then s:=intToStr(countIPs())
-   else if s = 'ips-ever' then s:=intToStr(ipsEverConnected.count);
+  if quitting or (mainfrm = NIL) then
+    exit;
+  bmp := getBaseTrayIcon(0, TRAY_ICON_SIZE);
 
-drawTrayIconString(bmp.canvas, s);
-//tray_ico.Handle := bmpToHico(bmp);
-tray_ico.Handle := bmp2ico32(bmp);
-//tray_ico.Handle := bmp2ico4M(bmp);
-//tray_ico.Transparent := FALSE;
-bmp.free;
-tray.setIcon(tray_ico);
+  case trayShows of
+   TS_connections: n := srv.conns.count;
+   TS_downloads: n := downloadsLogged;
+   TS_uploads: n := uploadsLogged;
+   TS_hits: n := hitsLogged;
+   TS_ips: n := countIPs();
+   TS_ips_ever: n := ipsEverConnected.count;
+   else
+    n := 0;
+  end;
+  if trayShows <> TTrayShows.TS_none then
+    drawTrayIconNumber(bmp.canvas, n, TRAY_ICON_SIZE);
+  //tray_ico.Handle := bmpToHico(bmp);
+  tray_ico.Handle := bmp2ico32(bmp);
+  //tray_ico.Handle := bmp2ico4M(bmp);
+  //tray_ico.Transparent := FALSE;
+  bmp.free;
+  tray.setIcon(tray_ico);
 end; // repaintTray
 
 procedure resetTotals();
@@ -1731,10 +1689,10 @@ if idx < 0 then
     try idx:=strToInt(s) except exit end;
   end;
 
-if (special = no) and ((idx < 0) or (idx >= images.count)) then exit;
+if (special = no) and ((idx < 0) or (idx >= IconsDM.images.count)) then exit;
 
 case special of
-  no: cd.conn.reply.body := pic2str(idx);
+  no: cd.conn.reply.body := pic2str(idx, 16);
   graph: cd.conn.reply.body := getGraphPic(cd);
   end;
 
@@ -1808,8 +1766,8 @@ procedure setupDownloadIcon(data:TconnData);
   begin
   perc:=safeDiv(0.0+data.conn.bytesSentLastItem, data.conn.bytesPartial);
   s:=intToStr( trunc(perc*100) )+'%';
-  bmp:=getBaseTrayIcon(perc);
-  drawTrayIconString(bmp.canvas, s);
+  bmp:=getBaseTrayIcon(perc, TRAY_ICON_SIZE);
+  drawTrayIconNumber(bmp.canvas, s, TRAY_ICON_SIZE);
 //  data.tray_ico.Handle:=bmpToHico(bmp);
   data.tray_ico.Handle := bmp2ico32(bmp);
   bmp.free;
@@ -3144,7 +3102,7 @@ var
 
   conn.addHeader('Accept-Ranges', 'bytes');
   if sendHFSidentifierChk.checked then
-    conn.addHeader('Server', 'HFS '+ hfsGlobal.VERSION);
+    conn.addHeader('Server', 'HFS '+ srvConst.VERSION);
 
   case data.preReply of
     PR_OVERLOAD:
@@ -4440,7 +4398,7 @@ var
     begin
     j:=idx_img2ico(iconMasks[i].int);
     if j >= USER_ICON_MASKS_OFS then
-      userIconMasks:=userIconMasks+format('%d:%s|', [j, encodeA(pic2str(j), E_ZIP)]);
+      userIconMasks:=userIconMasks+format('%d:%s|', [j, encodeA(pic2str(j, 16), E_ZIP)]);
     result:=result+format('%s|%d||', [iconMasks[i].str, j]);
     end;
   end; // iconMasksToStr
@@ -4455,7 +4413,7 @@ var
 begin
 userIconMasks:='';
 iconMasksStr:=iconMasksToStr();
-result:='HFS '+ hfsGlobal.VERSION+' - Build #'+VERSION_BUILD+CRLF
+result:='HFS '+ srvConst.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'active='+yesno[srv.active]+CRLF
 +'only-1-instance='+yesno[only1instanceChk.checked]+CRLF
 +'window='+rectToStr(lastWindowRect)+CRLF
@@ -4551,7 +4509,7 @@ result:='HFS '+ hfsGlobal.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'last-update-check='+floatToStr(lastUpdateCheck)+CRLF
 +'allowed-referer='+allowedReferer+CRLF
 +'forwarded-mask='+forwardedMask+CRLF
-+'tray-shows='+trayShows+CRLF
++'tray-shows='+ trayShowCode[trayShows]+CRLF
 +'tray-message='+escapeNL(trayMsg)+CRLF
 +'speed-limit='+floatToStr(speedLimit)+CRLF
 +'speed-limit-ip='+floatToStr(speedLimitIP)+CRLF
@@ -4778,11 +4736,11 @@ var
   var
     i, iFrom, iTo: integer;
   begin
-  userIconOfs := images.Count;
+  userIconOfs := IconsDM.images.Count;
     while l > '' do
     begin
     iFrom:=strTointDef(chop(':', l), -1);
-    iTo:=str2pic(unzipA(chop('|', l)));
+    iTo:=str2pic(unzipA(chop('|', l)), 16);
     for i:=0 to length(iconMasks)-1 do
       if iconMasks[i].int = iFrom then
         iconMasks[i].int:=iTo;
@@ -4981,7 +4939,7 @@ while cfg > '' do
     if h = 'stop-spiders' then stopSpidersChk.checked:=yes;
     if h = 'find-external-on-startup' then findExtOnStartupChk.checked:=yes;
     if h = 'dont-include-port-in-url' then noPortInUrlChk.checked:=yes;
-    if h = 'tray-shows' then trayshows:=l;
+    if h = 'tray-shows' then trayshows:=strToTrayShow(l);
     if h = 'auto-save-vfs-every' then setAutosave(autosaveVFS, int);
     if h = 'external-ip-server' then customIPservice:=l;
     if h = 'only-1-instance' then only1instanceChk.checked:=yes;
@@ -5388,7 +5346,7 @@ const
   +#13#13'HFS comes with ABSOLUTELY NO WARRANTY under the license GNU GPL 3.0. For details click Menu -> Web links -> License'
   +#13'This is FREE software, and you are welcome to redistribute it under certain conditions.'
   +#13#13'Build #%s';
-begin msgDlg(format(copyright, [hfsGlobal.VERSION,VERSION_BUILD + ' ' + DateTimeToStr(BuiltTime)])) end;
+begin msgDlg(format(copyright, [srvConst.VERSION,VERSION_BUILD + ' ' + DateTimeToStr(BuiltTime)])) end;
 
 procedure Tmainfrm.purgeConnections();
 var
@@ -5469,7 +5427,7 @@ while s > '' do
   while (s > '') and (s[1] <> '@') do
     msg:=msg+chopLine(s)+#13;
   // before 2.0 beta14 a bare semicolon-separated string comparison was used
-  if filematch(l, hfsGlobal.VERSION) or filematch(l, '#'+VERSION_BUILD) then
+  if filematch(l, srvConst.VERSION) or filematch(l, '#'+VERSION_BUILD) then
     msgDlg(msg, MB_ICONWARNING);
   end;
 end; // parseVersionNotice
@@ -5643,7 +5601,7 @@ try
   and (not VERSION_STABLE or testerUpdatesChk.checked) then
     thereSnew('untested');
   // same version? we show build number
-  if ver = hfsGlobal.VERSION then
+  if ver = srvConst.VERSION then
     ver:=format(MSG_CHK_UPD_VER_EXT, [build, VERSION_BUILD]);
   if logOtherEventsChk.checked then
     add2log(MSG_CHK_UPD_HEAD+ifThen(updateURL = '', MSG_CHK_UPD_NONE, format(MSG_CHK_UPD_VER,[ver])));
@@ -7071,7 +7029,9 @@ case ev of
     begin
     setForegroundWindow(handle); // application.bringToFront() will act up when the window is minimized: the popped up menu will stay up forever
     with mouse.cursorPos do
+     begin
       menu.popup(x,y);
+     end;
     end;
   TE_CLICK:
     application.bringToFront();
@@ -7125,7 +7085,7 @@ if quitting or (fileSrv.rootFile = NIL) then
   end;
   a := ['%ip%', defaultIP,
   '%port%', srv.port,
-  '%version%', hfsGlobal.VERSION,
+  '%version%', srvConst.VERSION,
   '%build%', VERSION_BUILD];
   pat := first(tpl, trayMsg);
   Result := xtpl(pat, a);
@@ -7194,22 +7154,23 @@ finally progFrm.hide() end;
 end;
 
 procedure TmainFrm.Numberofcurrentconnections1Click(Sender: TObject);
-begin setTrayShows('connections') end;
+begin setTrayShows(TS_connections) end;
 
 procedure TmainFrm.NumberofdifferentIPaddresses1Click(Sender: TObject);
-begin setTrayShows('ips') end;
+begin setTrayShows(TS_ips) end;
 
 procedure TmainFrm.NumberofdifferentIPaddresseseverconnected1Click(
   Sender: TObject);
-begin setTrayShows('ips-ever') end;
+begin setTrayShows(TS_ips_ever) end;
 
 procedure TmainFrm.Numberofloggeddownloads1Click(Sender: TObject);
-begin setTrayShows('downloads') end;
+begin setTrayShows(TS_downloads) end;
 
 procedure TmainFrm.Numberofloggedhits1Click(Sender: TObject);
-begin setTrayShows('hits') end;
+begin setTrayShows(TS_hits) end;
 
-procedure Tmainfrm.setTrayShows(s:string);
+//procedure Tmainfrm.setTrayShows(s:string);
+procedure Tmainfrm.setTrayShows(s: TTrayShows);
 begin
 trayShows:=s;
 repainttray();
@@ -7253,6 +7214,9 @@ begin
 if trayed then showWindow(application.handle, SW_HIDE);
 updateTrayTip();
 connBox.DoubleBuffered:=true;
+
+  logBox.Font.PixelsPerInch := Self.CurrentPPI;
+  IconsDM.images.SetSize(MulDiv(16, Self.CurrentPPI, 96), MulDiv(16, Self.CurrentPPI, 96));
 end;
 
 procedure TmainFrm.filesBoxDragOver(Sender, Source: TObject; X, Y: Integer;
@@ -7426,7 +7390,7 @@ result:=TLV(FK_NODE, commonFields
 {$IFDEF HFS_GIF_IMAGES}
   +TLV_NOT_EMPTY(FK_ICON_GIF, pic2str(f.icon))
 {$ELSE ~HFS_GIF_IMAGES}
-  +TLV_NOT_EMPTY(FK_ICON_PNG, pic2str(f.icon))
+  +TLV_NOT_EMPTY(FK_ICON_PNG, pic2str(f.icon, 16))
 {$ENDIF HFS_GIF_IMAGES}
   +s
   +result // subnodes
@@ -7580,7 +7544,7 @@ while not tlv.isOver() do
 {$IFDEF HFS_GIF_IMAGES}
     FK_ICON_GIF: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2));
 {$ELSE ~HFS_GIF_IMAGES}
-    FK_ICON_PNG: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2));
+    FK_ICON_PNG: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2, 16));
 {$ENDIF HFS_GIF_IMAGES}
     FK_AUTOUPDATED_FILES: parseAutoupdatedFiles(UnUTF(data2));
     FK_HFS_BUILD: loadingVFS.build:= UnUTF(data2);
@@ -7625,7 +7589,7 @@ if length(vfsdata) > COMPRESSION_THRESHOLD then
     ZcompressStr(vfsdata, clFastest, zsGZip) );
 result:= TLV(FK_HEAD, VFS_FILE_IDENTIFIER)
   +TLV(FK_FORMAT_VER, str_(CURRENT_VFS_FORMAT))
-  +TLV(FK_HFS_VER, hfsGlobal.VERSION)
+  +TLV(FK_HFS_VER, srvConst.VERSION)
   +TLV(FK_HFS_BUILD, VERSION_BUILD)
   +TLV(FK_CRC, str_(getCRC(vfsdata)));  // CRC must always be right before data
 result:=result+vfsdata
@@ -7832,19 +7796,6 @@ begin
 if showmaintrayiconChk.Checked then addTray()
 else tray.hide();
 end;
-
-function Shell_GetImageLists(var hl,hs:Thandle):boolean; stdcall; external 'shell32.dll' index 71;
-
-function getSystemimages():TImageList;
-var
-  hl, hs: Thandle;
-begin
-result:=NIL;
-if not Shell_GetImageLists(hl,hs) then exit;
-result:=Timagelist.Create(NIL);
-result.ShareImages:=TRUE;
-result.handle:=hs;
-end; // loadSystemimages
 
 procedure TmainFrm.expandBtnClick(Sender: TObject);
 begin setLogToolbar(TRUE) end;
@@ -8631,6 +8582,13 @@ begin
     TFile(Node.Data).SyncNode(Node);
 end;
 
+procedure TmainFrm.FormAfterMonitorDpiChanged(Sender: TObject; OldDPI,
+  NewDPI: Integer);
+begin
+  logBox.Font.PixelsPerInch := NewDPI;
+  IconsDM.images.SetSize(MulDiv(16, NewDPI, 96), MulDiv(16, NewDPI, 96));
+end;
+
 procedure TmainFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
 quitting:=TRUE;
@@ -9013,7 +8971,7 @@ else
 end; // processParams_after
 
 procedure TmainFrm.Numberofloggeduploads1Click(Sender: TObject);
-begin setTrayShows('uploads') end;
+begin setTrayShows(TS_uploads) end;
 
 procedure Tmainfrm.compressReply(cd:TconnData);
 const
@@ -9780,12 +9738,12 @@ showSetting(mainFrm.Minimumdiskspace1, minDiskSpace, 'MB');
 showSetting(mainFrm.Flagfilesaddedrecently1, filesStayFlaggedForMinutes, 'minutes');
 Restore1.visible:=trayed;
 Restoredefault1.Enabled:=tplIsCustomized;
-Numberofcurrentconnections1.Checked:= trayShows='connections';
-Numberofloggedhits1.checked:= trayShows='hits';
-Numberofloggeddownloads1.checked:= trayShows='downloads';
-Numberofloggeduploads1.Checked:= trayShows='uploads';
-NumberofdifferentIPaddresses1.Checked:= trayShows='ips';
-NumberofdifferentIPaddresseseverconnected1.Checked:= trayShows='ips-ever';
+Numberofcurrentconnections1.Checked:= trayShows = TS_connections;
+Numberofloggedhits1.checked:= trayShows= TS_hits;
+Numberofloggeddownloads1.checked:= trayShows= TS_downloads;
+Numberofloggeduploads1.Checked:= trayShows= TS_uploads;
+NumberofdifferentIPaddresses1.Checked:= trayShows= TS_ips;
+NumberofdifferentIPaddresseseverconnected1.Checked:= trayShows= TS_ips_ever;
 ondownloadChk.checked:= flashOn='download';
 onconnectionChk.checked:= flashOn='connection';
 never1.checked:= flashOn='';
@@ -9987,7 +9945,7 @@ if winVersion < WV_2000 then trayNL:='  ';
 
 trayMsg:=MSG_TRAY_DEF;
 
-startingImagesCount:=mainfrm.images.count;
+startingImagesCount:= IconsDM.images.count;
 srv:=ThttpSrv.create();
 srv.autoFreeDisconnectedClients:=FALSE;
 srv.limiters.add(globalLimiter);
@@ -9996,8 +9954,8 @@ tray_ico:=Ticon.create();
 tray:=TmyTrayicon.create(self.Handle);
 DragAcceptFiles(handle, true);
 caption:=format('HFS ~ HTTP File Server %s%sBuild %s',
-  [hfsGlobal.VERSION, stringOfChar(' ',80), VERSION_BUILD]);
-application.Title:=format('HFS %s (%s)', [hfsGlobal.VERSION, VERSION_BUILD]);
+  [srvConst.VERSION, stringOfChar(' ',80), VERSION_BUILD]);
+application.Title:=format('HFS %s (%s)', [srvConst.VERSION, VERSION_BUILD]);
 setSpeedLimit(-1);
 setSpeedLimitIP(-1);
 setGraphRate(10);
@@ -10183,9 +10141,12 @@ begin
 result:=[];
 if f.locked or f.isRoot() then exit;
 result:=[FCB_RECALL_AFTER_CHILDREN];
-if f.isFile() and purgeFrm.rmFilesChk.checked and not fileExists(f.resource)
-or f.isRealFolder() and purgeFrm.rmRealFoldersChk.checked and not sysutils.directoryExists(f.resource)
-or f.isVirtualFolder() and purgeFrm.rmEmptyFoldersChk.checked and (f.node.count = 0)
+//if f.isFile() and purgeFrm.rmFilesChk.checked and not fileExists(f.resource)
+//or f.isRealFolder() and purgeFrm.rmRealFoldersChk.checked and not sysutils.directoryExists(f.resource)
+//or f.isVirtualFolder() and purgeFrm.rmEmptyFoldersChk.checked and (f.node.count = 0)
+if f.isFile() and (par and 1 <> 0) and not fileExists(f.resource)
+or f.isRealFolder() and (par and 2 <> 0) and not sysutils.directoryExists(f.resource)
+or f.isVirtualFolder() and (par and 4 <> 0) and (f.node.count = 0)
 then result:=[FCB_DELETE]; // don't dig further
 end; // purgeFilesCB
 
@@ -10204,14 +10165,29 @@ end;
 procedure TmainFrm.Purge1Click(Sender: TObject);
 var
   f: Tfile;
+  param: IntPtr; // 3 bits used as parameters
+  purgeFrm: TpurgeFrm;
 begin
+  purgeFrm := NIL;
 f:=selectedFile;
 if f = NIL then
   f:= fileSrv.rootFile;
 if purgeFrm = NIL then
   application.CreateForm(TpurgeFrm, purgeFrm);
-if purgeFrm.showModal() <> mrOk then exit;
-f.recursiveApply(purgeFilesCB);
+  try
+    if purgeFrm.showModal() <> mrOk then exit;
+      param := 0;
+      if purgeFrm.rmFilesChk.checked then
+        param := param + 1;
+      if purgeFrm.rmRealFoldersChk.checked then
+        param := param + 2;
+      if purgeFrm.rmEmptyFoldersChk.checked then
+        param := param + 4;
+  finally
+    purgeFrm.Free;
+    purgeFrm := NIL;
+  end;
+  f.recursiveApply(purgeFilesCB, param);
 end;
 
 procedure TmainFrm.UninstallHFS1Click(Sender: TObject);
@@ -10379,7 +10355,7 @@ begin
 default:=TStringList.create();
 default.text:=defaultCfg;
 current:=getCfg();
-diff:='# '+hfsGlobal.VERSION+' (build '+VERSION_BUILD+')'+CRLF;
+diff:='# '+srvConst.VERSION+' (build '+VERSION_BUILD+')'+CRLF;
 
 while current > '' do
   begin
@@ -10454,10 +10430,10 @@ var
   i, n: integer;
 begin
 if not selectFiles('', files) then exit;
-n:=images.Count;
+n:= IconsDM.images.Count;
 for i:=0 to length(files)-1 do
   getImageIndexForFile(files[i]);
-n:=images.Count-n;
+n:= IconsDM.images.Count-n;
 msgDlg(format(MSG_ICONS_ADDED,[n]));
 end;
 
@@ -10593,7 +10569,7 @@ with sender as Tmenuitem do
   if isLine() then
     w:=cnv.textwidth(hint+'----')
   else
-    w:=cnv.textWidth(caption+'----')+images.Width;
+    w:=cnv.textWidth(caption+'----')+ IconsDM.images.Width;
 h:=getSystemMetrics(SM_CYMENU);
 end;
 
@@ -10602,7 +10578,9 @@ var
   mi: Tmenuitem;
   s: string;
   i: integer;
+  iw: Integer;
 begin
+  iw := IconsDM.images.width;
 mi:=sender as Tmenuitem;
 if mi.IsLine() then
   begin
@@ -10627,18 +10605,18 @@ if mi.IsLine() then
   exit;
   end;
 cnv.fillRect(r);
-inc(r.left, images.width*2);
+inc(r.left, iw*2);
 inc(r.top,2);
 drawText(cnv.handle, pchar(mi.caption), -1, r, DT_LEFT or DT_VCENTER);
-dec(r.left, images.width*2);
+dec(r.left, iw*2);
 
 if mi.ImageIndex >= 0 then
-  images.draw(cnv, r.left+1, r.top, mi.ImageIndex);
+  IconsDM.images.draw(cnv, r.left+1, r.top, mi.ImageIndex);
 if mi.Checked then
   begin
   cnv.font.Name:='WingDings';
   with cnv.Font do size:=size+2;
-  cnv.TextOut(r.Left+images.width, r.Top, #$0252); // check mark
+  cnv.TextOut(r.Left+ iw, r.Top, #$0252); // check mark
   end;
 end;
 
@@ -10740,7 +10718,7 @@ ipsEverConnected.sorted:=TRUE;
 ipsEverConnected.duplicates:=dupIgnore;
 ipsEverConnected.delimiter:=';';
 logMaxLines:=2000;
-trayShows:='downloads';
+trayShows:= TS_downloads;
 flashOn:='download';
 forwardedMask:='::1;127.0.0.1';
 runningOnRemovable:=DRIVE_REMOVABLE = GetDriveType(PChar(exePath[1]+':\'));
@@ -10774,7 +10752,6 @@ MIMEtypes:=toSA([
   '*.webp', 'image/webp'
 ]);
 
-systemimages:=getSystemimages();
 saveMode:=SM_USER;
 lastDialogFolder:=getCurrentDir();
 autoupdatedFiles:=TstringToIntHash.create();

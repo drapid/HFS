@@ -26,7 +26,7 @@ object optionsFrm: ToptionsFrm
     Height = 414
     ActivePage = accountsPage
     Align = alClient
-    Images = mainFrm.images
+    Images = IconsDM.images
     MultiLine = True
     TabOrder = 0
     object bansPage: TTabSheet
@@ -193,7 +193,7 @@ object optionsFrm: ToptionsFrm
           Width = 302
           Height = 116
           Anchors = [akLeft, akTop, akBottom]
-          Images = mainFrm.images
+          Images = IconsDM.images
           Indent = 19
           ParentShowHint = False
           ReadOnly = True
@@ -402,7 +402,7 @@ object optionsFrm: ToptionsFrm
         RowSelect = True
         ParentShowHint = False
         ShowHint = False
-        SmallImages = mainFrm.images
+        SmallImages = IconsDM.images
         TabOrder = 0
         ViewStyle = vsList
         OnChange = accountsBoxChange

@@ -6,6 +6,9 @@ uses
   graphics, Types, SysUtils;
 
 const
+  VERSION = '2.4.0 RC8 RD';
+  VERSION_BUILD = '320';
+  VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CRLF = #13#10;
   CRLFA = RawByteString(#13#10);
   TAB = #9;
@@ -20,6 +23,12 @@ const
   DESCRIPT_ION = 'descript.ion';
   DIFF_TPL_FILE = 'hfs.diff.tpl';
   FILELIST_TPL_FILE = 'hfs.filelist.tpl';
+  SESSION_COOKIE = 'HFS_SID_';
+
+  USER_ANONYMOUS = '@anonymous';
+  USER_ANYONE = '@anyone';
+  USER_ANY_ACCOUNT = '@any account';
+
 
 const
   libsBaseUrl = 'http://rejetto.com/hfs/';
@@ -39,6 +48,9 @@ type
   Taccounts = array of Taccount;
 
   TdownloadingWhat = ( DW_UNK, DW_FILE, DW_FOLDERPAGE, DW_ICON, DW_ERROR, DW_ARCHIVE );
+
+type
+  TaccountRecursionStopCase = (ARSC_REDIR, ARSC_NOLIMITS, ARSC_IN_SET);
 
 implementation
 

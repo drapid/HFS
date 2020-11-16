@@ -5,7 +5,7 @@ interface
 uses
   // delphi libs
   Windows, Messages, Graphics, Forms, math, Types, SysUtils,
-  HSLib, classesLib, fileLib;
+  HSLib, srvClassesLib, fileLib;
 
 type
 
@@ -63,8 +63,9 @@ uses
   strutils, iniFiles, Classes, ComCtrls,
   RegExpr,
   utilLib,
+  scriptLib,
   RDUtils, RDFileUtil,
-  srvConst, srvUtils, scriptLib, hfsVars;
+  srvConst, srvUtils, parserLib, srvVars;
 
 constructor TfileListing.create();
 begin

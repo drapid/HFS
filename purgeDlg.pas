@@ -20,11 +20,12 @@ type
     { Public declarations }
   end;
 
-var
-  purgeFrm: TpurgeFrm;
+//var
+//  purgeFrm: TpurgeFrm;
 
 implementation
 
 {$R *.dfm}
+
 
 end.

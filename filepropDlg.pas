@@ -78,7 +78,9 @@ var
 implementation
 
 uses
-  optionsDlg, RDUtils, main, srvConst, srvUtils, utilLib;
+  optionsDlg, RDUtils,
+  main, utilLib,
+  srvConst, srvUtils, srvVars, IconsLib;
 
 {$R *.dfm}
 
@@ -239,7 +241,7 @@ var
 begin
 firstActionChange:=TRUE;
 
-accountsBox.smallImages:=mainfrm.images;
+accountsBox.smallImages:= IconsDM.images;
 updateAccountsBox();
 
 maskTab.tabVisible:=FALSE;
@@ -251,7 +253,7 @@ addiconBtn.Enabled:=FALSE;
 i:=if_(mainfrm.filesBox.SelectionCount > 1, -1, selectedFile.getIconForTreeview(mainfrm.usesystemiconsChk.Checked));
 iconBox.itemsEx.addItem('Default', i, i, -1, 0, NIL);
 iconOfs:=iconBox.ItemsEx.count;
-for i:=0 to mainfrm.images.Count-1 do
+for i:=0 to IconsDM.images.Count-1 do
   iconBox.itemsEx.addItem(idx_label(i), i, i, -1, 0, NIL);
 
 actions:=[FA_ACCESS];

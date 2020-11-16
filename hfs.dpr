@@ -46,7 +46,7 @@ uses
   diffDlg in 'diffDlg.pas' {diffFrm},
   classesLib in 'classesLib.pas',
   ipsEverDlg in 'ipsEverDlg.pas' {ipsEverFrm},
-  parserLib in 'parserLib.pas',
+  parserLib in 'srv\parserLib.pas',
   purgeDlg in 'purgeDlg.pas' {purgeFrm},
   listSelectDlg in 'listSelectDlg.pas' {listSelectFrm},
   filepropDlg in 'filepropDlg.pas' {filepropFrm},
@@ -58,7 +58,9 @@ uses
   hfsVars in 'hfsVars.pas',
   langLib in 'langLib.pas',
   progFrmLib in 'progFrmLib.pas',
-  serverLib in 'serverLib.pas';
+  srvUtils in 'srvUtils.pas',
+  serverLib in 'serverLib.pas',
+  IconsLib in 'srv\IconsLib.pas' {IconsDM: TDataModule};
 
 {$R *.res}
 
@@ -105,6 +107,7 @@ begin
     end;
   {$IFDEF EX_DEBUG}initErrorHandler(format('HFS %s (%s)', [VERSION, VERSION_BUILD]));{$ENDIF}
   Application.Initialize();
+  Application.CreateForm(TIconsDM, IconsDM);
   Application.CreateForm(TmainFrm, mainFrm);
   Application.CreateForm(TnewuserpassFrm, newuserpassFrm);
   Application.CreateForm(ToptionsFrm, optionsFrm);

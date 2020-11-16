@@ -18,11 +18,12 @@ This file is part of HFS ~ HTTP File Server.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 }
 unit scriptLib;
+{$I NoRTTI.inc}
 
 interface
 
 uses
-  iniFiles, types, srvConst, classesLib, fileLib, HSLib;
+  iniFiles, types, srvConst, srvClassesLib, fileLib, HSLib;
 
 type
   TmacroData = record
@@ -41,7 +42,6 @@ var
   eventScripts: Ttpl;
 
 function tryApplyMacrosAndSymbols(var txt:string; var md:TmacroData; removeQuotings:boolean=true):boolean;
-function macroQuote(s:string):string;
 function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL):string;
 function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnDataMain=NIL):string;
 procedure resetLog();
@@ -52,9 +52,9 @@ uses
   windows, graphics, classes, sysutils, StrUtils,
   comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
   Generics.Collections,
-  base64, OverbyteIcsSha1,
+  OverbyteIcsSha1,
   utilLib, parserLib, main, hfsVars, hfsGlobal,
-  srvUtils,
+  srvUtils, srvVars,
   RnQtrayLib, RDFileUtil, RDUtils, RnQCrypt;
 
 const
@@ -129,33 +129,6 @@ begin
 s:=reReplace(s,'%([-a-z0-9]+%)','&#37;$1', 'mi');
 result:=s;
 end; // noMacrosAllowed
-
-function isMacroQuoted(const s:string):boolean;
-begin result:=ansiStartsStr(MARKER_QUOTE, s) and ansiEndsStr(MARKER_UNQUOTE, s) end;
-
-function macroQuote(s:string):string;
-var
-  t: string;
-begin
-enforceNUL(s);
-if not anyMacroMarkerIn(s) then
-  begin
-  result:=s;
-  exit;
-  end;
-// an UNQUOTE would invalidate our quoting, so let's encode any of it
-t:=MARKER_UNQUOTE;
-replace(t, '&#'+intToStr(charToUnicode(t[1]))+';', 1,1);
-result:=MARKER_QUOTE+xtpl(s, [MARKER_UNQUOTE, t])+MARKER_UNQUOTE
-end; // macroQuote
-
-function macroDequote(s:string):string;
-begin
-result:=s;
-s:=trim(s);
-if isMacroQuoted(s) then
-  result:=copy(s, length(MARKER_QUOTE)+1, length(s)-length(MARKER_QUOTE)-length(MARKER_UNQUOTE) );
-end; // macroDequote
 
 function cbMacros(const fullMacro:string; pars: TPars; cbData:pointer):string;
 var
@@ -1790,7 +1763,7 @@ var
   else if name = '%now%' then
     result:=floatToStr(now())
   else if name = '%version%' then
-    result:= hfsGlobal.VERSION
+    result:= srvConst.VERSION
   else if name = '%build%' then
     result:=VERSION_BUILD
   else if name = '%uptime%' then
@@ -2142,11 +2115,11 @@ try
       result:=jsEncode(p, first(par(1),'''"'))
      else
     if name = 'base64' then
-      result := Base64EncodeString(UTF8Encode(p))
+      result := b64utf8(p)
      else
     if name = 'base64decode' then
       begin
-        result := UnUTF(Base64DecodeString(RawByteString(p)));
+        result := decodeB64utf8(RawByteString(p));
         if isFalse(par('macros')) then
           result:=noMacrosAllowed(result);
       end

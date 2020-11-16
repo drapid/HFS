@@ -23,7 +23,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Math,
-  Dialogs, ExtCtrls, StdCtrls, Grids, ComCtrls, ValEdit, types, hfsGlobal, CheckLst;
+  Dialogs, ExtCtrls, StdCtrls, Grids, ComCtrls, ValEdit, types, CheckLst,
+  hfsGlobal, IconsLib;
 
 type
   ToptionsFrm = class(TForm)
@@ -162,7 +163,7 @@ implementation
 
 uses
   utilLib, HSlib, strUtils, classesLib, listSelectDlg, fileLib, main,
-  srvConst, srvUtils;
+  srvConst, srvUtils, srvVars;
 
 var
   lastAccountSelected: integer = -1; // stores the previous selection index
@@ -915,16 +916,16 @@ begin
 cnv:=iconsBox.Canvas;
 bmp:=Tbitmap.create;
 try
-  mainfrm.images.GetBitmap(index, bmp);
+  IconsDM.images.GetBitmap(index, bmp);
   cnv.FillRect(rect);
   cnv.Draw(rect.Left, rect.Top, bmp);
-  cnv.TextOut(rect.Left+mainfrm.images.Width+2, rect.Top, idx_label(index));
+  cnv.TextOut(rect.Left+ IconsDM.images.Width+2, rect.Top, idx_label(index));
 finally bmp.free end;
 end;
 
 procedure ToptionsFrm.updateIconsBox();
 // alloc enough slots. the text is not used, labels are built by the paint event
-begin iconsBox.Items.Text:=dupeString(CRLF, mainfrm.images.count) end;
+begin iconsBox.Items.Text:=dupeString(CRLF, IconsDM.images.count) end;
 
 procedure ToptionsFrm.iconsBoxDropDown(Sender: TObject);
 begin updateIconsBox() end;
