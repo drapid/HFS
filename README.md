@@ -23,3 +23,4 @@ Now it can be build with full unicode support and in X64.
 ## Libs used
 - [ICS v8.64](http://www.overbyte.be) by François PIETTE 
 - [For.RnQ](https://github.com/drapid/rnq/tree/master/for.RnQ)
+- [Synopse mORMot2](https://github.com/synopse/mORMot2)
