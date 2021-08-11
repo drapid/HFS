@@ -58,7 +58,7 @@ uses
   hfsVars in 'hfsVars.pas',
   langLib in 'langLib.pas',
   progFrmLib in 'progFrmLib.pas',
-  srvUtils in 'srvUtils.pas',
+  srvUtils in 'srv\srvUtils.pas',
   serverLib in 'serverLib.pas',
   IconsLib in 'srv\IconsLib.pas' {IconsDM: TDataModule};
 

@@ -55,7 +55,6 @@ function allocatedMemory():int64;
 function currentStackUsage: NativeUInt;
 {$ENDIF MSWINDOWS}
 function maybeUnixTime(t:Tdatetime):Tdatetime;
-function filetimeToDatetime(ft:TFileTime):Tdatetime;
 function localToGMT(d:Tdatetime):Tdatetime;
 function onlyExistentAccounts(a:TstringDynArray):TstringDynArray;
 procedure onlyForExperts(controls:array of Tcontrol);
@@ -91,15 +90,11 @@ function getExternalAddress(var res:string; provider:Pstring=NIL):boolean;
 function checkAddressSyntax(address:string; mask:boolean=TRUE):boolean;
 function inputQueryLong(const caption, msg:string; var value:string; ofs:integer=0):boolean;
 procedure purgeVFSaccounts();
-function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
 function exec(cmd:string; pars:string=''; showCmd:integer=SW_SHOW):boolean;
 function execNew(cmd:string):boolean;
 function captureExec(const DosApp: string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
 function openURL(const url: string):boolean;
 function getRes(name:pchar; const typ:string='TEXT'): RawByteString;
-function compare_(i1,i2:double):integer; overload;
-function compare_(i1,i2:int64):integer; overload;
-function compare_(i1,i2:integer):integer; overload;
 function msgDlg(msg:string; code:integer=0; title:string=''):integer;
 // file
 function getEtag(const filename:string):string;
@@ -112,7 +107,6 @@ function moveToBin(fn:string; force:boolean=FALSE):boolean; overload;
 function moveToBin(files:TstringDynArray; force:boolean=FALSE):boolean; overload;
 function uri2disk(url:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
 function uri2diskMaybe(path:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
-function freeIfTemp(var f:Tfile):boolean; inline;
 function isAbsolutePath(path:string):boolean;
 function getTempDir():string;
 function createShellLink(linkFN:WideString; destFN:string):boolean;
@@ -149,7 +143,6 @@ function deleteRegistry(key: String; root:HKEY=0): boolean; overload;
 function listToArray(l:Tstrings):TstringDynArray;
 function arrayToList(a:TStringDynArray; list:TstringList=NIL):TstringList;
 // convert
-function str_(fa:TfileAttributes): RawByteString; overload;
 function rectToStr(r:Trect):string;
 function strToRect(s:string):Trect;
 function strToUInt(s:string): UInt;
@@ -162,10 +155,6 @@ function stringToColorEx(s:string; default:Tcolor=clNone):Tcolor;
 // misc string
 procedure excludeTrailingString(var s:string; ss:string);
 function getUniqueName(const start:string; exists:TnameExistsFun):string;
-function TLV(t:integer; const data: RawByteString): RawByteString;
-function TLVS(t:integer; const data: String): RawByteString;
-function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
-function TLVS_NOT_EMPTY(t:integer; const data: String): RawByteString;
 function popTLV(var s,data: RawByteString):integer;
 function getCRC(const data: RawByteString):integer;
 function dotted(i:int64):string;
@@ -178,13 +167,6 @@ function utf8Test(const s:string):boolean; OverLoad;
 function utf8Test(const s: RawByteString): boolean; OverLoad;
 function jsEncode(s, chars:string):string;
 function nonEmptyConcat(const pre,s:string; const post:string=''):string;
-function first(a,b:integer):integer; overload;
-function first(a,b:double):double; overload;
-function first(a,b:pointer):pointer; overload;
-function first(const a,b:string):string; overload;
-function first(a:array of string):string; overload;
-function first(a:array of RawByteString): RawByteString; overload;
-function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSetW=[]):string;
 function countSubstr(const ss:string; const s:string):integer;
 function trim2(const s:string; chars:TcharsetW):string;
 procedure urlToStrings(const s:string; sl:Tstrings); OverLoad;
@@ -449,31 +431,6 @@ begin
   result := ansi;
 end; // getRes
 
-function compare_(i1,i2:int64):integer; overload;
-begin
-  if i1 < i2 then
-    result:=-1
-   else
-    if i1 > i2 then
-      result:=1
-     else
-      result:=0
-end; // compare_
-
-function compare_(i1,i2:integer):integer; overload;
-begin
-if i1 < i2 then result:=-1 else
-if i1 > i2 then result:=1 else
-  result:=0
-end; // compare_
-
-function compare_(i1,i2:double):integer; overload;
-begin
-if i1 < i2 then result:=-1 else
-if i1 > i2 then result:=1 else
-  result:=0
-end; // compare_
-
 function rectToStr(r:Trect):string;
 begin result:=format('%d,%d,%d,%d',[r.left,r.top,r.right,r.bottom]) end;
 
@@ -484,19 +441,6 @@ result.Top:=strToInt(chop(',',s));
 result.right:=strToInt(chop(',',s));
 result.bottom:=strToInt(chop(',',s));
 end; // strToRect
-
-function TLV(t:integer; const data: RawByteString): RawByteString;
-begin result:=str_(t)+str_(length(data))+data end;
-
-function TLVS(t:integer; const data: String): RawByteString;
-begin result:=TLV(t, StrToUTF8(data)) end;
-
-
-function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
-begin if data > '' then result:=TLV(t,data) else result:='' end;
-
-function TLVS_NOT_EMPTY(t:integer; const data: String): RawByteString;
-begin if data > '' then result:=TLV(t, StrToUTF8(data)) else result:='' end;
 
 // for heavy jobs you are supposed to use class Ttlv
 function popTLV(var s,data: RawByteString):integer;
@@ -898,14 +842,6 @@ while address > '' do
 result:=TRUE;
 end; // checkAddressSyntax
 
-function freeIfTemp(var f:Tfile):boolean; inline;
-begin
-try
-  result:=assigned(f) and f.isTemp();
-  if result then freeAndNIL(f);
-except result:=FALSE end;
-end; // freeIfTemp
-
 function uri2disk(url:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
 var
   fi: Tfile;
@@ -1051,36 +987,6 @@ finally
   renamings.free;
   end;
 end; // purgeVFSaccounts
-
-function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
-var
-  a: TStringDynArray;
-begin
-result:=FALSE;
-if f = NIL then exit;
-if action = FA_ACCESS then
-  begin
-  result:= f.accessFor(cd);
-  exit;
-  end;
-if f.isTemp() then
-  f:=f.parent;
-if (action = FA_UPLOAD) and not f.isRealFolder() then exit;
-
-  repeat
-  a:=f.accounts[action];
-  if assigned(a)
-  and not ((action = FA_UPLOAD) and not f.isRealFolder()) then break;
-  f:=f.parent;
-  if f = NIL then exit;
-  until false;
-
-result:=TRUE;
-if stringExists(USER_ANYONE, a, TRUE) then exit;
-result:=(cd.usr = '') and stringExists(USER_ANONYMOUS, a, TRUE)
-  or assigned(cd.account) and stringExists(USER_ANY_ACCOUNT, a, TRUE)
-  or (NIL <> findEnabledLinkedAccount(cd.account, a, TRUE));
-end; // accountAllowed
 
 
 function inputQueryLong(const caption, msg:string; var value:string; ofs:integer=0):boolean;
@@ -1645,43 +1551,6 @@ begin result := ansiContainsText(s, RawByteString('charset=UTF-8')) end;
 function nonEmptyConcat(const pre, s:string; const post:string=''):string;
 begin if s = '' then result:='' else result:=pre+s+post end;
 
-// returns the first non empty string
-function first(a:array of string):string;
-var
-  i: integer;
-begin
-result:='';
-for i:=0 to length(a)-1 do
-  begin
-  result:=a[i];
-  if result > '' then exit;
-  end;
-end; // first
-
-function first(a:array of RawByteString): RawByteString; overload;
-var
-  i: integer;
-begin
-result:='';
-for i:=0 to length(a)-1 do
-  begin
-  result:=a[i];
-  if result > '' then exit;
-  end;
-end; // first
-
-function first(const a,b:string):string;
-begin if a = '' then result:=b else result:=a end;
-
-function first(a,b:integer):integer;
-begin if a = 0 then result:=b else result:=a end;
-
-function first(a,b:double):double;
-begin if a = 0 then result:=b else result:=a end;
-
-function first(a,b:pointer):pointer;
-begin if a = NIL then result:=b else result:=a end;
-
 // taken from http://www.delphi3000.com/articles/article_3361.asp
 function captureExec(const DosApp: string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
 const
@@ -1824,25 +1693,6 @@ end;
 
 function isLocalIP(const ip:string):boolean;
 begin result:=checkAddressSyntax(ip, FALSE) and HSlib.isLocalIP(ip) end;
-
-function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSetW=[]):string;
-var
-  i, c, l: integer;
-begin
-if spaces = [] then include(spaces, ' ');
-i:=0;
-l:=length(s);
-while i < l do
-  begin
-  inc(i);
-  c:=i;
-  while (c <= l) and (s[c] in spaces) do
-    inc(c);
-  if c = i then continue;
-  replace(s, replacement, i, c-1);
-  end;
-result:=s;
-end; // reduceSpaces
 
 function countSubstr(const ss:string; const s:string):integer;
 var
@@ -2106,10 +1956,6 @@ for i:=0 to length(a)-1 do
 result:=a;
 end; // onlyExistentAccounts
 
-// converts from TfileAttributes to string[4]
-function str_(fa:TfileAttributes): RawByteString; overload;
-begin result:=str_(integer(fa)) end;
-
 // recognize strings containing pieces (separated by backslash) made of only dots
 function dirCrossing(s:string):boolean;
 begin
@@ -2268,15 +2114,6 @@ except
     end;
   end;
 end; // stringToColorEx
-
-function filetimeToDatetime(ft:TFileTime):Tdatetime;
-var
-  st: TsystemTime;
-begin
-FileTimeToLocalFileTime(ft, ft);
-FileTimeToSystemTime(ft, st);
-TryEncodeDateTime(st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, result);
-end; // filetimeToDatetime
 
 // this is a blocking method for dns resolving. The Wsocket.DnsLookup() method provided by ICS is non-blocking
 function hostToIP(name: string):string;

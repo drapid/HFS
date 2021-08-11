@@ -28,7 +28,7 @@ uses
   // delphi libs
   Windows, Messages, SysUtils, Forms, Menus, Graphics, Controls, ComCtrls, Dialogs, math,
   Buttons, StdCtrls, ExtCtrls, ToolWin, ImageList, strutils, AppEvnts, types,
-  iniFiles, Classes, System.Contnrs, Winapi.CommCtrl,
+  iniFiles, Classes, System.Contnrs, Winapi.CommCtrl, JSON,
   // 3rd part libs. ensure you have all of these, the same version reported in dev-notes.txt
   OverbyteIcsWSocket, OverbyteIcsHttpProt,
    //RegularExpressions,
@@ -424,6 +424,7 @@ type
     delayUpdateChk: TMenuItem;
     oemTarChk: TMenuItem;
     AnyAddressV6: TMenuItem;
+    AddIPasreverseproxy1: TMenuItem;
     procedure FormResize(Sender: TObject);
     procedure filesBoxCollapsing(Sender: TObject; Node: TTreeNode; var AllowCollapse: Boolean);
     procedure newfolder1Click(Sender: TObject);
@@ -642,6 +643,7 @@ type
     procedure AnyAddressV6Click(Sender: TObject);
     procedure FormAfterMonitorDpiChanged(Sender: TObject; OldDPI,
       NewDPI: Integer);
+    procedure AddIPasreverseproxy1Click(Sender: TObject);
   private
     function searchLog(dir:integer):boolean;
     function  getGraphPic(cd:TconnData=NIL): RawByteString;
@@ -676,7 +678,11 @@ type
     procedure addTray();
     procedure refreshConn(conn:TconnData);
     function  getVFS(node:Ttreenode=NIL): RawByteString;
-    procedure setVFS2(vfs: RawByteString; node: Ttreenode=NIL); OverLoad;
+    function  getVFSJ(node: TTreeNode=NIL): RawByteString;
+    function  getVFSJZ(node: TTreeNode=NIL): RawByteString;
+    procedure setVFS2(const vfs: RawByteString; node: Ttreenode=NIL); OverLoad;
+    procedure setVFSJZ(const vfs: RawByteString; node: Ttreenode=NIL);
+    procedure setVFSJ(const vfs: TJSONValue; var macrosFound: Boolean; node: Ttreenode=NIL);
     procedure setnoDownloadTimeout(v:integer);
 		procedure addDropFiles(hnd:Thandle; under:Ttreenode);
     procedure pasteFiles();
@@ -779,8 +785,8 @@ function idx_label(i:integer):string;
 function conn2data(i:integer):TconnData; inline; overload;
 function uptimestr():string;
 function countIPs(onlyDownloading:boolean=FALSE; usersInsteadOfIps:boolean=FALSE):integer;
-function localDNSget(ip:string):string;
-function countDownloads(ip:string=''; user:string=''; f:Tfile=NIL):integer;
+function localDNSget(const ip: String): String;
+function countDownloads(const ip: String=''; const user: String=''; f:Tfile=NIL): Integer;
 function getAccountList(users:boolean=TRUE; groups:boolean=TRUE):TstringDynArray;
 function fileExistsByURL(url:string):boolean;
 function createFingerprint(const fn:string):string;
@@ -797,11 +803,17 @@ implementation
 { $R data.res }
 
 uses
-  AnsiStrings, MMsystem, UITypes, system.Generics.Collections,
+  {$IFDEF UNICODE}
+   AnsiStrings,
+  {$ENDIF UNICODE}
+  MMsystem, UITypes, system.Generics.Collections,
   clipbrd, dateutils, shlobj, shellapi, winsock,
   OverbyteIcsZLibHigh, OverbyteIcsUtils,
+  {$IFDEF UNICODE}
+   AnsiClasses,
+  {$ENDIF UNICODE}
   RDFileUtil, RDUtils, RDSysUtils,
-  RnQzip, RnQCrypt, RnQNet.Uploads, RnQLangs,
+  RnQzip, RnQCrypt, RnQNet.Uploads, RnQLangs, RnQJSON,
   langLib,
   newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg,
   parserLib, srvUtils, srvVars,
@@ -846,7 +858,7 @@ account:=accountRecursion(account, ARSC_NOLIMITS);
 result:=assigned(account) and account.noLimits;
 end; // noLimitsFor
 
-function isAnyMacroIn(s:RawByteString):boolean; inline;
+function isAnyMacroIn(const s: RawByteString):boolean; inline;
 begin result := pos(AMARKER_OPEN, s) > 0 end;
 
 function isDownloading(data:TconnData):boolean;
@@ -890,7 +902,7 @@ else
   result:=conn2data(li.index)
 end; // conn2data
 
-function countConnectionsByIP(ip:string):integer;
+function countConnectionsByIP(const ip: String): Integer;
 var
   i: integer;
 begin
@@ -904,7 +916,7 @@ while i < srv.conns.count do
   end;
 end; // countConnectionsByIP
 
-function countDownloads(ip:string=''; user:string=''; f:Tfile=NIL):integer;
+function countDownloads(const ip: String=''; const user: String=''; f: Tfile=NIL): Integer;
 var
   i: integer;
   d: TconnData;
@@ -991,7 +1003,7 @@ FlashWindow(application.handle, TRUE);
 if mainFrm.beepChk.checked then MessageBeep(MB_OK);
 end; // flash
 
-function localDNSget(ip:string):string;
+function localDNSget(const ip: String): String;
 begin
 for var i: integer :=0 to length(address2name) div 2-1 do
   if addressmatch(address2name[i*2+1], ip) then
@@ -1406,7 +1418,6 @@ begin
   if encodeSpacesChk.checked then
     Include(Result, spEncodeSpaces);
 end;
-
 
 function Tmainfrm.getFolderPage(folder:Tfile; cd:TconnData; otpl: TTpl):string;
 begin
@@ -5092,25 +5103,26 @@ var
   i: integer;
   cd: TconnData;
 begin
-cd:=selectedConnection();
-bs:=assigned(cd);
-ba:=FALSE;
-for i:=0 to connBox.items.count-1 do
-  if conn2data(i).conn.state <> HCS_DISCONNECTED then
-    begin
-    ba:=TRUE;
-    break;
-    end;
-Viewhttprequest1.enabled:=bs;
-BanIPaddress1.enabled:=bs;
-Kickconnection1.Enabled:=bs and (cd.conn.state <> HCS_DISCONNECTED);
-KickIPaddress1.Enabled:=bs and ba;
-Kickallconnections1.Enabled:=ba;
-Kickidleconnections1.Enabled:=ba;
-pause1.visible:=bs and isDownloading(cd);
-Pause1.Checked:=bs and cd.conn.paused;
+  cd:=selectedConnection();
+  bs:=assigned(cd);
+  ba:=FALSE;
+  for i:=0 to connBox.items.count-1 do
+    if conn2data(i).conn.state <> HCS_DISCONNECTED then
+      begin
+      ba:=TRUE;
+      break;
+      end;
+  Viewhttprequest1.enabled:=bs;
+  BanIPaddress1.enabled:=bs;
+  Kickconnection1.Enabled:=bs and (cd.conn.state <> HCS_DISCONNECTED);
+  KickIPaddress1.Enabled:=bs and ba;
+  Kickallconnections1.Enabled:=ba;
+  Kickidleconnections1.Enabled:=ba;
+  pause1.visible:=bs and isDownloading(cd);
+  Pause1.Checked:=bs and cd.conn.paused;
 
-trayiconforeachdownload1.visible:=trayfordownloadChk.Checked and fromTray;
+  trayiconforeachdownload1.visible:=trayfordownloadChk.Checked and fromTray;
+  AddIPasreverseproxy1.Visible := bs and (cd.conn.getHeader('x-forwarded-for') > '');
 end;
 
 function expandAccountByLink(a:Paccount; noGroups:boolean=TRUE):TstringDynArray;
@@ -7046,6 +7058,16 @@ end; // trayEvent
 procedure TmainFrm.trayiconforeachdownload1Click(Sender: TObject);
 begin trayfordownloadChk.Checked:=FALSE end;
 
+procedure TmainFrm.AddIPasreverseproxy1Click(Sender: TObject);
+var
+  cd: TconnData;
+begin
+  cd := selectedConnection();
+  if assigned(cd) then
+    if not addressmatch(forwardedMask, cd.conn.address) then
+      forwardedMask := forwardedMask + ';' + cd.conn.address;
+end;
+
 procedure Tmainfrm.downloadtrayEvent(sender:Tobject; ev:TtrayEvent);
 var
   i: integer;
@@ -7292,112 +7314,43 @@ for i:=0 to connBox.items.count-1 do
 //updateSbar();   // this was causing too many refreshes on fast connections
 end; // refreshConn
 
-const
-  // IDs used for file chunks
-  FK_HEAD = 0;
-  FK_RESOURCE = 1;
-  FK_NAME = 2;
-  FK_FLAGS = 3;
-  FK_NODE = 4;
-  FK_FORMAT_VER = 5;
-  FK_CRC = 6;
-  FK_COMMENT = 7;
-  FK_USERPWD = 8;
-  FK_USERPWD_UTF8 = 108;
-  FK_ADDEDTIME = 9;
-  FK_DLCOUNT = 10;
-  FK_ROOT = 11;
-  FK_ACCOUNTS = 12;
-  FK_FILESFILTER = 13;
-  FK_FOLDERSFILTER = 14;
-{$IFDEF HFS_GIF_IMAGES}
-  FK_ICON_GIF = 15;
-{$ELSE ~HFS_GIF_IMAGES}
-  FK_ICON_PNG = 115;
-{$ENDIF HFS_GIF_IMAGES}
-  FK_REALM = 16;
-  FK_UPLOADACCOUNTS = 17;
-  FK_DEFAULTMASK = 18;
-  FK_DONTCOUNTASDOWNLOADMASK = 19;
-  FK_AUTOUPDATED_FILES = 20;
-  FK_DONTCOUNTASDOWNLOAD = 21;
-  FK_HFS_VER = 22;
-  FK_HFS_BUILD = 23;
-  FK_COMPRESSED_ZLIB = 24;
-  FK_DIFF_TPL = 25;
-  FK_UPLOADFILTER = 26;
-  FK_DELETEACCOUNTS = 27;
 
 function Tmainfrm.getVFS(node:Ttreenode=NIL): RawByteString;
-
-  function getAutoupdatedFiles():RawByteString;
-  var
-    i: integer;
-    fn: string;
-  begin
-  result:='';
-  i:=0;
-  while i < autoupdatedFiles.Count do
-    begin
-    fn:=autoupdatedFiles[i];
-    result:=result+TLV(FK_NODE, TLV(FK_NAME, StrToUTF8(fn))
-      + TLV(FK_DLCOUNT, str_(autoupdatedFiles.getInt(fn))) );
-    inc(i);
-    end;
-  end; // getAutoupdatedFiles
-
 var
-  i: integer;
   f: Tfile;
-  commonFields, s: RawByteString;
 begin
-if node = NIL then node:=rootNode;
-if node = NIL then exit;
-f:=nodeToFile(node);
-commonFields:=TLV(FK_FLAGS, str_(f.flags))
-    +TLVS_NOT_EMPTY(FK_RESOURCE, f.resource)
-    +TLVS_NOT_EMPTY(FK_COMMENT, f.comment)
-    +if_(f.user>'', TLV(FK_USERPWD, b64R(AnsiString(f.user+':'+f.pwd))))
-    +if_(f.user>'', TLV(FK_USERPWD_UTF8, b64utf8(f.user+':'+f.pwd)))
-    +TLVS_NOT_EMPTY(FK_ACCOUNTS, join(';',f.accounts[FA_ACCESS]) )
-    +TLVS_NOT_EMPTY(FK_UPLOADACCOUNTS, join(';',f.accounts[FA_UPLOAD]))
-    +TLVS_NOT_EMPTY(FK_DELETEACCOUNTS, join(';',f.accounts[FA_DELETE]))
-    +TLVS_NOT_EMPTY(FK_FILESFILTER, f.filesfilter)
-    +TLVS_NOT_EMPTY(FK_FOLDERSFILTER, f.foldersfilter)
-    +TLVS_NOT_EMPTY(FK_REALM, f.realm)
-    +TLVS_NOT_EMPTY(FK_DEFAULTMASK, f.defaultFileMask)
-    +TLVS_NOT_EMPTY(FK_UPLOADFILTER, f.uploadFilterMask)
-    +TLVS_NOT_EMPTY(FK_DONTCOUNTASDOWNLOADMASK, f.dontCountAsDownloadMask)
-    +TLVS_NOT_EMPTY(FK_DIFF_TPL, f.diffTpl);
-
-result:='';
-if f.isRoot() then
-	result:=result+TLV(FK_ROOT, commonFields );
-for i:=0 to node.Count-1 do
-  result:=result+getVFS(node.item[i]); // recursion
-if f.isRoot() then
-  begin
-  result:=result+TLV_NOT_EMPTY(FK_AUTOUPDATED_FILES, getAutoupdatedFiles() );
-  exit;
-  end;
-if not f.isFile() then s:=''
-else s:=TLV(FK_DLCOUNT, str_(f.DLcount)); // called on a folder would be recursive
-
-// for non-root nodes, subnodes must be calculated first, so to be encapsulated
-result:=TLV(FK_NODE, commonFields
-  +TLVS_NOT_EMPTY(FK_NAME, f.name)
-  +TLV(FK_ADDEDTIME, str_(f.atime))
-{$IFDEF HFS_GIF_IMAGES}
-  +TLV_NOT_EMPTY(FK_ICON_GIF, pic2str(f.icon))
-{$ELSE ~HFS_GIF_IMAGES}
-  +TLV_NOT_EMPTY(FK_ICON_PNG, pic2str(f.icon, 16))
-{$ENDIF HFS_GIF_IMAGES}
-  +s
-  +result // subnodes
-);
+  if node = NIL then node:=rootNode;
+  if node = NIL then exit;
+  f:=nodeToFile(node);
+  Result := f.getVFS;
 end; // getVFS
 
-procedure Tmainfrm.setVFS2(vfs: RawByteString; node:Ttreenode=NIL);
+function Tmainfrm.getVFSJ(node: TTreeNode=NIL): RawByteString;
+var
+  f: Tfile;
+begin
+  if node = NIL then
+    node:=rootNode;
+  if node = NIL then
+    exit;
+  f := nodeToFile(node);
+  Result := f.getVFSJ;
+end; // getVFSJ
+
+function Tmainfrm.getVFSJZ(node: TTreeNode=NIL): RawByteString;
+var
+  f: Tfile;
+begin
+  if node = NIL then
+    node:=rootNode;
+  if node = NIL then
+    exit;
+  f := nodeToFile(node);
+  Result := f.getVFSZ;
+end; // getVFSJZ
+
+
+procedure Tmainfrm.setVFS2(const vfs: RawByteString; node:Ttreenode=NIL);
 resourcestring
   MSG_BETTERSTOP = #13'Going on may lead to problems.'
     +#13'It is adviced to stop loading.'
@@ -7416,7 +7369,8 @@ var
   act: TfileACtion;
   tlv: Ttlv;
 
-  procedure parseAutoupdatedFiles(data: string);
+//  procedure parseAutoupdatedFiles(data: string);
+  procedure parseAutoupdatedFiles();
   var
     fn: string;
     s: RawByteString;
@@ -7544,9 +7498,12 @@ while not tlv.isOver() do
 {$IFDEF HFS_GIF_IMAGES}
     FK_ICON_GIF: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2));
 {$ELSE ~HFS_GIF_IMAGES}
+    FK_ICON_GIF: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, strGif2pic(data2, 16));
     FK_ICON_PNG: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2, 16));
+    FK_ICON32_PNG: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2, 32));
 {$ENDIF HFS_GIF_IMAGES}
-    FK_AUTOUPDATED_FILES: parseAutoupdatedFiles(UnUTF(data2));
+//    FK_AUTOUPDATED_FILES: parseAutoupdatedFiles(UnUTF(data2));
+    FK_AUTOUPDATED_FILES: parseAutoupdatedFiles();
     FK_HFS_BUILD: loadingVFS.build:= UnUTF(data2);
     FK_HEAD, FK_HFS_VER: ; // recognize these fields, but do nothing
     else loadingVFS.unkFK:=TRUE;
@@ -7580,6 +7537,229 @@ f.setupImage(mainfrm.useSystemIconsChk.checked, node);
 if after.resetLetBrowse then
   f.recursiveApply(setBrowsable, integer(FA_BROWSABLE in f.flags));
 end; // setVFS
+
+procedure Tmainfrm.setVFSJZ(const vfs: RawByteString; node: Ttreenode=NIL);
+resourcestring
+  MSG_MISS_J = 'Missing "VFS.json" file in archive';
+var
+  z: TZipFile;
+  j: TJSONObject;
+  str: TAnsiStringStream;
+
+begin
+  if vfs = '' then
+    exit;
+  str := TAnsiStringStream.Create(vfs);
+  z := TZipFile.Create;
+  try
+    z.LoadFromStream(str);
+    if z.IndexOf('VFS.json') < 0 then
+      begin
+        msgDlg(MSG_MISS_J, MB_ICONERROR);
+        exit;
+      end;
+
+    if not ParseJSON(vfs, j) then
+      Exit;
+
+
+   finally
+     z.Free;
+     str.Free;
+  end;
+
+end; // setVFSJZ
+
+procedure Tmainfrm.setVFSJ(const vfs: TJSONValue; var macrosFound: Boolean; node: Ttreenode=NIL);
+resourcestring
+  MSG_BETTERSTOP = #13'Going on may lead to problems.'
+    +#13'It is adviced to stop loading.'
+    +#13'Stop?';
+  MSG_BADCRC = 'This file is corrupted (CRC).';
+  MSG_NEWER_INCOMP='This file has been created with a newer and incompatible version.';
+  MSG_ZLIB = 'This file is corrupted (ZLIB).';
+  MSG_BAKAVAILABLE = 'This file is corrupted but a backup is available.'#13'Continue with backup?';
+begin
+(*
+
+var
+  j: TJSONObject;
+  f: Tfile;
+  after: record
+    resetLetBrowse: boolean;
+   end;
+  act: TfileAction;
+  isOver: Boolean;
+
+//  procedure parseAutoupdatedFiles(data: string);
+  procedure parseAutoupdatedFiles();
+  var
+    fn: string;
+    s: RawByteString;
+  begin
+  autoupdatedFiles.Clear();
+  tlv.down();
+  while tlv.pop(s) = FK_NODE do
+    begin
+    tlv.down();
+    while not tlv.isOver() do
+      case tlv.pop(s) of
+        FK_NAME: fn:= UnUTF(s);
+        FK_DLCOUNT: autoupdatedFiles.setInt(fn, int_(s));
+        end;
+    tlv.up();
+    end;
+  tlv.up();
+  end; // parseAutoupdatedFiles
+
+begin
+  macrosFound := False;
+  isOver := false;
+
+  if node = NIL then // this is supposed to be always true when loading a vfs, and never recurring
+    begin
+      node := rootNode;
+      uploadPaths := NIL;
+      usersInVFS.reset();
+    end;
+  ZeroMemory(@after, sizeof(after));
+  node.DeleteChildren();
+  f := TFile(node.data);
+  f.SyncNode(node);
+  while not isOver do
+  case tlv.pop(data2) of
+    FK_ROOT:
+      begin
+      setVFS2(data2, rootNode );
+      if loadingVFS.build < '109' then
+        include(f.flags, FA_ARCHIVABLE);
+      end;
+    FK_NODE:
+      begin
+      if progFrm.cancelRequested then exit;
+      if progFrm.visible then
+        begin
+        progFrm.progress:= tlv.getPerc();
+        application.ProcessMessages();
+        end;
+      setVFS2(data2, addFile(Tfile.create(filesBox, ''), node, TRUE).node );
+      end;
+    FK_COMPRESSED_ZLIB:
+      { Explanation for the #0 workaround.
+      { I found an uncompressable vfs file, with ZDecompressStr2() raising an exception.
+      { In the end i found it was missing a trailing #0, maybe do to an incorrect handling of strings
+      { containing a trailing #0. Using a zlib wrapper there is some underlying C code.
+      { I was unable to reproduce the bug, but i found that correct data doesn't complain if i add an extra #0. }
+      try
+//        data := ZDecompressStr2(data+#0, 31);
+        data2 := ZDecompressStr3(data2+#0, zsGZip);
+        if isAnyMacroIn(data2) then
+          loadingVFS.macrosFound:=TRUE;
+        setVFS2(data2, node);
+      except msgDlg(MSG_ZLIB, MB_ICONERROR) end;
+    FK_FORMAT_VER:
+      begin
+      if length(data2) < 4 then // early versions: '1.0', '1.1'
+        begin
+        loadingVFS.resetLetBrowse:=TRUE;
+        after.resetLetBrowse:=TRUE;
+        end;
+      if (int_(data2) > CURRENT_VFS_FORMAT)
+      and (msgDlg(MSG_NEWER_INCOMP+MSG_BETTERSTOP, MB_ICONERROR+MB_YESNO) = IDYES) then
+        exit;
+      end;
+  	FK_CRC:
+      if str_(getCRC(tlv.getTheRest())) <> data2 then
+        begin
+        if loadingVFS.bakAvailable then
+          if msgDlg(MSG_BAKAVAILABLE, MB_ICONWARNING+MB_YESNO) = IDYES then
+            begin
+            loadingVFS.useBackup:=TRUE;
+            exit;
+            end;
+        if msgDlg(MSG_BADCRC+MSG_BETTERSTOP,MB_ICONERROR+MB_YESNO) = IDYES then
+        	exit;
+        end;
+    FK_RESOURCE: f.resource := UnUTF(data2);
+    FK_NAME:
+      begin
+      f.name:= UnUTF(data2);
+      node.text := f.name;
+      end;
+    FK_FLAGS: move(data2[1], f.flags, min(length(data2), SizeOf(f.flags)));
+  	FK_ADDEDTIME: f.atime:=dt_(data2);
+    FK_COMMENT: f.comment:=UnUTF(data2);
+    FK_USERPWD:
+    	begin
+      data2 := decodeB64(data2);
+      f.user := UnUTF(chop(':', data2));
+      f.pwd := UnUTF(data2);
+      usersInVFS.track(f.user, f.pwd);
+      end;
+    FK_USERPWD_UTF8:
+    	begin
+      data2 := decodeB64(data2);
+      f.user := UnUTF(chop(':', data2));
+      f.pwd := UnUTF(data2);
+      usersInVFS.track(f.user, f.pwd);
+      end;
+    FK_DLCOUNT: f.DLcount:=int_(data2);
+    FK_ACCOUNTS: f.accounts[FA_ACCESS]:= splitU(data2, ';');
+    FK_UPLOADACCOUNTS: f.accounts[FA_UPLOAD]:=splitU(data2, ';');
+    FK_DELETEACCOUNTS: f.accounts[FA_DELETE]:=splitU(data2, ';');
+    FK_FILESFILTER: f.filesfilter:=UnUTF(data2);
+    FK_FOLDERSFILTER: f.foldersfilter:=UnUTF(data2);
+    FK_UPLOADFILTER: f.uploadFilterMask:=UnUTF(data2);
+    FK_REALM: f.realm:=UnUTF(data2);
+    FK_DEFAULTMASK: f.defaultFileMask:=UnUTF(data2);
+    FK_DIFF_TPL: begin
+                   f.diffTpl := UnUTF(data2);
+                   macrosFound := isAnyMacroIn(f.diffTpl);
+                 end;
+    FK_DONTCOUNTASDOWNLOADMASK: f.dontCountAsDownloadMask := UnUTF(data2);
+    FK_DONTCOUNTASDOWNLOAD: if boolean(data2[1]) then include(f.flags, FA_DONT_COUNT_AS_DL);  // legacy, now moved into flags
+{$IFDEF HFS_GIF_IMAGES}
+    FK_ICON_GIF: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2));
+{$ELSE ~HFS_GIF_IMAGES}
+    FK_ICON_GIF: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, strGIF2pic(data2));
+    FK_ICON_PNG: if data2 > '' then f.setupImage(mainfrm.useSystemIconsChk.checked, str2pic(data2, 16));
+{$ENDIF HFS_GIF_IMAGES}
+//    FK_AUTOUPDATED_FILES: parseAutoupdatedFiles(UnUTF(data2));
+    FK_AUTOUPDATED_FILES: parseAutoupdatedFiles();
+    FK_HFS_BUILD: loadingVFS.build:= UnUTF(data2);
+    FK_HEAD, FK_HFS_VER: ; // recognize these fields, but do nothing
+    else loadingVFS.unkFK:=TRUE;
+    end;
+freeAndNIL(tlv);
+// legacy: in build #213 special usernames renamed for uniformity, and usernames are now sorted for faster access
+for act:=low(act) to high(act) do
+  if loadingVFS.build < '213' then
+    begin
+    replaceString(f.accounts[act], '*', USER_ANYONE);
+    replaceString(f.accounts[act], '*+', USER_ANY_ACCOUNT);
+    uniqueStrings(f.accounts[act]);
+    sortArray(f.accounts[act]);
+    // for a little time, we tried to replace anyone with any+anon. it was a failed and had to revert.
+    if stringExists(loadingVFS.build, ['211','212'])
+    and stringExists(USER_ANY_ACCOUNT, f.accounts[act])
+    and stringExists(USER_ANONYMOUS, f.accounts[act]) then
+      begin
+      removeString(USER_ANY_ACCOUNT, f.accounts[act]);
+      replaceString(f.accounts[act], USER_ANONYMOUS, USER_ANYONE);
+      end;
+    end;
+
+if FA_VIS_ONLY_ANON in f.flags then
+  loadingVFS.visOnlyAnon:=TRUE;
+if f.isVirtualFolder() or f.isLink() then
+  f.mtime:=f.atime;
+if assigned(f.accounts[FA_UPLOAD]) and (f.resource > '') then
+  addString(f.resource, uploadPaths);
+f.setupImage(mainfrm.useSystemIconsChk.checked, node);
+if after.resetLetBrowse then
+  f.recursiveApply(setBrowsable, integer(FA_BROWSABLE in f.flags));
+  *)
+end; // setVFSJ
 
 function addVFSheader(vfsdata: RawByteString): RawByteString;
 begin
@@ -7631,7 +7811,7 @@ begin
 if blockLoadSave() then exit;
 if not checkVfsOnQuit() then exit;
 fn:='';
-if promptForFileName(fn, 'VirtualFileSystem|*.vfs', 'vfs', MSG_OPEN_VFS) then
+if promptForFileName(fn, 'VirtualFileSystem|*.vfs|VirtualFileSystem JSON|*.vfsj|VirtualFileSystem JSON Zipped|*.vfsjz', 'vfs', MSG_OPEN_VFS) then
   loadVFS(fn);
 end;
 
@@ -8181,79 +8361,148 @@ var
   function anyAutosavingFeatureEnabled():boolean;
   begin  result:=(autosaveVFS.every > 0) or autosaveVFSchk.checked end;
 
-  function restoreBak():boolean;
+  function restoreBak(var dd: RawByteString): boolean;
   begin
-  result:=fileExists(fn+BAK_EXT)
-    and (not fileExists(fn) or renameFile(fn, fn+CORRUPTED_EXT))
-    and renameFile(fn+BAK_EXT, fn);
-  if result then
-    data2 := loadfile(fn);
+    result := fileExists(fn+BAK_EXT)
+      and (not fileExists(fn) or renameFile(fn, fn+CORRUPTED_EXT))
+      and renameFile(fn+BAK_EXT, fn);
+    if result then
+      dd := loadfile(fn);
   end; // restoreBak
 
 begin
-if fn = '' then exit;
-filesBox.hide(); // it seems to speed up a lot
-progFrm.show('Loading VFS...', TRUE);
-disableUserInteraction();
-try
-  ZeroMemory(@loadingVFS, sizeof(loadingVFS));
-  took:=now();
-  data2 := loadfile(fn);
-  loadingVfs.bakAvailable:=fileExists(fn+BAK_EXT);
-  if not ansiStartsStr(TLV(FK_HEAD, VFS_FILE_IDENTIFIER), data2)
-  and not restoreBak() then
-    begin
-    if data2 = '' then
-    msgDlg(MSG_CORRUPTED, MB_ICONERROR);
+  if fn = '' then
     exit;
-    end;
-  try
-    initVFS();
-    setVFS2(data2);
-    if loadingVFS.useBackup and restoreBak() then
-      begin
-      initVFS();
-      setVFS2(loadfile(fn));
+  if ExtractFileExt(fn) = '.vfsjz' then
+    begin // JSON in Zip
+      filesBox.hide(); // it seems to speed up a lot
+      progFrm.show('Loading VFS...', TRUE);
+      disableUserInteraction();
+      try
+        ZeroMemory(@loadingVFS, sizeof(loadingVFS));
+        took := now();
+
+        data2 := loadfile(fn);
+        loadingVfs.bakAvailable:=fileExists(fn+BAK_EXT);
+        if not ansiStartsStr(TLV(FK_HEAD, VFS_FILE_IDENTIFIER), data2)
+        and not restoreBak(data2) then
+          begin
+          if data2 = '' then
+          msgDlg(MSG_CORRUPTED, MB_ICONERROR);
+          exit;
+          end;
+        try
+          initVFS();
+          setVFS2(data2);
+          if loadingVFS.useBackup and restoreBak(data2) then
+            begin
+            initVFS();
+            setVFS2(data2);
+            end;
+          took:=now()-took;
+         finally
+          if progFrm.cancelRequested then
+            initVFS()
+           else
+            lastFileOpen:=fn;
+          VFSmodified:=FALSE;
+          purgeVFSaccounts(); // remove references to non-existent users
+          filesBox.FullCollapse();
+          rootNode.Selected:=TRUE;
+          rootNode.MakeVisible();
+        end;
+       finally
+        reenableUserInteraction();
+        progFrm.hide();
+        filesBox.show();
       end;
-    took:=now()-took;
-  finally
-    if progFrm.cancelRequested then initVFS()
-    else lastFileOpen:=fn;
-    VFSmodified:=FALSE;
-    purgeVFSaccounts(); // remove references to non-existent users
-    filesBox.FullCollapse();
-    rootNode.Selected:=TRUE;
-    rootNode.MakeVisible();
+      if progFrm.cancelRequested then exit;
+      if loadingVFS.macrosFound
+      and not stringExists(fn, trustedFiles)
+      and (msgDlg(MSG_MACROS_FOUND, MB_ICONWARNING+MB_YESNO, MSG_LOADING_VFS) = mrNo) then
+        begin
+        initVFS();
+        exit;
+        end;
+      addUniqueString(fn, trustedFiles);
+      if loadingVFS.visOnlyAnon then
+        msgDlg(MSG_VIS_ONLY_ANON, MB_ICONWARNING, MSG_LOADING_VFS);
+      if loadingVFS.resetLetBrowse then msgDlg(MSG_VFS_OLD, MB_ICONWARNING, MSG_LOADING_VFS);
+      if loadingVFS.unkFK then msgDlg(MSG_UNK_FK, MB_ICONWARNING, MSG_LOADING_VFS);
+
+      with loadingVFS do disableAutosave:=unkFK or resetLetBrowse or visOnlyAnon;
+      if loadingVFS.disableAutosave and anyAutosavingFeatureEnabled() then
+        msgDlg(MSG_AUTO_DISABLED, MB_ICONWARNING, MSG_LOADING_VFS);
+
+      setStatusBarText(format('Loaded in %.1f seconds (%s)', [took*SECONDS,fn]), 10);
+    end
+   else
+    begin
+      filesBox.hide(); // it seems to speed up a lot
+      progFrm.show('Loading VFS...', TRUE);
+      disableUserInteraction();
+      try
+        ZeroMemory(@loadingVFS, sizeof(loadingVFS));
+        took:=now();
+        data2 := loadfile(fn);
+        loadingVfs.bakAvailable:=fileExists(fn+BAK_EXT);
+        if not ansiStartsStr(TLV(FK_HEAD, VFS_FILE_IDENTIFIER), data2)
+        and not restoreBak(data2) then
+          begin
+          if data2 = '' then
+          msgDlg(MSG_CORRUPTED, MB_ICONERROR);
+          exit;
+          end;
+        try
+          initVFS();
+          setVFS2(data2);
+          if loadingVFS.useBackup and restoreBak(data2) then
+            begin
+            initVFS();
+            setVFS2(data2);
+            end;
+          took:=now()-took;
+         finally
+          if progFrm.cancelRequested then
+            initVFS()
+           else
+            lastFileOpen:=fn;
+          VFSmodified:=FALSE;
+          purgeVFSaccounts(); // remove references to non-existent users
+          filesBox.FullCollapse();
+          rootNode.Selected:=TRUE;
+          rootNode.MakeVisible();
+        end;
+       finally
+        reenableUserInteraction();
+        progFrm.hide();
+        filesBox.show();
+      end;
+      if progFrm.cancelRequested then exit;
+      if loadingVFS.macrosFound
+      and not stringExists(fn, trustedFiles)
+      and (msgDlg(MSG_MACROS_FOUND, MB_ICONWARNING+MB_YESNO, MSG_LOADING_VFS) = mrNo) then
+        begin
+        initVFS();
+        exit;
+        end;
+      addUniqueString(fn, trustedFiles);
+      if loadingVFS.visOnlyAnon then
+        msgDlg(MSG_VIS_ONLY_ANON, MB_ICONWARNING, MSG_LOADING_VFS);
+      if loadingVFS.resetLetBrowse then msgDlg(MSG_VFS_OLD, MB_ICONWARNING, MSG_LOADING_VFS);
+      if loadingVFS.unkFK then msgDlg(MSG_UNK_FK, MB_ICONWARNING, MSG_LOADING_VFS);
+
+      with loadingVFS do disableAutosave:=unkFK or resetLetBrowse or visOnlyAnon;
+      if loadingVFS.disableAutosave and anyAutosavingFeatureEnabled() then
+        msgDlg(MSG_AUTO_DISABLED, MB_ICONWARNING, MSG_LOADING_VFS);
+
+      setStatusBarText(format('Loaded in %.1f seconds (%s)', [took*SECONDS,fn]), 10);
     end;
-finally
-  reenableUserInteraction();
-  progFrm.hide();
-  filesBox.show();
-  end;
-if progFrm.cancelRequested then exit;
-if loadingVFS.macrosFound
-and not stringExists(fn, trustedFiles)
-and (msgDlg(MSG_MACROS_FOUND, MB_ICONWARNING+MB_YESNO, MSG_LOADING_VFS) = mrNo) then
-  begin
-  initVFS();
-  exit;
-  end;
-addUniqueString(fn, trustedFiles);
-if loadingVFS.visOnlyAnon then
-  msgDlg(MSG_VIS_ONLY_ANON, MB_ICONWARNING, MSG_LOADING_VFS);
-if loadingVFS.resetLetBrowse then msgDlg(MSG_VFS_OLD, MB_ICONWARNING, MSG_LOADING_VFS);
-if loadingVFS.unkFK then msgDlg(MSG_UNK_FK, MB_ICONWARNING, MSG_LOADING_VFS);
 
-with loadingVFS do disableAutosave:=unkFK or resetLetBrowse or visOnlyAnon;
-if loadingVFS.disableAutosave and anyAutosavingFeatureEnabled() then
-  msgDlg(MSG_AUTO_DISABLED, MB_ICONWARNING, MSG_LOADING_VFS);
-
-setStatusBarText(format('Loaded in %.1f seconds (%s)', [took*SECONDS,fn]), 10);
-
-removestring(fn, recentFiles); // avoid duplicates
-insertstring(fn, 0, recentFiles); // insert fn as first element
-removeString(recentFiles, MAX_RECENT_FILES, length(recentFiles)); // shrink2max
-updateRecentFilesMenu();
+  removestring(fn, recentFiles); // avoid duplicates
+  insertstring(fn, 0, recentFiles); // insert fn as first element
+  removeString(recentFiles, MAX_RECENT_FILES, length(recentFiles)); // shrink2max
+  updateRecentFilesMenu();
 end; // loadVFS
 
 procedure TmainFrm.logBoxChange(Sender: TObject);
@@ -8402,16 +8651,14 @@ procedure Tmainfrm.initVFS();
 var
   f:Tfile;
 begin
-uploadPaths:=NIL;
-if assigned(rootNode) then rootNode.delete();
-f:=Tfile.createVirtualFolder(filesBox, '/');
-f.flags:=f.flags+[FA_ROOT, FA_ARCHIVABLE];
-f.dontCountAsDownloadMask:='*.htm;*.html;*.css';
-f.defaultFileMask:='index.html;index.htm;default.html;default.htm';
-fileSrv.rootFile:=f;
-addFile(f, NIL, TRUE, rootNode);
-VFSmodified:=FALSE;
-lastFileOpen:='';
+  uploadPaths := NIL;
+  if assigned(rootNode) then
+    rootNode.delete();
+  rootNode := NIL;
+  f := fileSrv.initRoot(filesBox);
+  addFile(f, NIL, TRUE, rootNode);
+  VFSmodified:=FALSE;
+  lastFileOpen:='';
 end; // initVFS
 
 procedure TmainFrm.alwaysontopChkClick(Sender: TObject);
@@ -8547,7 +8794,7 @@ procedure TmainFrm.traymessage1Click(Sender: TObject);
 begin showOptions(optionsFrm.trayPage) end;
 
 procedure TmainFrm.Guide1Click(Sender: TObject);
-begin openURL('http://www.rejetto.com/hfs/guide/') end;
+begin openURL(HFS_GUIDE_URL) end;
 
 procedure Tmainfrm.saveVFS(fn:string='');
 begin
@@ -8555,24 +8802,36 @@ if blockLoadSave() then exit;
 if fn = '' then
   begin
   fn:=lastFileOpen;
-  if not promptForFileName(fn, 'VirtualFileSystem|*.vfs', 'vfs', 'Save VFS', '', TRUE) then
+  if not promptForFileName(fn, 'VirtualFileSystem|*.vfs|VirtualFileSystem JSON|*.vfsj|VirtualFileSystem JSON Zipped|*.vfsjz', 'vfs', 'Save VFS', '', TRUE) then
     exit;
   end;
-lastFileOpen:=fn;
-deleteFile(fn+BAK_EXT);
-renameFile(fn, fn+BAK_EXT);
-if not savefileA(fn, addVFSheader(getVFS())) then
-  begin
-  deleteFile(fn);
-  renameFile(fn+BAK_EXT, fn);
-  msgDlg('Error saving', MB_ICONERROR);
-  exit;
-  end;
-if not backupSavingChk.checked then
-  deleteFile(fn+BAK_EXT);
-VFSmodified:=FALSE;
-loadingVFS.disableAutosave:=FALSE;
-addUniqueString(fn, trustedFiles);
+  if isExtension(fn, '.vfsj') then
+    begin
+      savefileA(fn, getVFSJ());
+    end
+   else
+  if isExtension(fn, '.vfsjz') then
+    begin
+      savefileA(fn, getVFSJZ());
+    end
+   else
+    begin
+      lastFileOpen:=fn;
+      deleteFile(fn+BAK_EXT);
+      renameFile(fn, fn+BAK_EXT);
+      if not savefileA(fn, addVFSheader(getVFS())) then
+        begin
+        deleteFile(fn);
+        renameFile(fn+BAK_EXT, fn);
+        msgDlg('Error saving', MB_ICONERROR);
+        exit;
+        end;
+      if not backupSavingChk.checked then
+        deleteFile(fn+BAK_EXT);
+      VFSmodified:=FALSE;
+      loadingVFS.disableAutosave:=FALSE;
+      addUniqueString(fn, trustedFiles);
+    end;
 end; // saveVFS
 
 procedure TmainFrm.filesBoxAddition(Sender: TObject; Node: TTreeNode);
@@ -10136,23 +10395,9 @@ with sender as ThttpCli do
   setStatusBarText( format(MSG_DL_PERC, [safeDiv(RcvdCount*100, contentLength)]) );
 end; // statusBarHttpGetUpdate
 
-function purgeFilesCB(f:Tfile; childrenDone:boolean; par, par2: IntPtr):TfileCallbackReturn;
-begin
-result:=[];
-if f.locked or f.isRoot() then exit;
-result:=[FCB_RECALL_AFTER_CHILDREN];
-//if f.isFile() and purgeFrm.rmFilesChk.checked and not fileExists(f.resource)
-//or f.isRealFolder() and purgeFrm.rmRealFoldersChk.checked and not sysutils.directoryExists(f.resource)
-//or f.isVirtualFolder() and purgeFrm.rmEmptyFoldersChk.checked and (f.node.count = 0)
-if f.isFile() and (par and 1 <> 0) and not fileExists(f.resource)
-or f.isRealFolder() and (par and 2 <> 0) and not sysutils.directoryExists(f.resource)
-or f.isVirtualFolder() and (par and 4 <> 0) and (f.node.count = 0)
-then result:=[FCB_DELETE]; // don't dig further
-end; // purgeFilesCB
-
 procedure TmainFrm.Properties1Click(Sender: TObject);
 begin
-if selectedFile = NIL then exit;                                                                           
+if selectedFile = NIL then exit;
 
 filepropFrm:=TfilepropFrm.Create(mainFrm);
 try
@@ -10161,6 +10406,22 @@ finally freeAndNIL(filepropFrm) end;
 VFSmodified:=TRUE;
 filesBox.invalidate();
 end;
+
+function purgeFilesCB(f:Tfile; childrenDone:boolean; par, par2: IntPtr): TfileCallbackReturn;
+begin
+  result:=[];
+  if f.locked or f.isRoot() then
+    exit;
+  result := [FCB_RECALL_AFTER_CHILDREN];
+  //if f.isFile() and purgeFrm.rmFilesChk.checked and not fileExists(f.resource)
+  //or f.isRealFolder() and purgeFrm.rmRealFoldersChk.checked and not sysutils.directoryExists(f.resource)
+  //or f.isVirtualFolder() and purgeFrm.rmEmptyFoldersChk.checked and (f.node.count = 0)
+  if f.isFile() and (par and 1 <> 0) and not fileExists(f.resource)
+  or f.isRealFolder() and (par and 2 <> 0) and not sysutils.directoryExists(f.resource)
+  or f.isVirtualFolder() and (par and 4 <> 0) and (f.node.count = 0)
+  then
+    result:=[FCB_DELETE]; // don't dig further
+end; // purgeFilesCB
 
 procedure TmainFrm.Purge1Click(Sender: TObject);
 var

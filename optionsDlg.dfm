@@ -32,10 +32,7 @@ object optionsFrm: ToptionsFrm
     object bansPage: TTabSheet
       Caption = 'Bans'
       ImageIndex = 25
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ImageName = '25'
       object Panel1: TPanel
         Left = 0
         Top = 0
@@ -119,10 +116,7 @@ object optionsFrm: ToptionsFrm
     object accountsPage: TTabSheet
       Caption = 'Accounts'
       ImageIndex = 29
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ImageName = '29'
       DesignSize = (
         797
         385)
@@ -420,10 +414,7 @@ object optionsFrm: ToptionsFrm
     object mimePage: TTabSheet
       Caption = 'MIME types'
       ImageIndex = 7
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ImageName = '7'
       object mimeBox: TValueListEditor
         Left = 0
         Top = 30
@@ -480,10 +471,7 @@ object optionsFrm: ToptionsFrm
     object trayPage: TTabSheet
       Caption = 'Tray Message'
       ImageIndex = 10
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ImageName = '10'
       object Label2: TLabel
         Left = 8
         Top = 16
@@ -529,10 +517,6 @@ object optionsFrm: ToptionsFrm
     object a2nPage: TTabSheet
       Caption = 'Address2name'
       ImageIndex = -1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Panel4: TPanel
         Left = 0
         Top = 0
@@ -592,10 +576,6 @@ object optionsFrm: ToptionsFrm
     object iconsPage: TTabSheet
       Caption = 'Icon masks'
       ImageIndex = -1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         797
         385)

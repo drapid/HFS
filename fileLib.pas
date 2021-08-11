@@ -5,7 +5,7 @@ interface
 
 uses
   // delphi libs
-  Windows, Messages, Graphics, Forms, ComCtrls, math, Types, SysUtils,
+  Windows, Messages, Graphics, Forms, ComCtrls, math, Types, SysUtils, JSON,
   HSLib, srvClassesLib;
 
 type
@@ -48,6 +48,9 @@ type
   TLoadPrefs = set of (lpION, lpHideProt, lpSysAttr, lpHdnAttr, lpSnglCmnt, lpFingerPrints, lpRecurListing, lpOEMForION);
 
   TFindFileNode = function(f: TFile): TTreeNode;
+
+  TIconsIdxArray = array of integer;
+
 
   Tfile = class (Tobject)
   private
@@ -112,7 +115,12 @@ type
     function  getDynamicComment(loadPrefs: TLoadPrefs; skipParent:boolean=FALSE):string;
     procedure setDynamicComment(loadPrefs: TLoadPrefs; cmt:string);
     function  getRecursiveDiffTplAsStr(outInherited:Pboolean=NIL; outFromDisk:Pboolean=NIL):string;
-    // locking prevents modification of all its ancestors and descendants
+    function  getVFS(): RawByteString;
+    function  getVFSJ(): RawByteString;
+    function  getVFSJV(): TJSONObject;
+    function  getVFSZ(): RawByteString;
+    function  getVFSJZ(var p_icons: TIconsIdxArray): TJSONObject;
+     // locking prevents modification of all its ancestors and descendants
     procedure lock();
     procedure unlock();
     procedure SyncNode(pNode: Ttreenode);
@@ -137,16 +145,58 @@ function isFingerprintFile(const lp: TLoadPrefs; const fn: string): boolean;
 function hasRightAttributes(const lp: TLoadPrefs; const fn: string): boolean; overload;
 function hasRightAttributes(const lp: TLoadPrefs; attr:integer): boolean; overload;
 function findNameInDescriptionFile(const txt, name:string):integer;
+function freeIfTemp(var f:Tfile):boolean; inline;
+function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
+function str_(fa:TfileAttributes): RawByteString; overload;
 
 function loadMD5for(const fn: String): String;
 
 const
   FILEACTION2STR: array [TfileAction] of string = ('Access', 'Delete', 'Upload');
 
+const
+  // IDs used for file chunks
+  FK_HEAD = 0;
+  FK_RESOURCE = 1;
+  FK_NAME = 2;
+  FK_FLAGS = 3;
+  FK_NODE = 4;
+  FK_FORMAT_VER = 5;
+  FK_CRC = 6;
+  FK_COMMENT = 7;
+  FK_USERPWD = 8;
+  FK_USERPWD_UTF8 = 108;
+  FK_ADDEDTIME = 9;
+  FK_DLCOUNT = 10;
+  FK_ROOT = 11;
+  FK_ACCOUNTS = 12;
+  FK_FILESFILTER = 13;
+  FK_FOLDERSFILTER = 14;
+{$IFDEF HFS_GIF_IMAGES}
+  FK_ICON_GIF = 15;
+{$ELSE ~HFS_GIF_IMAGES}
+  FK_ICON_GIF = 15;
+  FK_ICON_PNG = 115;
+  FK_ICON32_PNG = 116;
+  FK_ICON_IDX = 117;
+{$ENDIF HFS_GIF_IMAGES}
+  FK_REALM = 16;
+  FK_UPLOADACCOUNTS = 17;
+  FK_DEFAULTMASK = 18;
+  FK_DONTCOUNTASDOWNLOADMASK = 19;
+  FK_AUTOUPDATED_FILES = 20;
+  FK_DONTCOUNTASDOWNLOAD = 21;
+  FK_HFS_VER = 22;
+  FK_HFS_BUILD = 23;
+  FK_COMPRESSED_ZLIB = 24;
+  FK_DIFF_TPL = 25;
+  FK_UPLOADFILTER = 26;
+  FK_DELETEACCOUNTS = 27;
+
 type
   TstringIntPairs = array of record
-    str:string;
-    int:integer;
+    str: string;
+    int: integer;
    end;
 
 
@@ -159,10 +209,10 @@ implementation
 uses
   strutils, iniFiles, Classes,
   RegExpr,
-  serverLib, srvConst, srvUtils, srvVars, IconsLib,
-  RDUtils, RDFileUtil, RDSysUtils,
+  RDUtils, RDFileUtil, RDSysUtils, RnQZip,
+  serverLib,
+  srvConst, srvUtils, srvVars, IconsLib,
   parserLib
-//  hfsGlobal, scriptLib
   ;
 
 function loadDescriptionFile(const lp: TLoadPrefs; const fn: string): string;
@@ -245,8 +295,49 @@ if findFirst(mask, faAnyFile, sr) = 0 then
   finally findClose(sr) end;
 end; // getFiles
 
+function freeIfTemp(var f:Tfile):boolean; inline;
+begin
+try
+  result:=assigned(f) and f.isTemp();
+  if result then freeAndNIL(f);
+except result:=FALSE end;
+end; // freeIfTemp
 
+function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
+var
+  a: TStringDynArray;
+begin
+result:=FALSE;
+if f = NIL then exit;
+if action = FA_ACCESS then
+  begin
+  result:= f.accessFor(cd);
+  exit;
+  end;
+if f.isTemp() then
+  f:=f.parent;
+if (action = FA_UPLOAD) and not f.isRealFolder() then exit;
 
+  repeat
+  a:=f.accounts[action];
+  if assigned(a)
+  and not ((action = FA_UPLOAD) and not f.isRealFolder()) then break;
+  f:=f.parent;
+  if f = NIL then exit;
+  until false;
+
+result:=TRUE;
+if stringExists(USER_ANYONE, a, TRUE) then exit;
+result:=(cd.usr = '') and stringExists(USER_ANONYMOUS, a, TRUE)
+  or assigned(cd.account) and stringExists(USER_ANY_ACCOUNT, a, TRUE)
+  or (NIL <> findEnabledLinkedAccount(cd.account, a, TRUE));
+end; // accountAllowed
+
+// converts from TfileAttributes to string[4]
+function str_(fa:TfileAttributes): RawByteString; overload;
+begin result:=str_(integer(fa)) end;
+
+////////////---------------------------------------------///////////////
 constructor Tfile.create(pTree: TTreeView; fullpath: String);
 begin
   fullpath:=ExcludeTrailingPathDelimiter(fullpath);
@@ -271,7 +362,7 @@ include(flags, FA_TEMP);
     tempParent := NIL;
 end; // createTemp
 
-constructor Tfile.createVirtualFolder(pTree: TTreeView; const name:string);
+constructor Tfile.createVirtualFolder(pTree: TTreeView; const name: string);
 begin
   fMainTreeView := pTree;
 icon:=-1;
@@ -351,6 +442,307 @@ begin
       n.Text := name;
    end;
 end; // setName
+
+function TFile.getVFS(): RawByteString;
+  function getAutoupdatedFiles():RawByteString;
+  var
+    i: integer;
+    fn: string;
+  begin
+  result:='';
+  i:=0;
+  while i < autoupdatedFiles.Count do
+    begin
+    fn:=autoupdatedFiles[i];
+    result:=result+TLV(FK_NODE, TLV(FK_NAME, StrToUTF8(fn))
+      + TLV(FK_DLCOUNT, str_(autoupdatedFiles.getInt(fn))) );
+    inc(i);
+    end;
+  end; // getAutoupdatedFiles
+
+var
+  i: integer;
+  commonFields, s: RawByteString;
+begin
+//  nn := node;
+  commonFields := TLV(FK_FLAGS, str_(self.flags))
+    +TLVS_NOT_EMPTY(FK_RESOURCE, self.resource)
+    +TLVS_NOT_EMPTY(FK_COMMENT, self.comment)
+    +if_(self.user>'', TLV(FK_USERPWD, b64R(AnsiString(self.user+':'+self.pwd))))
+    +if_(self.user>'', TLV(FK_USERPWD_UTF8, b64utf8(self.user+':'+self.pwd)))
+    +TLVS_NOT_EMPTY(FK_ACCOUNTS, join(';', self.accounts[FA_ACCESS]) )
+    +TLVS_NOT_EMPTY(FK_UPLOADACCOUNTS, join(';', self.accounts[FA_UPLOAD]))
+    +TLVS_NOT_EMPTY(FK_DELETEACCOUNTS, join(';', self.accounts[FA_DELETE]))
+    +TLVS_NOT_EMPTY(FK_FILESFILTER, self.filesfilter)
+    +TLVS_NOT_EMPTY(FK_FOLDERSFILTER, self.foldersfilter)
+    +TLVS_NOT_EMPTY(FK_REALM, self.realm)
+    +TLVS_NOT_EMPTY(FK_DEFAULTMASK, self.defaultFileMask)
+    +TLVS_NOT_EMPTY(FK_UPLOADFILTER, self.uploadFilterMask)
+    +TLVS_NOT_EMPTY(FK_DONTCOUNTASDOWNLOADMASK, self.dontCountAsDownloadMask)
+    +TLVS_NOT_EMPTY(FK_DIFF_TPL, self.diffTpl);
+
+  result:='';
+  if self.isRoot() then
+    result:=result+TLV(FK_ROOT, commonFields );
+  for i:=0 to node.Count-1 do
+    begin
+    var
+      ff: TFile := nodetofile(node.item[i]);
+      if Assigned(ff) then
+         result := result+ ff.getVFS(); // recursion
+    end;
+  if self.isRoot() then
+    begin
+    result := result+TLV_NOT_EMPTY(FK_AUTOUPDATED_FILES, getAutoupdatedFiles() );
+    exit;
+    end;
+  if not self.isFile() then
+    s := ''
+   else
+    s := TLV(FK_DLCOUNT, str_(self.DLcount)); // called on a folder would be recursive
+
+// for non-root nodes, subnodes must be calculated first, so to be encapsulated
+  result := TLV(FK_NODE, commonFields
+                +TLVS_NOT_EMPTY(FK_NAME, self.name)
+                +TLV(FK_ADDEDTIME, str_(self.atime))
+              {$IFDEF HFS_GIF_IMAGES}
+                +TLV_NOT_EMPTY(FK_ICON_GIF, pic2str(self.icon))
+              {$ELSE ~HFS_GIF_IMAGES}
+                +TLV_NOT_EMPTY(FK_ICON_PNG, pic2str(self.icon, 16))
+                +TLV_NOT_EMPTY(FK_ICON32_PNG, pic2str(self.icon, 32))
+              {$ENDIF HFS_GIF_IMAGES}
+                +s
+                +result // subnodes
+          );
+end;
+
+function TFile.getVFSJ(): RawByteString;
+begin
+  Result := StrToUTF8(getVFSJV.ToString);
+end;
+
+function TFile.getVFSJV(): TJSONObject;
+
+  function getAutoupdatedFilesJ(): RawByteString;
+  var
+    i: integer;
+    fn: string;
+  begin
+  result := '';
+  i := 0;
+  while i < autoupdatedFiles.Count do
+    begin
+      fn := autoupdatedFiles[i];
+      result := result+TLV(FK_NODE, TLV(FK_NAME, StrToUTF8(fn))
+        + TLV(FK_DLCOUNT, str_(autoupdatedFiles.getInt(fn))) );
+      inc(i);
+    end;
+  end; // getAutoupdatedFiles
+
+  procedure addval(var o: TJSONObject; key: Integer; val: RawByteString); OverLoad;
+  begin
+    if val > '' then
+      begin
+        o.AddPair(IntToStr(key), str2hexU(val));
+      end;
+  end;
+  procedure addval(var o: TJSONObject; key: Integer; val: String); OverLoad;
+  begin
+    if val > '' then
+      begin
+        o.AddPair(IntToStr(key), val);
+      end;
+  end;
+var
+  i: integer;
+  commonFields: TJSONObject;
+  subFiles: TJSONArray;
+begin
+//  nn := node;
+  commonFields := TJSONObject.Create;
+  addval(commonFields, FK_FLAGS, str_(self.flags));
+  addval(commonFields, FK_RESOURCE, self.resource);
+  addval(commonFields, FK_COMMENT, self.comment);
+  if self.user>'' then
+    begin
+      addval(commonFields, FK_USERPWD_UTF8, b64utf8(self.user+':'+self.pwd));
+    end;
+  addval(commonFields, FK_ACCOUNTS, join(';', self.accounts[FA_ACCESS]));
+  addval(commonFields, FK_UPLOADACCOUNTS, join(';', self.accounts[FA_UPLOAD]));
+  addval(commonFields, FK_DELETEACCOUNTS, join(';', self.accounts[FA_DELETE]));
+  addval(commonFields, FK_FILESFILTER, self.filesfilter);
+  addval(commonFields, FK_FOLDERSFILTER, self.foldersfilter);
+  addval(commonFields, FK_REALM, self.realm);
+  addval(commonFields, FK_DEFAULTMASK, self.defaultFileMask);
+  addval(commonFields, FK_UPLOADFILTER, self.uploadFilterMask);
+  addval(commonFields, FK_DONTCOUNTASDOWNLOADMASK, self.dontCountAsDownloadMask);
+  addval(commonFields, FK_DIFF_TPL, self.diffTpl);
+
+  Result := TJSONObject.Create;
+  if self.isRoot() then
+    Result.AddPair(IntToStr(FK_ROOT), commonFields);
+
+  subFiles := TJSONArray.Create;
+  if node.Count > 0 then
+    begin
+      for i:=0 to node.Count-1 do
+        begin
+        var
+          ff: TFile := nodetofile(node.item[i]);
+          if Assigned(ff) then
+             subFiles.Add(ff.getVFSJV()); // recursion
+        end;
+    end;
+  if self.isRoot() then
+    begin
+      Result.AddPair('nodes', subFiles);
+      addval(Result, FK_AUTOUPDATED_FILES, getAutoupdatedFilesJ() );
+      exit;
+    end;
+
+//  addVal(Result, FK_NODE, commonFields);
+  Result.AddPair(IntToStr(FK_NODE), commonFields);
+  addVal(Result, FK_NAME, self.name);
+  addVal(Result, FK_ADDEDTIME, str_(self.atime));
+  addVal(Result, FK_ICON_PNG, pic2str(self.icon, 16));
+  addVal(Result, FK_ICON32_PNG, pic2str(self.icon, 32));
+  if self.isFile() then
+    addVal(Result, FK_DLCOUNT, str_(self.DLcount));
+  Result.AddPair('nodes', subFiles);
+end;
+
+function TFile.getVFSZ(): RawByteString;
+var
+  ResJ: TJSONObject;
+  ResZ: TZipFile;
+  icons: TIconsIdxArray;
+  stream: Tbytesstream;
+begin
+  ResJ := getVFSJZ(icons);
+  ResZ := TZipFile.create;
+
+  ResZ.AddFile('VFS.json', 0, '', StrToUTF8(ResJ.ToString));
+  if Length(icons) > 0 then
+    for var i := Low(icons) to High(icons) do
+      begin
+        var img: RawByteString;
+        img := pic2str(icons[i], 16);
+        if img > '' then
+          ResZ.AddFile(intToStr(icons[i]) + '.png', 0, '', img);
+
+        img := pic2str(icons[i], 32);
+        if img > '' then
+          ResZ.AddFile(intToStr(icons[i]) + '_BIG.png', 0, '', img);
+      end;
+  stream := TBytesStream.create();
+  ResZ.SaveToStream(stream);
+  setLength(result, stream.size);
+  move(stream.bytes[0], result[1], stream.size);
+  stream.free;
+  ResZ.Free;
+  ResJ.Free;
+end;
+
+function TFile.getVFSJZ(var p_icons: TIconsIdxArray): TJSONObject;
+
+  function getAutoupdatedFiles(): RawByteString;
+  var
+    i: integer;
+    fn: string;
+  begin
+  result:='';
+  i:=0;
+  while i < autoupdatedFiles.Count do
+    begin
+    fn:=autoupdatedFiles[i];
+    result:=result+TLV(FK_NODE, TLV(FK_NAME, StrToUTF8(fn))
+      + TLV(FK_DLCOUNT, str_(autoupdatedFiles.getInt(fn))) );
+    inc(i);
+    end;
+  end; // getAutoupdatedFiles
+
+  procedure addval(var o: TJSONObject; key: Integer; val: RawByteString); OverLoad;
+  begin
+    if val > '' then
+      begin
+        o.AddPair(IntToStr(key), str2hexU(val));
+      end;
+  end;
+  procedure addval(var o: TJSONObject; key: Integer; val: String); OverLoad;
+  begin
+    if val > '' then
+      begin
+        o.AddPair(IntToStr(key), val);
+      end;
+  end;
+  procedure addIcon(ic: Integer);
+  begin
+    if ic <= 0 then
+     Exit;
+    for var I := Low(p_icons) to High(p_icons) do
+      if p_icons[i] = ic then
+        Exit;
+    SetLength(p_icons, Length(p_icons) + 1);
+    p_icons[Length(p_icons)-1] := ic;
+  end;
+var
+  i: integer;
+  commonFields: TJSONObject;
+  subFiles: TJSONArray;
+begin
+//  nn := node;
+  commonFields := TJSONObject.Create;
+  addval(commonFields, FK_FLAGS, str_(self.flags));
+  addval(commonFields, FK_RESOURCE, self.resource);
+  addval(commonFields, FK_RESOURCE, self.resource);
+  addval(commonFields, FK_COMMENT, self.comment);
+  if self.user>'' then
+    begin
+      addval(commonFields, FK_USERPWD_UTF8, b64utf8(self.user+':'+self.pwd));
+    end;
+  addval(commonFields, FK_ACCOUNTS, join(';', self.accounts[FA_ACCESS]));
+  addval(commonFields, FK_UPLOADACCOUNTS, join(';', self.accounts[FA_UPLOAD]));
+  addval(commonFields, FK_DELETEACCOUNTS, join(';', self.accounts[FA_DELETE]));
+  addval(commonFields, FK_FILESFILTER, self.filesfilter);
+  addval(commonFields, FK_FOLDERSFILTER, self.foldersfilter);
+  addval(commonFields, FK_REALM, self.realm);
+  addval(commonFields, FK_DEFAULTMASK, self.defaultFileMask);
+  addval(commonFields, FK_UPLOADFILTER, self.uploadFilterMask);
+  addval(commonFields, FK_DONTCOUNTASDOWNLOADMASK, self.dontCountAsDownloadMask);
+  addval(commonFields, FK_DIFF_TPL, self.diffTpl);
+
+  Result := TJSONObject.Create;
+  if self.isRoot() then
+    Result.AddPair(IntToStr(FK_ROOT), commonFields);
+
+  subFiles := TJSONArray.Create;
+  if node.Count > 0 then
+    begin
+      for i:=0 to node.Count-1 do
+        begin
+        var
+          ff: TFile := nodetofile(node.item[i]);
+          if Assigned(ff) then
+             subFiles.Add(ff.getVFSJV()); // recursion
+        end;
+    end;
+  if self.isRoot() then
+    begin
+      Result.AddPair('nodes', subFiles);
+      addval(Result, FK_AUTOUPDATED_FILES, getAutoupdatedFiles() );
+      exit;
+    end;
+
+//  addVal(Result, FK_NODE, commonFields);
+  Result.AddPair(IntToStr(FK_NODE), commonFields);
+  addVal(Result, FK_NAME, self.name);
+  addVal(Result, FK_ADDEDTIME, str_(self.atime));
+  addVal(Result, FK_ICON_IDX, IntToStr(self.icon));
+  addIcon(self.icon);
+  if self.isFile() then
+    addVal(Result, FK_DLCOUNT, str_(self.DLcount));
+  Result.AddPair('nodes', subFiles);
+end;
 
 procedure TFile.SyncNode(pNode: Ttreenode);
 begin

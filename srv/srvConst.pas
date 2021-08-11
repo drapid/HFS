@@ -6,7 +6,7 @@ uses
   graphics, Types, SysUtils;
 
 const
-  VERSION = '2.4.0 RC8 RD';
+  VERSION = '2.4.0 RC8 RD' {$IFDEF CPUX64 } +' x64' {$ENDIF};
   VERSION_BUILD = '320';
   VERSION_STABLE = {$IFDEF STABLE } TRUE {$ELSE} FALSE {$ENDIF};
   CRLF = #13#10;
@@ -30,8 +30,8 @@ const
   USER_ANY_ACCOUNT = '@any account';
 
 
-const
-  libsBaseUrl = 'http://rejetto.com/hfs/';
+//const
+//  libsBaseUrl = 'http://rejetto.com/hfs/';
 
 type
   TcharSetA = TSysCharSet; //set of char;

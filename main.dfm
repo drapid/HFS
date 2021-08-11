@@ -1761,6 +1761,10 @@ object mainFrm: TmainFrm
       Checked = True
       OnClick = trayiconforeachdownload1Click
     end
+    object AddIPasreverseproxy1: TMenuItem
+      Caption = 'Add IP as reverse proxy'
+      OnClick = AddIPasreverseproxy1Click
+    end
   end
   object timer: TTimer
     Enabled = False

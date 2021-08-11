@@ -4,7 +4,7 @@ interface
 
 uses
   // delphi libs
-  Windows, Messages, Graphics, Forms, math, Types, SysUtils,
+  Windows, Messages, Graphics, Forms, math, Types, SysUtils, ComCtrls,
   HSLib, srvClassesLib, fileLib;
 
 type
@@ -32,6 +32,7 @@ type
 //    fSP: TShowPrefs;
     fOnGetSP: TOnGetSP;
    public
+    function  initRoot(pTree: TTreeView): TFile;
     function  encodeURLA(const s: string; fullEncode:boolean=FALSE): RawByteString;
     function  encodeURLW(const s: string; fullEncode:boolean=FALSE): String;
     function  pathTill(fl: Tfile; root: Tfile=NIL; delim: char='\'): String;
@@ -60,7 +61,7 @@ var
 implementation
 
 uses
-  strutils, iniFiles, Classes, ComCtrls,
+  strutils, iniFiles, Classes,
   RegExpr,
   utilLib,
   scriptLib,
@@ -578,6 +579,15 @@ finally
   end;
 result:=toSkip;
 end; // fromFolder
+
+function TFileServer.initRoot(pTree: TTreeView): TFile;
+begin
+  rootFile := Tfile.createVirtualFolder(pTree, '/');
+  rootFile.flags := rootFile.flags+[FA_ROOT, FA_ARCHIVABLE];
+  rootFile.dontCountAsDownloadMask:='*.htm;*.html;*.css';
+  rootFile.defaultFileMask:='index.html;index.htm;default.html;default.htm';
+  Result := rootFile;
+end;
 
 function TFileServer.encodeURLA(const s: String; fullEncode:boolean=FALSE): RawByteString;
 var

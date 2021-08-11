@@ -37,7 +37,7 @@ uses
   function removeString(var a:TStringDynArray; idx:integer; l:integer=1):boolean; overload;
   function removeString(s:string; var a:TStringDynArray; onlyOnce:boolean=TRUE; ci:boolean=TRUE; keepOrder:boolean=TRUE):boolean; overload;
   procedure removeStrings(find:string; var a:TStringDynArray);
-  procedure toggleString(s:string; var ss:TStringDynArray);
+  procedure toggleString(const s:string; var ss:TStringDynArray);
   function onlyString(const s: String; ss: TStringDynArray): boolean;
   function addArray(var dst:TstringDynArray; src:array of string; where:integer=-1; srcOfs:integer=0; srcLn:integer=-1):integer;
   function removeArray(var src:TstringDynArray; toRemove:array of string):integer;
@@ -95,18 +95,36 @@ uses
   function b64U(const b: RawByteString): UnicodeString;
   function b64R(const b: RawByteString): RawByteString;
 
-  function dt_(s: RawByteString):Tdatetime;
-  function int_(s: RawByteString):integer;
+  function TLV(t:integer; const data: RawByteString): RawByteString;
+  function TLVS(t:integer; const data: String): RawByteString;
+  function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
+  function TLVS_NOT_EMPTY(t:integer; const data: String): RawByteString;
+
+  function dt_(const s: RawByteString):Tdatetime;
+  function int_(const s: RawByteString):integer;
   function str_(i:integer): RawByteString; overload;
   function str_(t:Tdatetime): RawByteString; overload;
   function str_(b:boolean): RawByteString; overload;
 
+  function compare_(i1,i2:double):integer; overload;
+  function compare_(i1,i2:int64):integer; overload;
+  function compare_(i1,i2:integer):integer; overload;
+
+  function first(a,b:integer):integer; overload;
+  function first(a,b:double):double; overload;
+  function first(a,b:pointer):pointer; overload;
+  function first(const a,b:string):string; overload;
+  function first(a:array of string):string; overload;
+  function first(a:array of RawByteString): RawByteString; overload;
+
   function diskSpaceAt(path:string):int64;
 
-  function accountExists(user:string; evenGroups:boolean=FALSE):boolean;
-  function getAccount(user:string; evenGroups:boolean=FALSE):Paccount;
+  function accountExists(const user:string; evenGroups:boolean=FALSE):boolean;
+  function getAccount(const user:string; evenGroups:boolean=FALSE):Paccount;
   function accountRecursion(account:Paccount; stopCase:TaccountRecursionStopCase; data:pointer=NIL; data2:pointer=NIL):Paccount;
   function findEnabledLinkedAccount(account:Paccount; over:TStringDynArray; isSorted:boolean=FALSE):Paccount;
+  function filetimeToDatetime(ft:TFileTime):Tdatetime;
+  function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSetW=[]):string;
 
 type
   TfastStringAppend = class
@@ -117,7 +135,7 @@ type
     function length():integer;
     function reset():string;
     function get():string;
-    function append(s:string):integer;
+    function append(const s:string):integer;
     end;
 
 const
@@ -126,7 +144,7 @@ const
 
 implementation
 uses
-  math, SysUtils, strutils, RegExpr, iniFiles,
+  math, SysUtils, strutils, RegExpr, iniFiles, DateUtils,
   OverbyteIcsWSocket,
   Base64,
   RDUtils, RnQCrypt,
@@ -155,16 +173,19 @@ buff:='';
 n:=0;
 end; // reset
 
-function TfastStringAppend.append(s:string):integer;
+function TfastStringAppend.append(const s: string):integer;
 var
   ls, lb: integer;
 begin
   ls := system.length(s);
-  lb := system.length(buff);
-  if n+ls > lb then
-    setlength(buff, lb+ls+20000);
-  MoveChars(s[1], buff[n+1], ls);
-  inc(n, ls);
+  if ls > 0 then
+    begin
+      lb := system.length(buff);
+      if n+ls > lb then
+        setlength(buff, lb+ls+20000);
+      MoveChars(s[1], buff[n+1], ls);
+      inc(n, ls);
+    end;
   result:=n;
 end; // append
 
@@ -547,7 +568,7 @@ end;
 function stringExists(s:string; a:array of string; isSorted:boolean=FALSE):boolean;
 begin result:= idxOf(s,a, isSorted) >= 0 end;
 
-procedure toggleString(s:string; var ss:TStringDynArray);
+procedure toggleString(const s:string; var ss:TStringDynArray);
 var
   i: integer;
 begin
@@ -1148,7 +1169,7 @@ begin result:= SHA256PassLS(UTF8Encode(s)) end;
 function strMD5(s:string):string;
 begin Result := LowerCase(MD5PassHS(UTF8Encode(s))); end;
 
-function ipv6hex(ip:TIcsIPv6Address):string;
+function ipv6hex(ip:TIcsIPv6Address):string;
 begin
 setLength(result, 4*8);
 binToHex(@ip.words[0], pchar(result), sizeOf(ip))
@@ -1276,6 +1297,18 @@ begin result:=Base64DecodeString(s); end;
 function decodeB64(const s: RawByteString): RawByteString; OverLoad;
 begin result:=Base64DecodeString(s); end;
 
+function TLV(t:integer; const data: RawByteString): RawByteString;
+begin result:=str_(t)+str_(length(data))+data end;
+
+function TLVS(t:integer; const data: String): RawByteString;
+begin result:=TLV(t, StrToUTF8(data)) end;
+
+function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
+begin if data > '' then result:=TLV(t,data) else result:='' end;
+
+function TLVS_NOT_EMPTY(t:integer; const data: String): RawByteString;
+begin if data > '' then result:=TLV(t, StrToUTF8(data)) else result:='' end;
+
 // converts from integer to string[4]
 function str_(i:integer): RawByteString; overload;
 begin
@@ -1295,7 +1328,7 @@ begin
 end; // str_
 
 // converts from string[4] to integer
-function int_(s: RawByteString):integer;
+function int_(const s: RawByteString):integer;
 var
   s1: String[4];
 begin
@@ -1304,8 +1337,70 @@ begin
 end;
 
 // converts from string[8] to datetime
-function dt_(s: RawByteString):Tdatetime;
+function dt_(const s: RawByteString):Tdatetime;
 begin result:=Pdatetime(@s[1])^ end;
+
+function compare_(i1,i2:int64):integer; overload;
+begin
+  if i1 < i2 then
+    result:=-1
+   else
+    if i1 > i2 then
+      result:=1
+     else
+      result:=0
+end; // compare_
+
+function compare_(i1,i2:integer):integer; overload;
+begin
+if i1 < i2 then result:=-1 else
+if i1 > i2 then result:=1 else
+  result:=0
+end; // compare_
+
+function compare_(i1,i2:double):integer; overload;
+begin
+if i1 < i2 then result:=-1 else
+if i1 > i2 then result:=1 else
+  result:=0
+end; // compare_
+
+// returns the first non empty string
+function first(a:array of string):string;
+var
+  i: integer;
+begin
+result:='';
+for i:=0 to length(a)-1 do
+  begin
+  result:=a[i];
+  if result > '' then exit;
+  end;
+end; // first
+
+function first(a:array of RawByteString): RawByteString; overload;
+var
+  i: integer;
+begin
+result:='';
+for i:=0 to length(a)-1 do
+  begin
+  result:=a[i];
+  if result > '' then exit;
+  end;
+end; // first
+
+function first(const a,b:string):string;
+begin if a = '' then result:=b else result:=a end;
+
+function first(a,b:integer):integer;
+begin if a = 0 then result:=b else result:=a end;
+
+function first(a,b:double):double;
+begin if a = 0 then result:=b else result:=a end;
+
+function first(a,b:pointer):pointer;
+begin if a = NIL then result:=b else result:=a end;
 
 function boolToPtr(b:boolean):pointer;
 begin result:=if_(b, PTR1, NIL) end;
@@ -1326,7 +1421,7 @@ if not getDiskFreeSpaceEx(pchar(path), result, tmp, NIL) then
 end; // diskSpaceAt
 
 
-function getAccount(user:string; evenGroups:boolean=FALSE):Paccount;
+function getAccount(const user:string; evenGroups:boolean=FALSE):Paccount;
 var
   i: integer;
 begin
@@ -1342,7 +1437,7 @@ for i:=0 to length(accounts)-1 do
     end;
 end; // getAccount
 
-function accountExists(user:string; evenGroups:boolean=FALSE):boolean;
+function accountExists(const user:string; evenGroups:boolean=FALSE):boolean;
 begin result:=getAccount(user, evenGroups) <> NIL end;
 
 // this function follows account linking until it finds and returns the account matching the stopCase
@@ -1387,6 +1482,34 @@ end; // accountRecursion
 
 function findEnabledLinkedAccount(account:Paccount; over:TStringDynArray; isSorted:boolean=FALSE):Paccount;
 begin result:=accountRecursion(account, ARSC_IN_SET, over, boolToPtr(isSorted)) end;
+
+function filetimeToDatetime(ft:TFileTime):Tdatetime;
+var
+  st: TsystemTime;
+begin
+FileTimeToLocalFileTime(ft, ft);
+FileTimeToSystemTime(ft, st);
+TryEncodeDateTime(st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, result);
+end; // filetimeToDatetime
+
+function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSetW=[]):string;
+var
+  i, c, l: integer;
+begin
+if spaces = [] then include(spaces, ' ');
+i:=0;
+l:=length(s);
+while i < l do
+  begin
+  inc(i);
+  c:=i;
+  while (c <= l) and (s[c] in spaces) do
+    inc(c);
+  if c = i then continue;
+  replace(s, replacement, i, c-1);
+  end;
+result:=s;
+end; // reduceSpaces
 
 
 INITIALIZATION

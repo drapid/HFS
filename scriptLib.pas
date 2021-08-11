@@ -52,10 +52,9 @@ uses
   windows, graphics, classes, sysutils, StrUtils,
   comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
   Generics.Collections,
-  OverbyteIcsSha1,
-  utilLib, parserLib, main, hfsVars, hfsGlobal,
+  RnQtrayLib, RDFileUtil, RDUtils, RnQCrypt,
   srvUtils, srvVars,
-  RnQtrayLib, RDFileUtil, RDUtils, RnQCrypt;
+  utilLib, parserLib, main, hfsVars, hfsGlobal;
 
 const
   HEADER: RawByteString = RawByteString('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><style>'
@@ -2128,7 +2127,7 @@ try
       result:= MD5PassHS(AnsiString(p))
      else
     if name = 'sha1' then
-      result:=SHA1toHex(sha1OfStr(p))
+      result:=SHA1toHex(SHA1Pass(p))
      else
     if name = 'sha256' then
       result:=strSHA256(p)

@@ -78,7 +78,7 @@ begin
    else
     coef := frm.currentPPI / 96;
 
-  frm.Width := trunc(coef * 200);
+  frm.Width := trunc(coef * 220);
   frm.BorderStyle:=bsNone;
   frm.BorderWidth:= trunc(coef * 15);
   frm.Height:= trunc(25 * frm.CurrentPPI / 96)+frm.BorderWidth*2;

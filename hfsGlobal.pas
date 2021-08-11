@@ -37,7 +37,9 @@ const
   DEFAULT_MIME = 'application/octet-stream';
   IP_SERVICES_URL = 'http://hfsservice.rejetto.com/ipservices.php';
   SELF_TEST_URL = 'http://hfstest.rejetto.com/';
+//  LIBS_DOWNLOAD_URL = 'http://rejetto.com/hfs/';
   LIBS_DOWNLOAD_URL = 'http://libs.rnq.ru/';
+  HFS_GUIDE_URL = 'http://www.rejetto.com/hfs/guide/';
 
   ALWAYS_ON_WEB_SERVER = 'google.com';
   ADDRESS_COLOR = clGreen;

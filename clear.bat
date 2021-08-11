@@ -11,5 +11,6 @@
 @IF EXIST "Prefs\*.dcu" del /q Prefs\*.dcu
 @IF EXIST "__history\*" del /q __history\*
 @IF EXIST "srv\__history\*" del /q srv\__history\*
+@IF EXIST "srv\*.bak" del /q srv\*.bak
 
 @rem exit
