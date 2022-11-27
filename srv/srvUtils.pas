@@ -3,25 +3,43 @@ unit srvUtils;
 
 interface
 uses
-  Windows, Classes, graphics, Types,
-  srvConst;
+{$IFDEF MSWINDOWS}
+  Windows,
+{$ENDIF MSWINDOWS}
+ {$IFDEF FMX}
+  FMX.Graphics, System.UITypes, FMX.Types,
+ {$ELSE ~FMX}
+  Graphics,
+ {$ENDIF FMX}
+  Classes, Types,
+  HSLib, srvConst;
 
-  function xtpl(src:string; table:array of string):string; OverLoad;
-  function xtpl(src: RawByteString; table:array of RawByteString): RawByteString; OverLoad;
-  function escapeNL(s:string):string;
-  function unescapeNL(s:string):string;
+  function xtpl(src: String; const table: array of string): String; OverLoad;
+  function xtpl(src: RawByteString; table: array of RawByteString): RawByteString; OverLoad;
+  function escapeNL(s: String): String;
+  function unescapeNL(s: String): String;
   function htmlEncode(const s:string):string;
-  function substr(const s: RawByteString; start:integer; upTo:integer=0): RawByteString; inline; OverLoad;
-  function substr(const s:string; start:integer; upTo:integer=0):string; inline; overload;
-  function substr(const s:string; const after:string):string; overload;
-  function replace(var s:string; const ss:string; start,upTo:integer):integer;
+  function substr(const s: RawByteString; start: Integer; upTo: Integer=0): RawByteString; inline; OverLoad;
+  function substr(const s: String; start: Integer; upTo: Integer=0): String; inline; overload;
+  function substr(const s: String; const after: String): String; overload;
+  function replace(var s: String; const ss: String; start, upTo: Integer): Integer;
   function strAt(const s, ss:string; at:integer):boolean; inline;
   procedure enforceNUL(var s: string); OverLoad;
   procedure enforceNUL(var s: RawbyteString); OverLoad;
   function dequote(const s:string; quoteChars:TcharSetW=['"']):string;
+  function removeStartingStr(const ss, s: String): String;
+  procedure excludeTrailingString(var s: string; const ss:string);
+  function smartsize(size: int64): String;
+  function elapsedToStr(t: TDateTime): String;
+ {$IFDEF FMX}
+  function stringToColorEx(s:string; default:Tcolor= TColorRec.Null): Tcolor;
+ {$ELSE FMX}
+  function stringToColorEx(s:string; default:Tcolor=clNone):Tcolor;
+ {$ENDIF FMX}
 //  function reCache(exp:string; mods:string='m'):TregExpr;
   function reMatch(const s, exp:string; mods:string='m'; ofs:integer=1; subexp:PstringDynArray=NIL):integer;
-  function reReplace(subj, exp, repl:string; mods:string='m'):string;
+  function reReplace(const subj, exp, repl: String; const mods: String='m'): String;
+  function reGet(const s, exp:string; subexpIdx:integer=1; mods:string='!mi'; ofs:integer=1):string;
   function if_(v:boolean; const v1:string; const v2:string=''):string; overload; inline;
   function if_(v: Boolean; const v1: RawByteString; const v2: RawByteString = ''): RawByteString;overload; inline;
   function if_(v:boolean; v1:int64; v2:int64=0):int64; overload; inline;
@@ -30,40 +48,42 @@ uses
   function if_(v:boolean; v1:boolean; v2:boolean=FALSE):boolean; overload; inline;
   function isExtension(const filename, ext: String): Boolean;
 
-  function swapMem(var src,dest; count:dword; cond:boolean=TRUE):boolean;
+  function swapMem(var src, dest; count: dword; cond: Boolean=TRUE): Boolean;
 
 // strings array
-  function stringExists(s:string; a:array of string; isSorted:boolean=FALSE):boolean;
-  function removeString(var a:TStringDynArray; idx:integer; l:integer=1):boolean; overload;
-  function removeString(s:string; var a:TStringDynArray; onlyOnce:boolean=TRUE; ci:boolean=TRUE; keepOrder:boolean=TRUE):boolean; overload;
-  procedure removeStrings(find:string; var a:TStringDynArray);
-  procedure toggleString(const s:string; var ss:TStringDynArray);
-  function onlyString(const s: String; ss: TStringDynArray): boolean;
-  function addArray(var dst:TstringDynArray; src:array of string; where:integer=-1; srcOfs:integer=0; srcLn:integer=-1):integer;
-  function removeArray(var src:TstringDynArray; toRemove:array of string):integer;
-  function split(const separator, s:string; nonQuoted:boolean=FALSE):TStringDynArray;
-  function splitU(const s, separator: RawByteString; nonQuoted:boolean=FALSE):TStringDynArray;
-  function join(const separator: String; ss:TstringDynArray):string;
+  function  stringExists(const s: String; const a: array of String; isSorted: Boolean=FALSE): Boolean;
+  function  removeString(var a: TStringDynArray; idx: integer; l:integer=1): Boolean; overload;
+  function  removeString(const s: String; var a: TStringDynArray; onlyOnce: Boolean=TRUE; ci: Boolean=TRUE; keepOrder: Boolean=TRUE): Boolean; overload;
+  procedure removeStrings(const find: String; var a: TStringDynArray);
+  procedure toggleString(const s: String; var ss: TStringDynArray);
+  function  onlyString(const s: String; ss: TStringDynArray): boolean;
+  function  addArray(var dst: TstringDynArray; src: array of string; where: Integer=-1; srcOfs: Integer=0; srcLn: Integer=-1): Integer;
+  function  removeArray(var src: TstringDynArray; toRemove:array of string):integer;
+  function  split(const separator, s: String; nonQuoted:boolean=FALSE):TStringDynArray;
+  function  splitU(const s, separator: RawByteString; nonQuoted:boolean=FALSE):TStringDynArray;
+  function  join(const separator: String; ss:TstringDynArray):string;
+  function  listToArray(l: Tstrings): TstringDynArray;
+  function  arrayToList(a: TStringDynArray; list: TstringList=NIL): TstringList;
 
-  function  toSA(a:array of string):TstringDynArray; // this is just to have a way to typecast
+  function  toSA(a: array of string): TstringDynArray; // this is just to have a way to typecast
   function  addUniqueString(const s: String; var ss: TStringDynArray): boolean;
   function  addString(const s: String; var ss: TStringDynArray): integer;
-  function  replaceString(var ss:TStringDynArray; old, new:string):integer;
-  function  popString(var ss:TstringDynArray):string;
+  function  replaceString(var ss: TStringDynArray; const old, new: String): Integer;
+  function  popString(var ss: TstringDynArray): String;
   procedure insertString(const s: String; idx: integer; var ss: TStringDynArray);
   function  addUniqueArray(var a:TstringDynArray; b:array of string):integer;
   procedure uniqueStrings(var a:TstringDynArray; ci:Boolean=TRUE);
   procedure sortArray(var a:TStringDynArray);
   function  sortArrayF(const a:TStringDynArray):TStringDynArray;
-  function  idxOf(s:string; a:array of string; isSorted:boolean=FALSE):integer;
+  function  idxOf(const s: String; a:array of string; isSorted:boolean=FALSE):integer;
 
-  function match(mask, txt:pchar; fullMatch:boolean=TRUE; charsNotWildcard:TcharsetW=[]):integer;
+  function match(mask, txt: pchar; fullMatch:boolean=TRUE; charsNotWildcard: TcharsetW=[]): Integer;
   function filematch(mask: String; const fn: String):boolean;
-  function poss(chars:TcharSetW; s:string; ofs:integer=1):integer;
-  function strToCharset(const s:string): TcharsetW;
+  function poss(chars: TcharSetW; s: String; ofs: Integer=1): Integer;
+  function strToCharset(const s: string): TcharsetW;
   function anycharIn(const chars, s:string):boolean; overload;
-  function anycharIn(chars:TcharsetW; const s:string):boolean; overload;
-  function stripChars(s:string; cs:TcharsetW; invert:boolean=FALSE):string;
+  function anycharIn(chars: TcharsetW; const s: String): Boolean; overload;
+  function stripChars(s: String; cs: TcharsetW; invert: boolean=FALSE): String;
   function singleLine(const s: string): boolean;
   function findEOL(const s:string; ofs:integer=1; included:boolean=TRUE):integer;
   function quoteIfAnyChar(const badChars: String; s:string; const quote:string='"'; const unquote:string='"'):string;
@@ -80,10 +100,14 @@ uses
   function getSectionAt(p: pchar; out name: string): boolean;
   function isSectionAt(p: pChar): boolean;
 
-  function strSHA256(s:string):string;
-  function strMD5(s:string):string;
+  function name2mimetype(const fn: String; const default: RawByteString): RawByteString;
 
-  function ipToInt(const ip:string):dword;
+  function strSHA256(const s: String): String;
+  function strMD5(const s: String): String;
+  function getCRC(const data: RawByteString): Integer;
+
+
+  function ipToInt(const ip:string):dword;
   function addressmatch(mask: String; const address: string):boolean;
 
   function b64utf8(const s:string): RawByteString;
@@ -94,49 +118,79 @@ uses
   function decodeB64(const s: RawByteString): RawByteString; OverLoad;
   function b64U(const b: RawByteString): UnicodeString;
   function b64R(const b: RawByteString): RawByteString;
+  function jsEncode(s: String; const chars: String): String;
 
-  function TLV(t:integer; const data: RawByteString): RawByteString;
-  function TLVS(t:integer; const data: String): RawByteString;
-  function TLV_NOT_EMPTY(t:integer; const data: RawByteString): RawByteString;
-  function TLVS_NOT_EMPTY(t:integer; const data: String): RawByteString;
+  function TLV(t: Integer; const data: RawByteString): RawByteString;
+  function TLVS(t: Integer; const data: String): RawByteString;
+  function TLV_NOT_EMPTY(t: Integer; const data: RawByteString): RawByteString;
+  function TLVS_NOT_EMPTY(t: Integer; const data: String): RawByteString;
 
-  function dt_(const s: RawByteString):Tdatetime;
-  function int_(const s: RawByteString):integer;
-  function str_(i:integer): RawByteString; overload;
-  function str_(t:Tdatetime): RawByteString; overload;
-  function str_(b:boolean): RawByteString; overload;
+  function dt_(const s: RawByteString): TDatetime;
+  function int_(const s: RawByteString): Integer;
+  function str_(i: integer): RawByteString; overload;
+  function str_(t: Tdatetime): RawByteString; overload;
+  function str_(b: boolean): RawByteString; overload;
 
-  function compare_(i1,i2:double):integer; overload;
-  function compare_(i1,i2:int64):integer; overload;
-  function compare_(i1,i2:integer):integer; overload;
+  function compare_(i1, i2: double): integer; overload;
+  function compare_(i1, i2: int64): integer; overload;
+  function compare_(i1, i2: integer): integer; overload;
 
-  function first(a,b:integer):integer; overload;
-  function first(a,b:double):double; overload;
-  function first(a,b:pointer):pointer; overload;
-  function first(const a,b:string):string; overload;
-  function first(a:array of string):string; overload;
-  function first(a:array of RawByteString): RawByteString; overload;
+  function first(a, b: integer): Integer; overload;
+  function first(a, b: double): Double; overload;
+  function first(a, b: pointer): Pointer; overload;
+  function first(const a, b: String): String; overload;
+  function first(a: array of string): String; overload;
+  function first(a: array of RawByteString): RawByteString; overload;
 
-  function diskSpaceAt(path:string):int64;
+  function diskSpaceAt(path: String): Int64;
+  function getRes(name: PChar; const typ: string='TEXT'): RawByteString;
 
-  function accountExists(const user:string; evenGroups:boolean=FALSE):boolean;
-  function getAccount(const user:string; evenGroups:boolean=FALSE):Paccount;
-  function accountRecursion(account:Paccount; stopCase:TaccountRecursionStopCase; data:pointer=NIL; data2:pointer=NIL):Paccount;
-  function findEnabledLinkedAccount(account:Paccount; over:TStringDynArray; isSorted:boolean=FALSE):Paccount;
-  function filetimeToDatetime(ft:TFileTime):Tdatetime;
-  function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSetW=[]):string;
+  function accountExists(const user: String; evenGroups: Boolean=FALSE): Boolean;
+  function getAccount(const user: String; evenGroups: Boolean=FALSE): Paccount;
+  function accountRecursion(account: Paccount; stopCase: TaccountRecursionStopCase; data: pointer=NIL; data2: pointer=NIL): Paccount;
+  function findEnabledLinkedAccount(account: Paccount; over:TStringDynArray; isSorted: Boolean=FALSE): Paccount;
+{$IFDEF MSWINDOWS}
+  function filetimeToDatetime(ft: TFileTime): Tdatetime;
+{$ENDIF}
+{$IFDEF POSIX}
+  function filetimeToDatetime(ft: time_t): Tdatetime;
+{$ENDIF}
+  function dateToHTTP(gmtTime: Tdatetime): String; overload;
+  function dateToHTTP(const filename: String): String; overload;
+  function dateToHTTPr(const filename: String): RawByteString; overload;
+  function dateToHTTPr(gmtTime: Tdatetime): RawByteString; overload;
+
+  function reduceSpaces(s: String; const replacement:string=' '; spaces:TcharSetW=[]):string;
+
+  function dirCrossing(const s: String): boolean;
+  function fileOrDirExists(fn: String): boolean;
+  function getEtag(const filename: String): String;
+
+  function localDNSget(const ip: String): String;
+
+  function safeDiv(a, b: real; default: real=0): Real; overload;
+  function safeDiv(a, b: int64; default: int64=0): Int64; overload;
+  function safeMod(a, b: int64; default: int64=0): Int64;
+
+  function getAccountList(users: boolean=TRUE; groups: boolean=TRUE): TstringDynArray;
+
+  function notModified(conn: ThttpConn; const etag, ts: String): Boolean; overload;
+  function notModified(conn: ThttpConn; const f: String): Boolean; overload;
+
+  function getAgentID(conn: ThttpConn): String; overload;
+  procedure drawGraphOn(cnv: Tcanvas; colors: TIntegerDynArray=NIL);
 
 type
   TfastStringAppend = class
-  protected
+   protected
     buff: string;
     n: integer;
-  public
+   public
     function length():integer;
     function reset():string;
     function get():string;
     function append(const s:string):integer;
-    end;
+  end;
 
 const
   PTR1: Tobject = ptr(1);
@@ -148,7 +202,7 @@ uses
   OverbyteIcsWSocket,
   Base64,
   RDUtils, RnQCrypt,
-  HSLib, srvVars,
+  srvVars,
   ansistrings;
 
 var
@@ -190,7 +244,7 @@ begin
 end; // append
 
 
-function xtpl(src:string; table:array of string):string;
+function xtpl(src: String; const table: array of String): String;
 var
   i:integer;
 begin
@@ -254,19 +308,19 @@ else
       end;
 end; // newlineType
 
-function escapeNL(s:string):string;
+function escapeNL(s: String): String;
 begin
-  s:=replaceStr(s, '\','\\');
+  s := replaceStr(s, '\','\\');
   case newlineType(s) of
-    NL_D: s:=replaceStr(s, #13,'\n');
-    NL_A: s:=replaceStr(s, #10,'\n');
-    NL_DA: s:=replaceStr(s, #13#10,'\n');
-    NL_MIXED: s:=replaceStr(replaceStr(replaceStr(s, #13#10,'\n'), #13,'\n'), #10,'\n'); // bad case, we do our best
+    NL_D: s := replaceStr(s, #13,'\n');
+    NL_A: s := replaceStr(s, #10,'\n');
+    NL_DA: s := replaceStr(s, #13#10,'\n');
+    NL_MIXED: s := replaceStr(replaceStr(replaceStr(s, #13#10,'\n'), #13,'\n'), #10,'\n'); // bad case, we do our best
     end;
-  result:=s;
+  result := s;
 end; // escapeNL
 
-function unescapeNL(s:string):string;
+function unescapeNL(s: String): String;
 var
   o, n: integer;
 begin
@@ -347,13 +401,14 @@ if i = 0 then result:=''
 else result:=copy(s, i+length(after), MAXINT)
 end; // substr
 
-function replace(var s:string; const ss:string; start,upTo:integer):integer;
+function replace(var s: String; const ss: String; start,upTo: Integer): Integer;
 var
-  common, oldL, surplus: integer;
+  common, oldL, surplus: Integer;
 begin
   oldL := upTo-start+1;
   common := min(length(ss), oldL);
-  MoveChars(ss[1], s[start], common);
+  if common > 0 then
+    MoveChars(ss[1], s[start], common);
   surplus := oldL-length(ss);
   if surplus > 0 then
     delete(s, start+length(ss), surplus)
@@ -463,14 +518,23 @@ try
 except end;
 end; // reMatch
 
-function reReplace(subj, exp, repl:string; mods:string='m'):string;
+function reReplace(const subj, exp, repl: String; const mods: String='m'): String;
 var
   re: TRegExpr;
 begin
-re:=reCache(exp,mods);
-result:=re.replace(subj, repl, TRUE);
+  re := reCache(exp, mods);
+  result := re.replace(subj, repl, TRUE);
 end; // reReplace
 
+function reGet(const s, exp:string; subexpIdx:integer=1; mods:string='!mi'; ofs:integer=1):string;
+var
+  se: TstringDynArray;
+begin
+if reMatch(s, exp, mods, ofs, @se) > 0 then
+  result:=se[subexpIdx]
+else
+  result:='';
+end; // reGet
 
 function if_(v:boolean; v1:boolean; v2:boolean=FALSE):boolean;
 begin if v then result:=v1 else result:=v2 end;
@@ -502,6 +566,68 @@ if (s > '') and (s[1] = s[length(s)]) and (s[1] in quoteChars) then
 else
   result:=s;
 end; // dequote
+
+function removeStartingStr(const ss, s: String): String;
+begin
+if ansiStartsStr(ss, s) then
+  result:=substr(s, 1+length(ss))
+else
+  result:=s
+end; // removeStartingStr
+
+procedure excludeTrailingString(var s: String; const ss: String);
+var
+  i: integer;
+begin
+  i := length(s)-length(ss);
+  if i >= 0 then
+    if copy(s, i+1, length(ss)) = ss then
+      setLength(s, i);
+end;
+
+function smartsize(size: int64): string;
+begin
+  if size < 0 then result:='N/A'
+  else
+    if size < 1 shl 10 then result:=intToStr(size)
+    else
+      if size < 1 shl 20 then result:=format('%.1f K',[size/(1 shl 10)])
+      else
+        if size < 1 shl 30 then result:=format('%.1f M',[size/(1 shl 20)])
+        else result:=format('%.1f G',[size/(1 shl 30)])
+end; // smartsize
+
+function elapsedToStr(t: TDateTime): String;
+var
+  sec: integer;
+begin
+  sec := trunc(t*SECONDS);
+  result := format('%d:%.2d:%.2d', [sec div 3600, sec div 60 mod 60, sec mod 60] );
+end; // elapsedToStr
+
+function stringToColorEx(s:string; default:Tcolor=clNone):Tcolor;
+begin
+try
+  if reMatch(s, '#?[0-9a-f]{3,6}','!i') > 0 then
+    begin
+    s:=removeStartingStr('#', s);
+    case length(s) of
+      3: s:=s[3]+s[3]+s[2]+s[2]+s[1]+s[1];
+      6: s:=s[5]+s[6]+s[3]+s[4]+s[1]+s[2];
+      end;
+    end;
+  result:=stringToColor('$'+s)
+except
+  try result:=stringToColor('cl'+s);
+  except
+    if default = clNone then
+      result:=stringToColor(s)
+    else
+      try result:=stringToColor(s)
+      except result:=default end;
+    end;
+  end;
+end; // stringToColorEx
 
 function isExtension(const filename, ext: String):boolean;
 begin
@@ -542,7 +668,7 @@ for i:=0 to l-2 do
     swapMem(result[i], result[j], sizeof(result[i]), ansiCompareText(result[i], result[j]) > 0);
 end; // sortArray
 
-function idxOf(s:string; a:array of string; isSorted:boolean=FALSE):integer;
+function idxOf(const s: String; a: array of string; isSorted: Boolean=FALSE): Integer;
 var
   r, b, e: integer;
 begin
@@ -565,7 +691,7 @@ while b <= e do
 result:=-1;
 end;
 
-function stringExists(s:string; a:array of string; isSorted:boolean=FALSE):boolean;
+function stringExists(const s: String; const a: array of String; isSorted: Boolean=FALSE): Boolean;
 begin result:= idxOf(s,a, isSorted) >= 0 end;
 
 procedure toggleString(const s:string; var ss:TStringDynArray);
@@ -717,7 +843,7 @@ setLength(a, n);
 result:=n-l;
 end; // addUniqueArray
 
-procedure uniqueStrings(var a:TstringDynArray; ci:Boolean=TRUE);
+procedure uniqueStrings(var a: TstringDynArray; ci: Boolean=TRUE);
 var
   i, j: integer;
 begin
@@ -732,7 +858,7 @@ for i:=length(a)-1 downto 1 do
 end; // uniqueStrings
 
 // remove all instances of the specified string
-procedure removeStrings(find:string; var a:TStringDynArray);
+procedure removeStrings(const find: String; var a: TStringDynArray);
 var
   i, l: integer;
 begin
@@ -775,11 +901,11 @@ end; // popString
 
 function addString(const s: String; var ss: TStringDynArray): integer;
 begin
-result:=length(ss);
-addArray(ss, [s], result)
+  result := length(ss);
+  addArray(ss, [s], result)
 end; // addString
 
-function replaceString(var ss:TStringDynArray; old, new:string):integer;
+function replaceString(var ss: TStringDynArray; const old, new: String): Integer;
 var
   i: integer;
 begin
@@ -814,7 +940,7 @@ while idx+l < length(a) do
 setLength(a, idx);
 end; // removestring
 
-function removeString(s:string; var a:TStringDynArray; onlyOnce:boolean=TRUE; ci:boolean=TRUE; keepOrder:boolean=TRUE):boolean; overload;
+function removeString(const s: String; var a: TStringDynArray; onlyOnce: Boolean=TRUE; ci: Boolean=TRUE; keepOrder: Boolean=TRUE): Boolean; overload;
 var i, lessen:integer;
 begin
 result:=FALSE;
@@ -905,6 +1031,31 @@ result:=ss[0];
 for i:=1 to length(ss)-1 do
   result:=result+separator+ss[i];
 end; // join
+
+function listToArray(l:Tstrings):TstringDynArray;
+var
+  i: integer;
+begin
+try
+  setLength(result, l.Count);
+  for i:=0 to l.Count-1 do
+    result[i]:=l[i];
+except
+  result:=NIL
+  end
+end; // listToArray
+
+function arrayToList(a:TStringDynArray; list:TstringList=NIL):TstringList;
+var
+  i: integer;
+begin
+if list = NIL then
+  list:=ThashedStringList.create;
+result:=list;
+list.Clear();
+for i:=0 to length(a)-1 do
+  list.add(a[i]);
+end; // arrayToList
 
 function singleLine(const s: string): boolean;
 var
@@ -1015,7 +1166,7 @@ result:=s;
 end; // setKeyInString
 
 
-function stripChars(s:string; cs:TcharsetW; invert:boolean=FALSE):string;
+function stripChars(s: string; cs: TcharsetW; invert: boolean=FALSE): string;
 var
   i, l, ofs: integer;
   b: boolean;
@@ -1036,10 +1187,10 @@ result:=s;
 end; // stripChars
 
 
-function toSA(a:array of string):TstringDynArray; // this is just to have a way to typecast
+function toSA(a: array of string): TstringDynArray; // this is just to have a way to typecast
 begin
-result:=NIL;
-addArray(result, a);
+  result := NIL;
+  addArray(result, a);
 end; // toSA
 
 function getMtimeUTC(filename:string):Tdatetime;
@@ -1159,15 +1310,51 @@ begin
   result:=getSectionAt(p, trash);
 end; // isSectionAt
 
-function strSHA256(s:string):string;
+function name2mimetype(const fn: String; const default: RawByteString): RawByteString;
+begin
+  result := default;
+  for var i: Integer := 0 to length(mimeTypes) div 2-1 do
+    if fileMatch(mimeTypes[i*2], fn) then
+     begin
+      result := mimeTypes[i*2+1];
+      exit;
+     end;
+  for var i: Integer := 0 to length(DEFAULT_MIME_TYPES) div 2-1 do
+    if fileMatch(DEFAULT_MIME_TYPES[i*2], fn) then
+     begin
+      result := DEFAULT_MIME_TYPES[i*2+1];
+      exit;
+     end;
+end; // name2mimetype
+
+function strSHA256(const s: String): String;
 //begin result:=THashSHA2.GetHashString(s) end;
 begin result:= SHA256PassLS(UTF8Encode(s)) end;
 
 //function strMD5(s:string):string;
 //begin result:=THashMD5.GetHashString(s) end;
 
-function strMD5(s:string):string;
+function strMD5(const s: String): String;
 begin Result := LowerCase(MD5PassHS(UTF8Encode(s))); end;
+
+{$IFOPT Q+}{$DEFINE QOn}{$Q-}{$ELSE}{$UNDEF QOn}{$ENDIF}
+function getCRC(const data: RawByteString): Integer;
+var
+  i: UInt32;
+  p: Pinteger;
+begin
+  result:=0;
+  if length(data) > 0 then
+    begin
+      p := @data[1];
+      for i:=1 to length(data) div 4 do
+        begin
+          inc(result, p^);
+          inc(p);
+        end;
+    end;
+end; // crc
+{$IFDEF QOn}{$Q+}{$ENDIF}
 
 function ipv6hex(ip:TIcsIPv6Address):string;
 begin
@@ -1183,7 +1370,7 @@ begin
   result := dword(ipToInt_cache.Objects[i]);
   if result <> 0 then
     exit;
-  result := WSocket_ntohl(WSocket_inet_addr(PAnsichar(AnsiString(ip))));
+  result := dword(WSocket_ntohl(WSocket_inet_addr(PAnsichar(AnsiString(ip)))));
   ipToInt_cache.Objects[i] := Tobject(result);
 end; // ipToInt
 
@@ -1196,20 +1383,20 @@ var
   bits: integer;
   a: TStringDynArray;
 
-  function ipv6fix(s:string):string;
+  function ipv6fix(const s: string): string;
   var
     ok: boolean;
     r: TIcsIPv6Address;
   begin
-  if length(s) = 39 then
-    exit(replaceStr(s,':',''));
-  r:=wsocketStrToipv6(s, ok);
-  if ok then
-    exit(ipv6hex(r));
-  exit('');
+    if length(s) = 39 then
+      exit(replaceStr(s,':',''));
+    r := wsocketStrToipv6(s, ok);
+    if ok then
+      exit(ipv6hex(r));
+    exit('');
   end;
 
-  function ipv6range():boolean;
+  function ipv6range(): boolean;
   var
     min, max: string;
   begin
@@ -1296,6 +1483,15 @@ begin result:=Base64DecodeString(s); end;
 
 function decodeB64(const s: RawByteString): RawByteString; OverLoad;
 begin result:=Base64DecodeString(s); end;
+
+function jsEncode(s: String; const chars: String): String;
+var
+  i: integer;
+begin
+  for i:=1 to length(chars) do
+    s := ansiReplaceStr(s, chars[i], '\x'+intToHex(ord(chars[i]),2));
+  result := s;
+end; // jsEncode
 
 function TLV(t:integer; const data: RawByteString): RawByteString;
 begin result:=str_(t)+str_(length(data))+data end;
@@ -1420,6 +1616,27 @@ if not getDiskFreeSpaceEx(pchar(path), result, tmp, NIL) then
   result:=-1;
 end; // diskSpaceAt
 
+function getRes(name:pchar; const typ:string='TEXT'): RawByteString;
+var
+  h1, h2: Thandle;
+  p: pByte;
+  l: integer;
+  ansi: RawByteString;
+begin
+  result:='';
+  h1:=FindResource(HInstance, name, pchar(typ));
+  h2:=LoadResource(HInstance, h1);
+  if h2=0 then
+    exit;
+  l:=SizeOfResource(HInstance, h1);
+  p := LockResource(h2);
+  setLength(ansi, l);
+  move(p^, ansi[1], l);
+  UnlockResource(h2);
+  FreeResource(h2);
+  result := ansi;
+end; // getRes
+
 
 function getAccount(const user:string; evenGroups:boolean=FALSE):Paccount;
 var
@@ -1487,12 +1704,34 @@ function filetimeToDatetime(ft:TFileTime):Tdatetime;
 var
   st: TsystemTime;
 begin
-FileTimeToLocalFileTime(ft, ft);
-FileTimeToSystemTime(ft, st);
-TryEncodeDateTime(st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, result);
+  FileTimeToLocalFileTime(ft, ft);
+  FileTimeToSystemTime(ft, st);
+  TryEncodeDateTime(st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, result);
 end; // filetimeToDatetime
 
-function reduceSpaces(s:string; const replacement:string=' '; spaces:TcharSetW=[]):string;
+function dateToHTTP(gmtTime:Tdatetime):string; overload;
+begin
+result:=formatDateTime('"'+DOW2STR[dayOfWeek(gmtTime)]+'," dd "'+MONTH2STR[monthOf(gmtTime)]
+  +'" yyyy hh":"nn":"ss "GMT"', gmtTime);
+end; // dateToHTTP
+
+function dateToHTTP(const filename: String): String; overload;
+begin
+  result := dateToHTTP(getMtimeUTC(filename))
+end;
+
+function dateToHTTPr(gmtTime: Tdatetime): RawByteString; OverLoad;
+begin
+  result := RawByteString(formatDateTime('"'+DOW2STR[dayOfWeek(gmtTime)]+'," dd "'+MONTH2STR[monthOf(gmtTime)]
+  +'" yyyy hh":"nn":"ss "GMT"', gmtTime));
+end; // dateToHTTP
+
+function dateToHTTPr(const filename: string): RawByteString; overload;
+begin
+  result := dateToHTTPr(getMtimeUTC(filename))
+end;
+
+function reduceSpaces(s: String; const replacement: String=' '; spaces: TcharSetW=[]): String;
 var
   i, c, l: integer;
 begin
@@ -1511,6 +1750,210 @@ while i < l do
 result:=s;
 end; // reduceSpaces
 
+// recognize strings containing pieces (separated by backslash) made of only dots
+function dirCrossing(const s:string):boolean;
+begin
+result:=FALSE;
+
+if onlyDotsRE = NIL then
+  begin
+  onlyDotsRE:=TRegExpr.Create;
+  onlyDotsRE.modifierM:=TRUE;
+  onlyDotsRE.expression:='(^|\\)\.\.+($|\\)';
+  onlyDotsRE.compile();
+  end;
+
+with onlyDotsRE do
+  try result:=exec(s);
+  except end;
+end; // dirCrossing
+
+function fileOrDirExists(fn:string):boolean;
+begin
+result:=fileExists(fn) or directoryExists(fn);
+{** first i used this way, because faster, but it proved to not always work: http://www.rejetto.com/forum/index.php/topic,10825.0.html
+var
+  sr:TsearchRec;
+begin
+result:= 0=findFirst(ExcludeTrailingPathDelimiter(fn),faAnyFile,sr);
+if result then FindClose(sr);
+}
+end; // fileOrDirExists
+
+function getEtag(const filename: String): String;
+var
+  sr: TsearchRec;
+  st: TSystemTime;
+begin
+  result:='';
+  if findFirst(filename, faAnyFile, sr) <> 0 then
+    exit;
+  FileTimeToSystemTime(sr.FindData.ftLastWriteTime, st);
+  result := intToStr(sr.Size)+':'+floatToStr(SystemTimeToDateTime(st))+':'+expandFileName(filename);
+  findClose(sr);
+  result := MD5PassHS(StrToUTF8(result));
+end; // getEtag
+
+
+function localDNSget(const ip: String): String;
+begin
+  for var i: integer :=0 to length(address2name) div 2-1 do
+    if addressmatch(address2name[i*2+1], ip) then
+      begin
+        result := address2name[i*2];
+        exit;
+      end;
+  result := '';
+end; // localDNSget
+
+function safeMod(a, b: int64; default: int64=0): int64;
+begin if b=0 then result:=default else result:=a mod b end;
+
+function safeDiv(a, b: int64; default: int64=0): int64; inline;
+begin if b=0 then result:=default else result:=a div b end;
+
+function safeDiv(a, b: real; default: real=0): real; inline;
+begin if b=0 then result:=default else result:=a/b end;
+
+function getAccountList(users: boolean=TRUE; groups: boolean=TRUE): TstringDynArray;
+var
+  n: integer;
+begin
+  setLength(result, length(accounts));
+  n := 0;
+  for var i: Integer :=0 to length(result)-1 do
+    with accounts[i] do
+      if group and groups
+      or not group and users
+      then
+        begin
+        result[n]:=user;
+        inc(n);
+        end;
+  setlength(result, n);
+end; // getAccountList
+
+function notModified(conn: ThttpConn; const etag, ts: String): Boolean; overload;
+begin
+  result := (etag>'') and (etag = conn.getHeader('If-None-Match'));
+  if result then
+  begin
+    conn.reply.mode:=HRM_NOT_MODIFIED;
+    exit;
+  end;
+  conn.setHeaderIfNone('ETag',etag);
+  if ts > '' then
+    conn.setHeaderIfNone('Last-Modified', ts);
+end; // notModified
+
+function notModified(conn: ThttpConn; const f: String): Boolean; overload;
+begin
+  result := notModified(conn, getEtag(f), dateToHTTP(f))
+end;
+
+function getAgentID(s: String): String; overload;
+var
+  res: string;
+
+  function test(const id: String): Boolean;
+  var
+    i: integer;
+  begin
+  result:=FALSE;
+  i:=pos(id,s);
+  case i of
+    0: exit;
+    1: res:=getTill('/', getTill(' ',s));
+    else
+      begin
+      delete(s,1,i-1);
+      res:=getTill(';',s);
+      end;
+    end;
+  result:=TRUE;
+  end; // its
+
+begin
+  result := stripChars(s,['<','>']);
+  if test('Crazy Browser')
+  or test('iPhone')
+  or test('iPod')
+  or test('iPad')
+  or test('Chrome')
+  or test('WebKit') // generic webkit browser
+  or test('Opera')
+  or test('MSIE')
+  or test('Mozilla') then
+    result := res;
+end; // getAgentID
+
+function getAgentID(conn: ThttpConn):string; overload;
+begin
+  result := getAgentID(conn.getHeader('User-Agent'))
+end;
+
+procedure drawGraphOn(cnv:Tcanvas; colors:TIntegerDynArray=NIL);
+var
+  i, h, maxV: integer;
+  r: Trect;
+  top: double;
+  s: string;
+
+  procedure drawSample(sample:integer);
+  begin
+	cnv.moveTo(r.left+i, r.bottom);
+  cnv.lineTo(r.Left+i, r.Bottom-1-sample*h div maxV);
+  end; // drawSample
+
+  function getColor(idx:integer; def:Tcolor):Tcolor;
+  begin
+  if (length(colors) <= idx) or (colors[idx] = Graphics.clDefault) then result:=def
+  else result:=colors[idx]
+  end; // getColor
+
+resourcestring
+  LIMIT = 'Limit';
+  TOP_SPEED = 'Top speed';
+begin
+  r:=cnv.cliprect;
+  // clear
+  cnv.brush.color:=getColor(0, clBlack);
+  cnv.fillrect(r);
+  // draw grid
+  cnv.Pen.color:=getColor(1, rgb(0,0,120));
+  i:=r.left;
+  while i < r.right do
+    begin
+      cnv.moveTo(i, r.top);
+      cnv.LineTo(i, r.Bottom);
+      inc(i,10);
+    end;
+  i:=r.bottom;
+  while i > r.top do
+    begin
+      cnv.moveTo(r.left, i);
+      cnv.LineTo(r.right, i);
+      dec(i,10);
+    end;
+
+  maxV:=max(graph.maxV, 1);
+  h:=r.bottom-r.top-1;
+  // draw graph
+  cnv.Pen.color:=getColor(2, clFuchsia);
+  for i:=0 to (r.Right-r.left)-1 do	drawSample(graph.samplesOut[i]);
+  cnv.Pen.color:=getColor(3, clYellow);
+  for i:=0 to (r.Right-r.left)-1 do	drawSample(graph.samplesIn[i]);
+  // text
+  cnv.Font.Color:=getColor(4, clLtGray);
+  cnv.Font.Name:='Small Fonts';
+  cnv.font.size:=7;
+  SetBkMode(cnv.handle, TRANSPARENT);
+  top:=(graph.maxV/1000)*safeDiv(10.0, graph.rate);
+  s:=format(TOP_SPEED+':'+MSG_SPEED_KBS+'    ---    %d kbps', [top, round(top*8)]);
+  cnv.TextOut(r.right-cnv.TextWidth(s)-20, 3, s);
+  if assigned(globalLimiter) and (globalLimiter.maxSpeed < MAXINT) then
+    cnv.TextOut(r.right-180+25, 15, format(LIMIT+': '+MSG_SPEED_KBS, [globalLimiter.maxSpeed/1000]));
+end; // drawGraphOn
 
 INITIALIZATION
 

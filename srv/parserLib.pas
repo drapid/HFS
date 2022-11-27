@@ -4,8 +4,13 @@ unit parserLib;
 interface
 
 uses
-  strutils, sysutils, classes, types, windows, Generics.Collections,
-  intlist;
+  strutils, sysutils, classes, types, windows,
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  Generics.Collections,
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  mormot.core.collections,
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+  intlist, serverLib;
 
 type
 
@@ -15,9 +20,12 @@ type
     full: String;
   end;
 
+//  TParsVal = Tdictionary<string,Tdatetime>;
+  TParsVal = IKeyValue<String, String>;
+
   TPars2 = class
    private
-    fD: TDictionary<String, String>;
+    fD2: TParsVal;
     fA: array of TParameter;
     fCount: Integer;
    public
@@ -35,14 +43,14 @@ type
     property  count: Integer read fCount;
     property  Items[Index: Integer]: String read Get write setItem; default;
     property  names[Index: Integer]: String read GetNames;
-    property  d: TDictionary<String, String> read fD;
+    property  d2: TParsVal read fD2;
   end;
 
 
 //  TPars = TStringList;
   TPars = TPars2;
 
-  TmacroCB = function(const fullMacro:string; pars: TPars; cbData:pointer):string;
+  TmacroCB = function(fs: TFileServer; const fullMacro: string; pars: TPars; cbData: pointer): string;
   EtplError = class(Exception)
     pos, row, col: integer;
     code: string;
@@ -63,9 +71,10 @@ const
   AMARKER_UNQUOTE = RawByteString(':}');
   AMARKERS: array [0..4] of RawByteString = ( MARKER_OPEN, MARKER_CLOSE, MARKER_SEP, MARKER_QUOTE, MARKER_UNQUOTE );
 
+function isAnyMacroIn(const s: RawByteString): Boolean; inline;
 function anyMacroMarkerIn(const s:string):boolean;
 function findMacroMarker(const s:string; ofs:integer=1):integer;
-procedure applyMacrosAndSymbols(var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
+procedure applyMacrosAndSymbols(fs: TFileServer; var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
 
 function macroQuote(s:string):string;
 function macroDequote(s:string):string;
@@ -90,14 +99,15 @@ end;
 constructor TPars2.create;
 begin
   fCount := 0;
-  fD := TDictionary<String, String>.Create;
+//  fD := TDictionary<String, String>.Create;
+  fD2 := Collections.NewKeyValue<String, String>;
   setLength(fA, 0);
 end;
 
 destructor TPars2.destroy;
 begin
-  fD.Free;
-  fD := NIL;
+//  fD.Free;
+  fD2 := NIL;
   SetLength(fA, 0);
   fCount := 0;
 end;
@@ -123,7 +133,8 @@ begin
       fA[idx].v := '';
     end;
   if fA[idx].k > '' then
-    fD.AddOrSetValue(fA[idx].k, fA[idx].v);
+//    fD.AddOrSetValue(fA[idx].k, fA[idx].v);
+    fD2[fA[idx].k] := fA[idx].v;
 end;
 
 procedure TPars2.Delete(idx: Integer);
@@ -133,7 +144,7 @@ begin
   if idx >= fCount then
     Exit;
   if fA[idx].k > '' then
-    fD.Remove(fA[idx].k);
+    fD2.Remove(fA[idx].k);
   if idx < (fCount-1) then
     for I := idx to fCount-2 do
       fA[i] := fA[i+1];
@@ -172,14 +183,15 @@ begin
   if k = fA[idx].k then
     begin
       if k > '' then
-        fD.AddOrSetValue(k, v);
+//        fD.AddOrSetValue(k, v);
+        fD2[k] := v;
     end
    else
     begin
       if fA[idx].k > '' then
-        fD.Remove(fA[idx].k);
+        fD2.Remove(fA[idx].k);
       if k > '' then
-        fD.Add(k, v);
+        fD2.Add(k, v);
       fA[idx].k := k;
     end;
 
@@ -189,19 +201,19 @@ end;
 
 function TPars2.TryGetValue(const k: String; var v: String): Boolean;
 begin
-  Result := fD.TryGetValue(k, v);
+  Result := fD2.TryGetValue(k, v);
 end;
 
 function TPars2.ContainsKey(const k: String): Boolean;
 begin
-  Result := fD.ContainsKey(k);
+  Result := fD2.ContainsKey(k);
 end;
 
 procedure TPars2.clear;
 begin
   fCount := 0;
   SetLength(fA, 0);
-  fD.clear;
+  fD2.clear;
 end;
 
 function TPars2.ToArray: TStringDynArray;
@@ -220,7 +232,7 @@ begin
 end; // ToArray
 
 
-procedure applyMacrosAndSymbols2(var txt:string; cb:TmacroCB; cbData:pointer; var idsStack:TparserIdsStack; recurLevel:integer=0);
+procedure applyMacrosAndSymbols2(fs: TFileServer; var txt:string; cb:TmacroCB; cbData:pointer; var idsStack:TparserIdsStack; recurLevel:integer=0);
 const
   // we don't track SEPs, they are handled just before the callback
   QUOTE_ID = 0;   // QUOTE must come before OPEN because it is a substring
@@ -265,12 +277,12 @@ const
     s:=substr(txt,b,e);
     if alreadyRecurredOn(s) then continue; // the user probably didn't meant to create an infinite loop
 
-    newS:=cb(s, NIL, cbData);
+    newS:=cb(fs, s, NIL, cbData);
     if s = newS then continue;
 
     idsStack[recurLevel]:=s; // keep track of what we recur on
     // apply translation, and eventually recur
-    try applyMacrosAndSymbols2(newS, cb, cbData, idsStack, recurLevel);
+    try applyMacrosAndSymbols2(fs, newS, cb, cbData, idsStack, recurLevel);
     except end;
     idsStack[recurLevel]:='';
     inc(e, replace(txt, newS, b, e));
@@ -329,11 +341,11 @@ const
     // ok, 'pars' has now been built
 
     // do the call, recur, and replace with the result
-    s:=cb(fullMacro, pars, cbData);
+    s:=cb(fs, fullMacro, pars, cbData);
     idsStack[recurLevel]:=fullmacro; // keep track of what we recur on
     try
       try
-        applyMacrosAndSymbols2(s, cb, cbData, idsStack, recurLevel)
+        applyMacrosAndSymbols2(fs, s, cb, cbData, idsStack, recurLevel)
       except end;
     finally idsStack[recurLevel]:='' end;
     result:=replace(txt, s, from, to_);
@@ -411,18 +423,23 @@ handleSymbols();
 handleMacros();
 end; //applyMacrosAndSymbols2
 
-procedure applyMacrosAndSymbols(var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
+procedure applyMacrosAndSymbols(fs: TFileServer; var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
 var
   idsStack: TparserIdsStack;
 begin
 enforceNUL(txt);
-applyMacrosAndSymbols2(txt,cb,cbData,idsStack);
+applyMacrosAndSymbols2(fs, txt, cb, cbData, idsStack);
 if removeQuotings then
   txt:=xtpl(txt, [MARKER_QUOTE, '', MARKER_UNQUOTE, ''])
 end;
 
 function findMacroMarker(const s:string; ofs:integer=1):integer;
 begin result:=reMatch(s, '\{[.:]|[.:]\}|\|', 'm!', ofs) end;
+
+function isAnyMacroIn(const s: RawByteString): Boolean; inline;
+begin
+  result := pos(AMARKER_OPEN, s) > 0
+end;
 
 function anyMacroMarkerIn(const s:string):boolean;
 begin result:=findMacroMarker(s) > 0 end;

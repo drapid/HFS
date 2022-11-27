@@ -4,44 +4,75 @@ unit IconsLib;
 interface
 
 uses
-  Windows, System.SysUtils, System.Classes, Graphics, System.ImageList, Vcl.ImgList,
-  Vcl.BaseImageCollection, Vcl.ImageCollection, Controls, CommCtrl,
+  Windows,
+  mormot.core.base,
+  System.SysUtils, System.Types, SyncObjs,
+ {$IFDEF FMX}
+  FMX.Types,
+  FMX.Forms,
+  FMX.Controls,
+  FMX.Graphics, System.UITypes,
+  FMX.TreeView,
+  FMX.MultiResBitmap,
+  FMX.ImgList,
+ {$ELSE ~FMX}
+  Graphics,
+  Forms,
+  CommCtrl,
+  Controls,
   {$IFDEF HFS_GIF_IMAGES}
   Vcl.Imaging.gifimg,
   {$ELSE ~HFS_GIF_IMAGES}
   Vcl.Imaging.gifimg,
   Vcl.Imaging.pngImage,
   {$ENDIF HFS_GIF_IMAGES}
-  Vcl.VirtualImageList
+  Vcl.VirtualImageList, Vcl.BaseImageCollection,
+  Vcl.ImageCollection, Vcl.ImgList,
+ {$ENDIF FMX}
+ System.Classes, System.ImageList
   ;
 
 type
   TIconsDM = class(TDataModule)
     ImgCollection: TImageCollection;
     images: TVirtualImageList;
+    BtnImgCollection: TImageCollection;
     constructor Create(AOwner: TComponent); override;
   private
     { Private declarations }
+    imgCS: TCriticalSection;
+
   public
     { Public declarations }
+ {$IFDEF FMX}
+    systemimages: TImageList;
+ {$ELSE ~FMX}
     systemimages: Timagelist;    // system icons
+ {$ENDIF FMX}
+    function getImageIndexForFile(fn: string): integer;
   end;
 
-  function idx_img2ico(i:integer):integer;
-  function idx_ico2img(i:integer):integer;
+  function idx_img2ico(i: integer): integer;
+  function idx_ico2img(i: integer): integer;
+  function idx_label(i: integer): String;
 
+ {$IFDEF FMX}
+  function stringToPNG(const s: RawByteString; png: TBitmap=NIL): TBitmap;
+  function png2str(png: TBitmap): RawByteString;
+ {$ELSE ~FMX}
   {$IFDEF HFS_GIF_IMAGES}
   function stringToGif(s: RawByteString; gif: TgifImage=NIL): TgifImage;
-  function gif2str(gif:TgifImage): RawByteString;
+  function gif2str(gif: TgifImage): RawByteString;
   {$ELSE ~HFS_GIF_IMAGES}
   function stringToPNG(const s: RawByteString; png: TpngImage=NIL): TpngImage;
   function png2str(png: TPngImage): RawByteString;
   {$ENDIF HFS_GIF_IMAGES}
+ {$ENDIF FMX}
   function bmp2str(bmp: Tbitmap): RawByteString;
   function pic2str(idx: integer; imgSize: Integer): RawByteString;
   function str2pic(const s: RawByteString; imgSize: Integer): integer;
   function strGif2pic(const gs: RawByteString; imgSize: Integer): integer;
-  function getImageIndexForFile(fn:string):integer;
+  function ico2str(hndl: THandle; icoNdx: Integer; imgSize: Integer): RawByteString;
 
   function  stringPNG2BMP(const s: RawByteString): TBitmap;
 
@@ -70,7 +101,9 @@ implementation
 
 {$R *.dfm}
 uses
-  AnsiClasses, ansiStrings, WinApi.ShellAPI,
+//  AnsiClasses,
+  ansiStrings,
+  WinApi.ShellAPI,
   RnQCrypt,
   srvVars;
 
@@ -82,27 +115,88 @@ var
   imagescacheBg: array of RawByteString;
   sysidx2index: array of record sysidx, idx:integer; end; // maps system imagelist icons to internal imagelist
 
-function Shell_GetImageLists(var hl,hs:Thandle):boolean; stdcall; external 'shell32.dll' index 71;
 
-function getSystemimages():TImageList;
+
+function Shell_GetImageLists(var hl, hs: Thandle): boolean; stdcall; external 'shell32.dll' index 71;
+
+function getSystemimages(): TImageList;
 var
   hl, hs: Thandle;
 begin
   result := NIL;
-  if not Shell_GetImageLists(hl,hs) then exit;
+  if not Shell_GetImageLists(hl, hs) then
+    exit;
+ {$IFDEF FMX}
+  result := TImageList.Create(NIL);
+ {$ELSE ~FMX}
   result := Timagelist.Create(NIL);
-    Result.ColorDepth := cd32Bit;
+  Result.ColorDepth := cd32Bit;
   result.ShareImages := TRUE;
   result.handle := hs;
+ {$ENDIF FMX}
 end; // loadSystemimages
 
+{
+function InitIcons: Boolean;
+var
+  z: TZipFile;
+  I: Integer;
+  ii: Integer;
+  s: String;
+  item: TImageCollectionItem;
+  str: TMemoryStream;
+begin
+  ICOImgCollection := TImageCollection.Create(Application.MainForm);
+  ICOImages := TVirtualImageList.Create(Application.MainForm);
+  ICOsystemimages := TImageList.Create(Application.MainForm);
+  ICOsystemimages := getSystemimages();
+  ICOimages.Masked := false;
+  ICOimages.ColorDepth := cd32bit;
+  if FileExists('HFS.Icons.zip') then
+    begin
+      z := TZipFile.create;
+      z.LoadFromFile('HFS.Icons.zip');
+      // We have 40 icons to load
+      for ii := 0 to 40-1 do
+        begin
+          s := IntToStr(ii) + '.';
+          for I := 0 to z.Count - 1 do
+            if z.Name[i].StartsWith(s) then
+              begin
+                str := TMemoryStream.Create;
+                try
+                  if z.ExtractToStream(i, str) then
+                    begin
+                      var itemIdx := ICOImgCollection.GetIndexByName(IntToStr(ii));
+                      if itemIdx <0 then
+                        begin
+                          item := ICOImgCollection.Images.Add;
+                          item.Name := IntToStr(ii);
+                        end
+                       else
+                        item := ICOImgCollection.Images.Items[itemIdx];
+                      item.SourceImages.Add.Image.LoadFromStream(str);
+                    end;
+                finally
+                  str.Free;
+                end;
+              end;
+        end;
+
+    end;
+  ICOImages.ImageCollection := ICOImgCollection;
+end;
+}
 
 constructor TIconsDM.Create(AOwner: TComponent);
 begin
   Inherited Create(AOwner);
   systemimages := getSystemimages();
+ {$IFNDEF FMX}
   images.Masked := false;
   images.ColorDepth := cd32bit;
+ {$ENDIF FMX}
+  imgCS := TCriticalSection.Create;
 end;
 
 function idx_img2ico(i: integer): integer;
@@ -138,20 +232,22 @@ end; // stringToGif
 
 function gif2str(gif: TgifImage): RawByteString;
 var
-  stream: Tbytesstream;
+//  stream: Tbytesstream;
+  stream: TRawByteStringStream;
 begin
-stream:=Tbytesstream.create();
-gif.SaveToStream(stream);
-setLength(result, stream.size);
-move(stream.bytes[0], result[1], stream.size);
-stream.free;
+  stream := TRawByteStringStream.create();
+  gif.SaveToStream(stream);
+//  setLength(result, stream.size);
+//  move(stream.bytes[0], result[1], stream.size);
+  Result := stream.dataString;
+  stream.free;
 end; // gif2str
 
 function bmp2str(bmp: Tbitmap): RawByteString;
 var
 	gif: TGIFImage;
 begin
-gif:=TGIFImage.Create();
+  gif := TGIFImage.Create();
 try
   gif.ColorReduction:=rmQuantize;
   gif.Assign(bmp);
@@ -186,7 +282,7 @@ finally
   end;
 end; // pic2str
 
-function str2pic(s: RawByteString):integer;
+function str2pic(s: RawByteString): integer;
 var
 	gif: TGIFImage;
 begin
@@ -203,14 +299,23 @@ begin
   end;
 end; // str2pic
 {$ELSE ~HFS_GIF_IMAGES}
+ {$IFDEF FMX}
+function stringToPNG(const s: RawByteString; png: TBitmap=NIL): TBitmap;
+ {$ELSE ~FMX}
 function stringToPNG(const s: RawByteString; png: TpngImage=NIL): TpngImage;
+ {$ENDIF FMX}
 var
-  ss: TAnsiStringStream;
+//  ss: TAnsiStringStream;
+  ss: TRawByteStringStream;
 begin
-  ss := TAnsiStringStream.create(s);
+  ss := TRawByteStringStream.create(s);
 try
   if png = NIL then
+ {$IFDEF FMX}
+    png := TBitmap.Create();
+ {$ELSE ~FMX}
     png := TPNGImage.Create();
+ {$ENDIF FMX}
   png.loadFromStream(ss);
   result := png;
 finally ss.free end;
@@ -218,31 +323,48 @@ end; // stringToPNG
 
 function gif2png(const s: RawByteString): RawByteString;
 var
+ {$IFNDEF FMX}
   gif: TgifImage;
-  ss: TAnsiStringStream;
+ {$ENDIF ~FMX}
+//  ss: TAnsiStringStream;
+  ss: TRawByteStringStream;
   bmp: TBitmap;
 begin
   Result := '';
-  ss := TAnsiStringStream.create(s);
+  ss := TRawByteStringStream.create(s);
   try
-    gif := TGIFImage.Create();
     bmp := TBitmap.Create;
+ {$IFDEF FMX}
+    bmp.loadFromStream(ss);
+ {$ELSE FMX}
+    gif := TGIFImage.Create();
     gif.loadFromStream(ss);
+    bmp.Assign(gif);
+ {$ENDIF ~FMX}
     Result := bmp2str(bmp);
    finally
      ss.free;
+ {$IFNDEF FMX}
      gif.Free;
+ {$ENDIF ~FMX}
   end;
 end; // Gif2PNG
 
+ {$IFDEF FMX}
+function png2str(png: TBitmap): RawByteString;
+ {$ELSE ~FMX}
 function png2str(png: TpngImage): RawByteString;
+ {$ENDIF FMX}
 var
-  stream: Tbytesstream;
+//  stream: Tbytesstream;
+  stream: TRawByteStringStream;
 begin
-  stream := Tbytesstream.create();
+//  stream := Tbytesstream.create();
+  stream := TRawByteStringStream.create();
   png.SaveToStream(stream);
-  setLength(result, stream.size);
-  move(stream.bytes[0], result[1], stream.size);
+  Result := stream.DataString;
+//  setLength(result, stream.size);
+//  move(stream.bytes[0], result[1], stream.size);
   stream.free;
 end; // png2str
 
@@ -252,36 +374,46 @@ const
 type
   TRGBAArray = Array [0..PixelsQuad - 1] of TRGBQuad;
   PRGBAArray = ^TRGBAArray;
+ {$IFNDEF FMX}
 var
 	png: TPNGImage;
   RowInOut: PRGBAArray;
   RowAlpha: PByteArray;
+ {$ENDIF FMX}
 begin
+ {$IFDEF FMX}
+  result := png2str(bmp);
+ {$ELSE ~FMX}
   png := TPNGImage.Create();
-try
-//  png.ColorReduction:=rmQuantize;
-  png.Assign(bmp);
-  if bmp.PixelFormat = pf32bit then
-    begin
-      PNG.CreateAlpha;
-      for var Y:=0 to Bmp.Height - 1 do
+  try
+  //  png.ColorReduction:=rmQuantize;
+    png.Assign(bmp);
+   {$IFDEF FMX}
+    if bmp.PixelFormat in [TPixelFormat.RGBA, TPixelFormat.BGRA, TPixelFormat.RGBA16] then
+   {$ELSE ~FMX}
+    if bmp.PixelFormat = pf32bit then
+   {$ENDIF FMX}
       begin
-        RowInOut := Bmp.ScanLine[Y];
-        RowAlpha := PNG.AlphaScanline[Y];
-        for var X:=0 to Bmp.Width - 1 do
-          RowAlpha[X] := RowInOut[X].rgbReserved;
+        PNG.CreateAlpha;
+        for var Y:=0 to Bmp.Height - 1 do
+        begin
+          RowInOut := Bmp.ScanLine[Y];
+          RowAlpha := PNG.AlphaScanline[Y];
+          for var X:=0 to Bmp.Width - 1 do
+            RowAlpha[X] := RowInOut[X].rgbReserved;
+        end;
       end;
-    end;
-  result:=png2str(png);
-finally png.free;
+    result := png2str(png);
+  finally png.free;
   end;
+ {$ENDIF FMX}
 end; // bmp2str
 
-function pic2str(idx:integer; imgSize: Integer): RawByteString;
+function pic2str(idx: integer; imgSize: Integer): RawByteString;
 var
   bmp: TBitmap;
 begin
-  result := '';
+  Result := '';
   if idx < 0 then
     exit;
   idx := idx_ico2img(idx);
@@ -291,17 +423,21 @@ begin
       setlength(imagescacheBg, idx+1);
     end;
   if imgSize = ImageSizeSmall then
-    result := imagescacheSm[idx]
+    Result := imagescacheSm[idx]
    else
   if imgSize = ImageSizeBig then
-    result := imagescacheBg[idx];
+    Result := imagescacheBg[idx];
 
-  if result > '' then
+  if Result > '' then
     exit;
 
   bmp := nil;
   try
+   {$IFDEF FMX}
+    bmp := IconsDM.Images.Bitmap(TSizeF.Create(imgSize, imgSize), idx);
+   {$ELSE FMX}
     bmp := IconsDM.ImgCollection.GetBitmap(idx, imgSize, imgSize);
+   {$ENDIF FMX}
 
     if Assigned(bmp) then
      begin
@@ -319,27 +455,65 @@ begin
   end;
 end; // pic2str
 
-function str2pic(const s: RawByteString; imgSize: Integer):integer;
+function ico2str(hndl: THandle; icoNdx: Integer; imgSize: Integer): RawByteString;
 var
-	png: TPNGImage;
-  str: TAnsiStringStream;
+  bmp: TBitmap;
+begin
+  Result := '';
+    bmp := TBitmap.Create;
+    try
+      bmp.PixelFormat := pf32bit;
+      bmp.SetSize(imgSize, imgSize);
+      ImageList_DrawEx(hndl, icoNdx, bmp.Canvas.Handle, 0, 0, imgSize, ImgSize, CLR_NONE, CLR_NONE, ILD_SCALE or ILD_PRESERVEALPHA);
+      Result := bmp2str(bmp);
+     finally
+      bmp.Free;
+    end;
+end;
+
+function str2pic(const s: RawByteString; imgSize: Integer): Integer;
+var
+   {$IFDEF FMX}
+	png: TBitmap;
+   {$ELSE FMX}
+//	png: TPNGImage;
+  str: TRawByteStringStream;
+   {$ENDIF FMX}
   i: Integer;
 begin
   for result:=0 to IconsDM.images.count-1 do
     if pic2str(result, imgSize) = s then
       exit;
 // in case the pic was not found, it automatically adds it to the pool
+   {$IFDEF FMX}
   png := stringToPNG(s);
+   {$ENDIF FMX}
   try
-    str := TAnsiStringStream.Create(s);
+   {$IFDEF FMX}
     i := IconsDM.images.count;
+    IconsDM.images.AddOrSet(IntToStr(i), [], []);//, i);
+    var bi: tcustombitmapItem;
+    var sz: TSize;
+    IconsDM.images.BitmapItemByName(IntToStr(i), bi, sz);
+    bi.Bitmap.Assign(png);
+   {$ELSE ~FMX}
+    str := TRawByteStringStream.Create(s);
+    if imgSize = ImageSizeBig then
+      i := IconsDM.images.count-1
+     else
+      i := IconsDM.images.count;
+
     IconsDM.imgCollection.Add(IntToStr(i), str);
+    if IconsDM.images.GetIndexByName(IntToStr(i)) < 0 then
+      IconsDM.images.Add(IntToStr(i), IntToStr(i));
     str.free;
-    IconsDM.images.Add(IntToStr(i), i);
+   {$ENDIF FMX}
     Result := i;
     etags.values['icon.'+intToStr(result)] := MD5PassHS(s);
    finally
+   {$IFDEF FMX}
     png.free
+   {$ENDIF FMX}
   end;
 end; // str2pic
 
@@ -354,13 +528,23 @@ end; // str2pic
 
 function stringPNG2BMP(const s: RawByteString): TBitmap;
 var
-  ss: TAnsiStringStream;
+  ss: TRawByteStringStream;
+   {$IFNDEF FMX}
   png: TPNGImage;
+   {$ENDIF FMX}
 begin
   Result := NIL;
   if s = '' then
     Exit(NIL);
-  ss := TAnsiStringStream.create(s);
+  ss := TRawByteStringStream.create(s);
+   {$IFDEF FMX}
+  result := TBitmap.Create;
+  try
+    Result.LoadFromStream(ss);
+  finally
+    ss.free;
+  end;
+   {$ELSE ~FMX}
   png := TPngImage.Create;
   try
     png.LoadFromStream(ss);
@@ -372,156 +556,118 @@ begin
       result := TBitmap.Create;
       png.AssignTo(Result);
     end;
+   {$ENDIF FMX}
 end;
 
-procedure ClearAlpha(B: TBitmap);
-type
-  PRGBA = ^TRGBA;
-  TRGBA = packed record
-    case Cardinal of
-      0: (Color: Cardinal);
-      2: (HiWord, LoWord: Word);
-      3: (B, G, R, A: Byte);
-    end;
-  PRGBAArray = ^TRGBAArray;
-  TRGBAArray = array[0..0] of TRGBA;
-var
-  I: Integer;
-  p: Pointer;
-begin
-{
-  p := B.Scanline[B.Height - 1];
-  if p <> NIL then
-    for I := 0 to B.Width * B.Height - 1 do
-      PRGBAArray(P)[I].A := 1;
-}
-  for var j := 0 to b.Height -1 do
-    begin
-      p := B.Scanline[j];
-
-      if p <> NIL then
-       for i := 0 to B.Width - 1 do
-         begin
-           PRGBAArray(P)[I].A := 5;
-           PRGBAArray(P)[I].r := 222;
-//           PRGBAArray(P)[I].b := 9;
-         end;
-    end;
-end;
-
-function getImageIndexForFile(fn:string):integer;
+function TIconsDM.getImageIndexForFile(fn: String): Integer;
 var
   newIdx, n: integer;
   shfi: TShFileInfo;
   sR16, sR32: RawByteString;
   bmp: TBitmap;
-  str: TAnsiStringStream;
+  str: TRawByteStringStream;
 //  iconX, iconY: Integer;
 begin
   ZeroMemory(@shfi, SizeOf(TShFileInfo));
+ try
+  imgCS.Acquire;
 // documentation reports shGetFileInfo() to be working with relative paths too,
 // but it does not actually work without the expandFileName()
-shGetFileInfo( pchar(expandFileName(fn)), 0, shfi, SizeOf(shfi), SHGFI_SYSICONINDEX);
-if shfi.iIcon = 0 then
-  begin
-  result:=ICON_FILE;
-  exit;
-  end;
-// as reported by official docs
-if shfi.hIcon <> 0 then
-  destroyIcon(shfi.hIcon);
+  shGetFileInfo( pchar(expandFileName(fn)), 0, shfi, SizeOf(shfi), SHGFI_SYSICONINDEX);
+  if shfi.iIcon = 0 then
+   begin
+    result := ICON_FILE;
+    exit;
+   end;
+  // as reported by official docs
+  if shfi.hIcon <> 0 then
+    destroyIcon(shfi.hIcon);
 
   sR16 := '';
   sR32 := '';
+   {$IFNDEF FMX}
 
-// have we already met this sysidx before?
-for var i:=0 to length(sysidx2index)-1 do
-  if sysidx2index[i].sysidx = shfi.iIcon then
-  	begin
-    result:=sysidx2index[i].idx;
-    exit;
-    end;
-// found not, let's check deeper: byte comparison.
-// we first add the ico to the list, so we can use pic2str()
-
-// 16x16
-  bmp := TBitmap.Create;
-  try
-    bmp.PixelFormat := pf32bit;
-    bmp.SetSize(ImageSizeSmall, ImageSizeSmall);
-    ImageList_DrawEx(IconsDM.systemimages.Handle, shfi.iIcon, bmp.Canvas.Handle, 0, 0, ImageSizeSmall, ImageSizeSmall, CLR_NONE, CLR_NONE, ILD_SCALE or ILD_PRESERVEALPHA);
-    sR16 := bmp2str(bmp);
-   finally
-    bmp.Free;
-  end;
-// 32x32
-  bmp := TBitmap.Create;
-  try
-    bmp.PixelFormat := pf32bit;
-    bmp.SetSize(ImageSizeBig, ImageSizeBig);
-    ImageList_DrawEx(IconsDM.systemimages.Handle, shfi.iIcon, bmp.Canvas.Handle, 0, 0, ImageSizeBig, ImageSizeBig, CLR_NONE, CLR_NONE, ILD_SCALE or ILD_PRESERVEALPHA);
-    sR32 := bmp2str(bmp);
-//     saveFileA(IntToStr(i) + '.png', sR);
-//    bmp.saveToStream(str);
-   finally
-    bmp.Free;
-  end;
-
-  if (sR16 > '') or (sR32 > '') then
-  begin
-    newIdx := IconsDM.imgCollection.count;
-    if sR16 > '' then
-     begin
-      str := TAnsiStringStream.Create(sR16);
-      IconsDM.imgCollection.add(IntToStr(newIdx), str);
-      str.free;
-     end;
-    if sR32 > '' then
-     begin
-      str := TAnsiStringStream.Create(sR32);
-      IconsDM.imgCollection.add(IntToStr(newIdx), str);
-      str.free;
-     end;
-
-    IconsDM.images.Add(IntToStr(newIdx), newIdx);
-//    sR:=pic2str(i);
-    etags.values['icon.'+intToStr(newIdx)] := MD5PassHS(sR16);
-  end
-  else
-   newIdx := -1;
-//  i:=mainfrm.images.addIcon(ico);
-// now we can search if the icon was already there, by byte comparison
-n:=0;
-  if newIdx >= 0 then
-    while n < length(sysidx2index) do
+  // have we already met this sysidx before?
+  for var i:=0 to length(sysidx2index)-1 do
+    if sysidx2index[i].sysidx = shfi.iIcon then
       begin
-      if pic2str(sysidx2index[n].idx, ImageSizeSmall) = sR16 then
-        begin // found, delete the duplicate
-        IconsDM.imgCollection.delete(newIdx);
-        IconsDM.images.Delete(IntToStr(newIdx));
-        setlength(imagescacheSm, newIdx);
-        setlength(imagescacheBg, newIdx);
-        newIdx := sysidx2index[n].idx;
-        break;
-        end;
-      inc(n);
+        result := sysidx2index[i].idx;
+        exit;
       end;
-      if (newIdx >= length(imagescacheSm)) then
-        begin
-          setLength(imagescacheSm, newIdx+1);
-          setLength(imagescacheBg, newIdx+1);
-        end;
-      if (newIdx>=0) and (imagescacheSm[newIdx] = '') then
-        imagescacheSm[newIdx] := sR16;
-      if (newIdx>=0) and (imagescacheBg[newIdx] = '') then
-        imagescacheBg[newIdx] := sR32;
+  // found not, let's check deeper: byte comparison.
+  // we first add the ico to the list, so we can use pic2str()
 
-n:=length(sysidx2index);
-setlength(sysidx2index, n+1);
-sysidx2index[n].sysidx:=shfi.iIcon;
-sysidx2index[n].idx:= newIdx;
-result:= newIdx;
+  // 16x16
+    sR16 := ico2str(IconsDM.systemimages.Handle, shfi.iIcon, ImageSizeSmall);
+  // 32x32
+    sR32 := ico2str(IconsDM.systemimages.Handle, shfi.iIcon, ImageSizeBig);
+
+    if (sR16 > '') or (sR32 > '') then
+    begin
+      newIdx := IconsDM.imgCollection.count;
+      if sR16 > '' then
+       begin
+        str := TRawByteStringStream.Create(sR16);
+        IconsDM.imgCollection.add(IntToStr(newIdx), str);
+        str.free;
+       end;
+      if sR32 > '' then
+       begin
+        str := TRawByteStringStream.Create(sR32);
+        IconsDM.imgCollection.add(IntToStr(newIdx), str);
+        str.free;
+       end;
+
+      IconsDM.images.Add(IntToStr(newIdx), newIdx);
+  //    sR:=pic2str(i);
+      etags.values['icon.'+intToStr(newIdx)] := MD5PassHS(sR16);
+    end
+    else
+     {$ENDIF ~FMX}
+     newIdx := -1;
+  //  i:=mainfrm.images.addIcon(ico);
+  // now we can search if the icon was already there, by byte comparison
+  n:=0;
+     {$IFNDEF FMX}
+    if newIdx >= 0 then
+      while n < length(sysidx2index) do
+        begin
+        if pic2str(sysidx2index[n].idx, ImageSizeSmall) = sR16 then
+          begin // found, delete the duplicate
+          IconsDM.imgCollection.delete(newIdx);
+          IconsDM.images.Delete(IntToStr(newIdx));
+          setlength(imagescacheSm, newIdx);
+          setlength(imagescacheBg, newIdx);
+          newIdx := sysidx2index[n].idx;
+          break;
+          end;
+        inc(n);
+        end;
+    if (newIdx >= length(imagescacheSm)) then
+      begin
+        setLength(imagescacheSm, newIdx+1);
+        setLength(imagescacheBg, newIdx+1);
+      end;
+    if (newIdx>=0) and (imagescacheSm[newIdx] = '') then
+      imagescacheSm[newIdx] := sR16;
+    if (newIdx>=0) and (imagescacheBg[newIdx] = '') then
+      imagescacheBg[newIdx] := sR32;
+     {$ENDIF ~FMX}
+
+  n := length(sysidx2index);
+  setlength(sysidx2index, n+1);
+  sysidx2index[n].sysidx:=shfi.iIcon;
+  sysidx2index[n].idx:= newIdx;
+  result := newIdx;
+ finally
+  imgCS.Release;
+ end;
 end; // getImageIndexForFile
+
+function idx_label(i: Integer): String;
+begin
+  result := intToStr(idx_img2ico(i))
+end;
 
 
 end.

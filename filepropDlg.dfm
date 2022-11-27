@@ -11,20 +11,18 @@ object filepropFrm: TfilepropFrm
   Font.Name = 'Tahoma'
   Font.Style = []
   KeyPreview = True
-  OldCreateOrder = False
   Position = poMainFormCenter
   ShowHint = True
   OnClose = FormClose
   OnKeyPress = FormKeyPress
   OnShow = FormShow
-  PixelsPerInch = 96
   TextHeight = 13
   object pages: TPageControl
     Left = 0
     Top = 0
     Width = 393
     Height = 366
-    ActivePage = flagsTab
+    ActivePage = permTab
     Align = alClient
     ParentShowHint = False
     RaggedRight = True
@@ -33,10 +31,6 @@ object filepropFrm: TfilepropFrm
     object permTab: TTabSheet
       Caption = 'Permissions'
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object actionTabs: TTabControl
         Left = 0
         Top = 0
@@ -128,10 +122,6 @@ object filepropFrm: TfilepropFrm
     object flagsTab: TTabSheet
       Caption = 'Flags'
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object hiddenChk: TCheckBox
         Left = 32
         Top = 24
@@ -218,10 +208,6 @@ object filepropFrm: TfilepropFrm
     object diffTab: TTabSheet
       Caption = 'Diff template'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object difftplBox: TMemo
         Left = 0
         Top = 0
@@ -239,10 +225,6 @@ object filepropFrm: TfilepropFrm
     object commentTab: TTabSheet
       Caption = 'Comment'
       ImageIndex = 4
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object commentBox: TMemo
         Left = 0
         Top = 0
@@ -257,10 +239,6 @@ object filepropFrm: TfilepropFrm
     object maskTab: TTabSheet
       Caption = 'File masks'
       ImageIndex = 5
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         385
         338)
@@ -275,6 +253,7 @@ object filepropFrm: TfilepropFrm
         EditLabel.Caption = 'Files filter'
         Enabled = False
         TabOrder = 0
+        Text = ''
         OnEnter = textinputEnter
       end
       object foldersfilterBox: TLabeledEdit
@@ -288,6 +267,7 @@ object filepropFrm: TfilepropFrm
         EditLabel.Caption = 'Folders filter'
         Enabled = False
         TabOrder = 1
+        Text = ''
         OnEnter = textinputEnter
       end
       object deffileBox: TLabeledEdit
@@ -305,6 +285,7 @@ object filepropFrm: TfilepropFrm
         EditLabel.Caption = 'Default file mask'
         Enabled = False
         TabOrder = 2
+        Text = ''
         OnEnter = textinputEnter
       end
       object uploadfilterBox: TLabeledEdit
@@ -319,6 +300,7 @@ object filepropFrm: TfilepropFrm
         EditLabel.Caption = 'Upload filter mask'
         Enabled = False
         TabOrder = 3
+        Text = ''
         OnEnter = textinputEnter
       end
       object dontconsiderBox: TLabeledEdit
@@ -335,16 +317,13 @@ object filepropFrm: TfilepropFrm
         EditLabel.Caption = 'Don'#39't consider as download (mask)'
         Enabled = False
         TabOrder = 4
+        Text = ''
         OnEnter = textinputEnter
       end
     end
     object otherTab: TTabSheet
       Caption = 'Other'
       ImageIndex = 5
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         385
         338)
@@ -371,6 +350,7 @@ object filepropFrm: TfilepropFrm
         EditLabel.Caption = 'Realm'
         Enabled = False
         TabOrder = 0
+        Text = ''
         OnEnter = textinputEnter
       end
       object iconBox: TComboBoxEx
@@ -381,7 +361,6 @@ object filepropFrm: TfilepropFrm
         ItemsEx = <>
         Style = csExDropDownList
         TabOrder = 1
-        Images = mainFrm.images
       end
       object addiconBtn: TButton
         Left = 152

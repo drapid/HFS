@@ -31,7 +31,16 @@ unit HSlib;
 interface
 
 uses
-  classes, messages, winprocs, forms, extctrls, sysutils,
+  classes, messages, winprocs,
+  mormot.core.base,
+ {$IFDEF FMX}
+  FMX.Graphics, System.UITypes, FMX.Types,
+ {$ELSE ~FMX}
+  Graphics,
+  Forms,
+  extctrls,
+ {$ENDIF FMX}
+  sysutils,
   contnrs, strUtils, winsock, inifiles, types,
   OverbyteIcsWSocket //OverbyteIcsWSockets,
   ;
@@ -210,15 +219,15 @@ type
     procedure notify(ev:ThttpEvent);
     procedure tryNotify(ev:ThttpEvent);
     procedure calculateSpeed();
-	  procedure sendheader(const h:string); OverLoad;
+	  procedure sendheader(const h: String); OverLoad;
 	  procedure sendheader(const h: RawByteString=''); OverLoad;
-		function  replyHeader_mode(mode:ThttpReplyMode): RawByteString;
-		function  replyHeader_code(code:integer): RawByteString;
-    function  getDontFree():boolean;
+		function  replyHeader_mode(mode: ThttpReplyMode): RawByteString;
+		function  replyHeader_code(code: Integer): RawByteString;
+    function  getDontFree(): Boolean;
     procedure processInputBuffer();
     procedure clearRequest();
     procedure clearReply();
-    procedure setSndbuf(v:integer);
+    procedure setSndbuf(v: Integer);
   public
     sock: Twsocket;             // client-server communication socket
     state: ThttpConnState;      // what is doing now with this
@@ -233,23 +242,23 @@ type
     constructor create(server:ThttpSrv; acceptingSock:Twsocket);
     destructor Destroy; override;
     procedure disconnect();
-//    procedure addHeader(s:string; overwrite:boolean=TRUE); OverLoad; // append an additional header line
-    procedure addHeader(const s:RawByteString; overwrite:boolean=TRUE); OverLoad; // append an additional header line
-    procedure addHeader(const s: String; overwrite:boolean=TRUE); OverLoad;
-    procedure addHeader(const h, v:RawByteString; overwrite:boolean=TRUE); OverLoad; // append an additional header line
-    procedure addHeader(const h, v: String; overwrite:boolean=TRUE); OverLoad;
-    function  setHeaderIfNone(const s:string):boolean; OverLoad;// set header if not already existing
-    function  setHeaderIfNone(const s:RawByteString):boolean; OverLoad;// set header if not already existing
-    function  setHeaderIfNone(const name: RawByteString; const s:string):boolean; OverLoad;
+//    procedure addHeader(s: String; overwrite: Boolean=TRUE); OverLoad; // append an additional header line
+    procedure addHeader(const s: RawByteString; overwrite: Boolean=TRUE); OverLoad; // append an additional header line
+    procedure addHeader(const s: String; overwrite: Boolean=TRUE); OverLoad;
+    procedure addHeader(const h, v: RawByteString; overwrite: Boolean=TRUE); OverLoad; // append an additional header line
+    procedure addHeader(const h, v: String; overwrite: Boolean=TRUE); OverLoad;
+    function  setHeaderIfNone(const s: String): Boolean; OverLoad;// set header if not already existing
+    function  setHeaderIfNone(const s: RawByteString): Boolean; OverLoad;// set header if not already existing
+    function  setHeaderIfNone(const name: RawByteString; const s: String): Boolean; OverLoad;
     procedure removeHeader(name: RawByteString);
-    function  getHeader(h:string):string;  // extract the value associated to the specified header field
-    function  getCookie(k:string):string;
-    procedure setCookie(k, v:string; pairs:array of string; extra:string='');
-    procedure delCookie(k:string);
-    function getBuffer():RawByteString;
-    function  initInputStream():boolean;
-    property address:string read P_address;      // other peer ip address
-    property port:string read P_port;            // other peer port
+    function  getHeader(const h: String): String;  // extract the value associated to the specified header field
+    function  getCookie(const k: String): String;
+    procedure setCookie(const k, v: String; pairs: array of string; const extra: String='');
+    procedure delCookie(const k: String);
+    function  getBuffer(): RawByteString;
+    function  initInputStream(): boolean;
+    property address: String read P_address;      // other peer ip address
+    property port: String read P_port;            // other peer port
     property v6:boolean read P_v6;
     property requestCount:integer read P_requestCount;
     property bytesToSend:int64 read getBytesToSend;
@@ -331,25 +340,25 @@ const
     'Moved permanently', 'Not Modified');
 
 // decode/decode url
-function decodeURL(const url:string; utf8:boolean=TRUE):string; OverLoad;
-function decodeURL(const url: RawByteString):string; OverLoad;
-function encodeURL(const url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
-  htmlEncoding:boolean=FALSE):string; OverLoad;
-function encodeURL(const url: RawByteString; nonascii:boolean=TRUE; spaces:boolean=TRUE;
+function decodeURL(const url: String; utf8: Boolean=TRUE): String; OverLoad;
+function decodeURL(const url: RawByteString): String; OverLoad;
+function encodeURL(const url: String; nonascii: Boolean=TRUE; spaces: Boolean=TRUE;
+  htmlEncoding: Boolean=FALSE):string; OverLoad;
+function encodeURL(const url: RawByteString; nonascii: Boolean=TRUE; spaces: Boolean=TRUE;
   unicode: boolean=FALSE): RawByteString; OverLoad;
 // returns true if address is not suitable for the internet
-function isLocalIP(const ip:string):boolean;
+function isLocalIP(const ip: String): Boolean;
 // an ip address where we are listening
-function getIP():string;
+function getIP(): String;
 // ensure a string ends with a specific string
-procedure includeTrailingString(var s:string; const ss:string); OverLoad;
+procedure includeTrailingString(var s: String; const ss: String); OverLoad;
 procedure includeTrailingString(var s: RawByteString; const ss: RawByteString); OverLoad;
 // gets unicode code for specified character
-function charToUnicode(c:char):dword; OverLoad;
-function charToUnicode(c:AnsiChar):dword; OverLoad;
+function charToUnicode(c: char): dword; OverLoad;
+function charToUnicode(c: AnsiChar): dword; OverLoad;
 // this version of pos() is able to skip the pattern if inside quotes
-function nonQuotedPos(ss, s:string; ofs:integer=1; quote:string='"'; unquote:string='"'):integer; OverLoad;
-function nonQuotedPos(ss, s: RawByteString; ofs: integer=1; quote: RawByteString='"'; unquote: RawByteString='"'):integer; OverLoad;
+function nonQuotedPos(const ss, s: String; ofs: Integer=1; const quote: String='"'; const unquote: String='"'): Integer; OverLoad;
+function nonQuotedPos(const ss, s: RawByteString; ofs: integer=1; const quote: RawByteString='"'; const unquote: RawByteString='"'): Integer; OverLoad;
 // case insensitive version
 //function ipos(ss, s:string; ofs:integer=1):integer; overload;
 function getNameOf(const s: String): String; OverLoad; // colon included
@@ -361,7 +370,8 @@ implementation
 
 uses
   Windows, AnsiStrings,
-  AnsiClasses, RDUtils, Base64,
+//  AnsiClasses,
+   RDUtils, Base64,
   srvConst;
 
 const
@@ -408,9 +418,9 @@ function isLocalIP(const ip:string):boolean;
 var
   r: record d,c,b,a:byte end;
 begin
-if ip = '::1' then
-  exit(TRUE);
-dword(r):=WSocket_ntohl(WSocket_inet_addr(ansiString(ip)));
+  if ip = '::1' then
+    exit(TRUE);
+  dword(r) := dword(WSocket_ntohl(WSocket_inet_addr(ansiString(ip))));
 result:=(r.a in [0,10,23,127])
   or (r.a = 192) and ((r.b = 168) or (r.b = 0) and (r.c = 2))
   or (r.a = 169) and (r.b = 254)
@@ -422,26 +432,30 @@ begin if a < b then result:=a else result:=b end;
 
 
 
-function nonQuotedPos(ss, s: string; ofs: integer=1; quote: string='"'; unquote: string='"'):integer; OverLoad;
+function nonQuotedPos(const ss, s: String; ofs: Integer=1; const quote: String='"'; const unquote: String='"'): Integer; OverLoad;
 var
   qpos: integer;
 begin
   repeat
-  result:=posEx(ss, s, ofs);
-  if result = 0 then exit;
-  
+    result := posEx(ss, s, ofs);
+    if result = 0 then
+      exit;
+
     repeat
-    qpos:=posEx(quote, s, ofs);
-    if qpos = 0 then exit; // there's no quoting, our result will fit
-    if qpos > result then exit; // the quoting doesn't affect the piece, accept the result
-    ofs:=posEx(unquote, s, qpos+1);
-    if ofs = 0 then exit; // it is not closed, we don't consider it quoting
-    inc(ofs);
+      qpos := posEx(quote, s, ofs);
+      if qpos = 0 then
+        exit; // there's no quoting, our result will fit
+      if qpos > result then
+        exit; // the quoting doesn't affect the piece, accept the result
+      ofs := posEx(unquote, s, qpos+1);
+      if ofs = 0 then
+        exit; // it is not closed, we don't consider it quoting
+      inc(ofs);
     until ofs > result; // this quoting was short, let's see if we have another
   until false;
 end; // nonQuotedPos
 
-function nonQuotedPos(ss, s: RawByteString; ofs: integer=1; quote: RawByteString='"'; unquote: RawByteString='"'):integer; OverLoad;
+function nonQuotedPos(const ss, s: RawByteString; ofs: integer=1; const quote: RawByteString='"'; const unquote: RawByteString='"'):integer; OverLoad;
 var
   qpos: integer;
 begin
@@ -616,23 +630,23 @@ var
   i: integer;
   ips: Tstrings;
 begin
-ips:=LocalIPlist();
-case ips.count of
-  0: result:='';
-  1: result:=ips[0];
-  else
-    i:=0;
-    while (i < ips.count-1) and isLocalIP(ips[i]) do
-      inc(i);
-    result:=ips[i];
-  end;
+  ips := LocalIPlist();
+  case ips.count of
+    0: result := '';
+    1: result := ips[0];
+    else
+      i:=0;
+      while (i < ips.count-1) and isLocalIP(ips[i]) do
+        inc(i);
+      result := ips[i];
+    end;
 end; // getIP
 
-function replyHeader_IntPositive(const name:string; int:int64):string;
+function replyHeader_IntPositive(const name: String; int: Int64): String;
 begin
-result:='';
-if int >= 0 then
-  result:=name+': '+intToStr(int)+CRLF;
+  result := '';
+  if int >= 0 then
+    result := name+': '+intToStr(int)+CRLF;
 end;
 
 {
@@ -1130,17 +1144,18 @@ state:=HCS_DISCONNECTED;
 srv.disconnecting.Add(self);
 end;
 
-function ThttpConn.getHeader(h:string):string;
+function ThttpConn.getHeader(const h: String): String;
 begin
-result:='';
-if request.method = HM_UNK then exit;
-result:=trim(request.headers.values[h]);
+  result := '';
+  if request.method = HM_UNK then
+    exit;
+  result := trim(request.headers.values[h]);
 end; // getHeader
 
 function ThttpConn.getBuffer(): RawByteString;
 begin result:=buffer end;
 
-function ThttpConn.getCookie(k:string):string;
+function ThttpConn.getCookie(const k: String): String;
 begin
 result:='';
 if request.method = HM_UNK then exit;
@@ -1154,10 +1169,12 @@ if request.cookies = NIL then
 result:=decodeURL(trim(request.cookies.values[k]));
 end; // getCookie
 
-procedure ThttpConn.delCookie(k:string);
-begin setCookie(k,'', ['expires','Thu, 01-Jan-70 00:00:01 GMT']) end;
+procedure ThttpConn.delCookie(const k: String);
+begin
+  setCookie(k,'', ['expires','Thu, 01-Jan-70 00:00:01 GMT'])
+end;
 
-procedure ThttpConn.setCookie(k, v:string; pairs:array of string; extra:string='');
+procedure ThttpConn.setCookie(const k, v: String; pairs: array of String; const extra: String='');
 var
   i: integer;
   c: RawByteString;
@@ -1544,7 +1561,7 @@ if state = HCS_REPLYING_BODY then
 notify(HE_SENT);
 end; // senddata
 
-procedure ThttpConn.datasent(sender:Tobject; error:word);
+procedure ThttpConn.datasent(sender: Tobject; error: word);
 
   function toBeQueued():boolean;
   var
@@ -1642,8 +1659,10 @@ result:=FALSE;
 FreeAndNil(stream);
 try
   case reply.bodyMode of
-    RBM_RAW: stream := TAnsiStringStream.create(reply.body);
-    RBM_TEXT: stream := TAnsiStringStream.create(reply.body);
+//    RBM_RAW: stream := TAnsiStringStream.create(reply.body);
+//    RBM_TEXT: stream := TAnsiStringStream.create(reply.body);
+    RBM_RAW: stream := TRawByteStringStream.create(reply.body);
+    RBM_TEXT: stream := TRawByteStringStream.create(reply.body);
     RBM_FILE:
       begin
         s := reply.bodyU;
@@ -1833,7 +1852,7 @@ if result then
 end; // setHeaderIfNone
 
 // return true if the operation succeded
-function ThttpConn.setHeaderIfNone(const name: RawByteString; const s:string):boolean;
+function ThttpConn.setHeaderIfNone(const name: RawByteString; const s: string):boolean;
 begin
 if name = '' then
   raise Exception.Create('Missing colon');
@@ -1865,7 +1884,7 @@ begin
 reply.fAdditionalHeaders:=s;
 end; // removeHeader
 
-procedure ThttpConn.addHeader(const s: RawByteString; overwrite:boolean=TRUE);
+procedure ThttpConn.addHeader(const s: RawByteString; overwrite: Boolean=TRUE);
 begin
 if overwrite then
   removeHeader(getNameOf(s));
@@ -1873,7 +1892,7 @@ if overwrite then
 reply.fAdditionalHeaders := reply.fAdditionalHeaders + s + CRLFA;
 end; // addHeader
 
-procedure ThttpConn.addHeader(const s: String; overwrite:boolean=TRUE);
+procedure ThttpConn.addHeader(const s: String; overwrite: Boolean=TRUE);
 begin
 if overwrite then
   removeHeader(getNameOf(s));
@@ -1881,14 +1900,14 @@ if overwrite then
 reply.fAdditionalHeaders := reply.fAdditionalHeaders + StrToUTF8(s) + CRLFA;
 end; // addHeader
 
-procedure ThttpConn.addHeader(const h, v:RawByteString; overwrite:boolean=TRUE);
+procedure ThttpConn.addHeader(const h, v: RawByteString; overwrite: Boolean=TRUE);
 begin
   if overwrite then
     removeHeader(h);
   reply.fAdditionalHeaders := reply.fAdditionalHeaders + h + ': ' + v + CRLFA;
 end; // addHeader
 
-procedure ThttpConn.addHeader(const h, v:String; overwrite:boolean=TRUE);
+procedure ThttpConn.addHeader(const h, v: String; overwrite: Boolean=TRUE);
 var
   hr: RawByteString;
 begin

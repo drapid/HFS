@@ -4,9 +4,9 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, ComCtrls, StdCtrls, ExtCtrls, CheckLst, types, Grids,
+  Dialogs, ComCtrls, StdCtrls, ExtCtrls, CheckLst, types, Grids, Vcl.Mask,
   ValEdit, strutils, math,
-  hslib, fileLib, hfsGlobal;
+  hslib, serverLib, fileLib, hfsGlobal;
 
 type
   TfilepropFrm = class(TForm)
@@ -64,6 +64,7 @@ type
     procedure applyBtnClick(Sender: TObject);
   private
     iconOfs: integer;
+    procedure DoShow(fileTree: TTreeView; selectedFile: Tfile; fileSrv: TFileServer);
   public
     firstActionChange: boolean;
     users: array [TfileAction] of TStringDynArray;
@@ -79,8 +80,10 @@ implementation
 
 uses
   optionsDlg, RDUtils,
-  main, utilLib,
-  srvConst, srvUtils, srvVars, IconsLib;
+  main,
+  utilLib,
+  srvConst, srvUtils, srvVars,
+  IconsLib;
 
 {$R *.dfm}
 
@@ -148,11 +151,13 @@ var
   fn: string;
   i: integer;
 begin
-if not promptForFileName(fn) then exit;
-i:=getImageIndexForFile(fn);
-if i < 0 then exit;
-iconBox.itemsEx.addItem(idx_label(i), i, i, -1, 0, NIL);
-iconBox.itemIndex:=iconOfs+i;
+  if not promptForFileName(fn) then
+    exit;
+  i := IconsDM.getImageIndexForFile(fn);
+  if i < 0 then
+    exit;
+  iconBox.itemsEx.addItem(idx_label(i), i, i, -1, 0, NIL);
+  iconBox.itemIndex := iconOfs+i;
 end;
 
 procedure TfilepropFrm.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -169,54 +174,62 @@ if pages.focused then
     except end;
 end;
 
-procedure TfilepropFrm.FormShow(Sender: TObject);
+procedure TfilepropFrm.DoShow(fileTree: TTreeView; selectedFile: Tfile; fileSrv: TFileServer);
 var
   i: integer;
   f: Tfile;
 
-  procedure setFlag(flag:TfileAttribute; cb:TCheckBox);
+  procedure setFlag(flag: TfileAttribute; cb: TCheckBox);
   var
     should: TCheckBoxState;
   begin
-  cb.enabled:=TRUE;
-  if flag in f.flags then
-    should:=cbChecked
-  else
-    should:=cbUnchecked;
-  if i = 0 then
-    cb.state:=should
-  else
-    if (cb.state <> cbGrayed) and (cb.state <> should) then
-      cb.state:=cbGrayed;
+    cb.enabled:=TRUE;
+    if flag in f.flags then
+      should:=cbChecked
+    else
+      should:=cbUnchecked;
+    if i = 0 then
+      cb.state:=should
+    else
+      if (cb.state <> cbGrayed) and (cb.state <> should) then
+        cb.state:=cbGrayed;
   end; // setFlag
 
-  procedure setText(var v:string; box:TCustomEdit);
+  procedure setText(var v: string; box: TCustomEdit);
   const
     COLOR = clInfoBk;
   var
     n: integer;
   begin
-  n:=countSubstr(#0, box.hint);
-  box.enabled:=TRUE;
-  if n = 0 then
-    begin // init this edit box
-    box.text:=v;
-    box.hint:=box.hint+#0;
-    exit;
+    n := countSubstr(#0, box.hint);
+    box.enabled:=TRUE;
+    if n = 0 then
+      begin // init this edit box
+      box.text:=v;
+      box.hint:=box.hint+#0;
+      exit;
+      end;
+    if (pos(#0+v+#0, box.hint) > 0)
+    or (box.hint = #0) and (v = box.text) then
+      exit; // the value is already there
+    if n > 1 then
+      begin // add the value to the list of values
+      box.hint:=box.hint+v+#0;
+      exit;
+      end;
+    box.hint:=box.hint+box.text+#0+v+#0; // init the list of values
+    box.text:='(more values)'; // message to be shown
+    // these properties are unhappily kept unaccessible through TcustomEdit interface
+    try
+      if box is TLabeledEdit then
+        (box as Tlabelededit).color := COLOR
+     except
     end;
-  if (pos(#0+v+#0, box.hint) > 0)
-  or (box.hint = #0) and (v = box.text) then
-    exit; // the value is already there
-  if n > 1 then
-    begin // add the value to the list of values
-    box.hint:=box.hint+v+#0;
-    exit;
+    try
+      if box is TMemo then
+        (box as Tmemo).color := COLOR
+     except
     end;
-  box.hint:=box.hint+box.text+#0+v+#0; // init the list of values
-  box.text:='(more values)'; // message to be shown
-  // these properties are unhappily kept unaccessible through TcustomEdit interface
-  try (box as Tlabelededit).color:=COLOR except end;
-  try (box as Tmemo).color:=COLOR except end;
   end; // setText
 
   procedure setCaption();
@@ -226,118 +239,124 @@ var
     a: TStringDynArray;
     i: integer;
   begin
-  a:=NIL;
-  if mainFrm.filesBox.SelectionCount > 0 then
-    for i:=0 to min(mainFrm.filesBox.SelectionCount, MAX)-1 do
-      addString(mainFrm.filesBox.Selections[i].Text, a);
-  if mainFrm.filesBox.SelectionCount > MAX then
-    addString('...', a);
-  caption:='Properties for '+join(', ', a);
+    a := NIL;
+    if fileTree.SelectionCount > 0 then
+      for i:=0 to min(fileTree.SelectionCount, MAX)-1 do
+        addString(fileTree.Selections[i].Text, a);
+    if fileTree.SelectionCount > MAX then
+      addString('...', a);
+    caption:='Properties for '+join(', ', a);
   end; // setCaption
 
 var
   act: TfileAction;
   actions: set of TfileAction;
 begin
-firstActionChange:=TRUE;
+  firstActionChange := TRUE;
 
-accountsBox.smallImages:= IconsDM.images;
-updateAccountsBox();
+  accountsBox.smallImages := IconsDM.images;
+  updateAccountsBox();
 
-maskTab.tabVisible:=FALSE;
-diffTab.tabVisible:=FALSE;
+  maskTab.tabVisible := FALSE;
+  diffTab.tabVisible := FALSE;
 
-iconBox.clear();
-iconBox.Enabled:=FALSE;
-addiconBtn.Enabled:=FALSE;
-i:=if_(mainfrm.filesBox.SelectionCount > 1, -1, selectedFile.getIconForTreeview(mainfrm.usesystemiconsChk.Checked));
-iconBox.itemsEx.addItem('Default', i, i, -1, 0, NIL);
-iconOfs:=iconBox.ItemsEx.count;
-for i:=0 to IconsDM.images.Count-1 do
-  iconBox.itemsEx.addItem(idx_label(i), i, i, -1, 0, NIL);
+  iconBox.clear();
+  iconBox.Enabled := FALSE;
+  addiconBtn.Enabled := FALSE;
+  i := if_(fileTree.SelectionCount > 1, -1, selectedFile.getIconForTreeview(spUseSysIcons in fileSrv.getSP));
+  iconBox.itemsEx.addItem('Default', i, i, -1, 0, NIL);
+  iconOfs := iconBox.ItemsEx.count;
+  for i:=0 to IconsDM.images.Count-1 do
+    iconBox.itemsEx.addItem(idx_label(i), i, i, -1, 0, NIL);
+  iconBox.Images := IconsDM.images;
 
-actions:=[FA_ACCESS];
-if mainFrm.filesBox.SelectionCount > 0 then
-for i:=0 to mainFrm.filesBox.SelectionCount-1 do
-  begin
-  f:=mainFrm.filesBox.Selections[i].data;
-
-  setText(f.comment, commentBox);
-  setText(f.realm, realmBox);
-
-  if f.isRealFolder() then
+  actions := [FA_ACCESS];
+  if fileTree.SelectionCount > 0 then
+  for i:=0 to fileTree.SelectionCount-1 do
     begin
-    include(actions, FA_UPLOAD);
-    setText(f.uploadFilterMask, uploadfilterBox);
-    end;
+    f := fileTree.Selections[i].data;
 
-  if f.isFileOrFolder() then
-    setFlag(FA_DONT_LOG, dontlogChk);
+    setText(f.comment, commentBox);
+    setText(f.realm, realmBox);
 
-  if f.isFile() or f.isRealFolder() then
-    setFlag(FA_DL_FORBIDDEN, nodlChk);
-
-  if not f.isRoot() then
-    begin
-    setFlag(FA_HIDDEN, hiddenChk);
-    if not iconBox.enabled then
+    if f.isRealFolder() then
       begin
-      iconBox.enabled:=TRUE;
-      iconBox.itemIndex:=f.icon+iconOfs;
-      addiconBtn.Enabled:=TRUE;
-      end
-    else
-      if iconBox.itemIndex <> f.icon+iconOfs then
-        iconBox.itemIndex:=-1;
+      include(actions, FA_UPLOAD);
+      setText(f.uploadFilterMask, uploadfilterBox);
+      end;
+
+    if f.isFileOrFolder() then
+      setFlag(FA_DONT_LOG, dontlogChk);
+
+    if f.isFile() or f.isRealFolder() then
+      setFlag(FA_DL_FORBIDDEN, nodlChk);
+
+    if not f.isRoot() then
+      begin
+      setFlag(FA_HIDDEN, hiddenChk);
+      if not iconBox.enabled then
+        begin
+        iconBox.enabled:=TRUE;
+        iconBox.itemIndex := f.icon+iconOfs;
+        addiconBtn.Enabled:=TRUE;
+        end
+      else
+        if iconBox.itemIndex <> f.icon+iconOfs then
+          iconBox.itemIndex := -1;
+      end;
+
+    if f.isFile() then
+      setFlag(FA_DONT_COUNT_AS_DL, dontconsiderChk);
+
+    if f.isFolder() then
+      begin
+      include(actions, FA_DELETE);
+
+      diffTab.tabVisible:=TRUE;
+      maskTab.tabVisible:=TRUE;
+      setText(f.filesFilter, filesfilterBox);
+      setText(f.foldersFilter, foldersfilterBox);
+      setText(f.defaultFileMask, deffileBox);
+      setText(f.dontCountAsDownloadMask, dontconsiderBox);
+      setText(f.diffTpl, difftplBox);
+
+      setFlag(FA_HIDDENTREE, hidetreeChk);
+      setFlag(FA_HIDE_EXT, hideextChk);
+      setFlag(FA_BROWSABLE, browsableChk);
+      setFlag(FA_ARCHIVABLE, archivableChk);
+      setFlag(FA_HIDE_EMPTY_FOLDERS, hideemptyChk);
+
+      end;
+
+    // collect usernames
+    for act:=low(act) to high(act) do
+      addUniqueArray(users[act], f.accounts[act]);
     end;
 
-  if f.isFile() then
-    setFlag(FA_DONT_COUNT_AS_DL, dontconsiderChk);
-
-  if f.isFolder() then
-    begin
-    include(actions, FA_DELETE);
-
-    diffTab.tabVisible:=TRUE;
-    maskTab.tabVisible:=TRUE;
-    setText(f.filesFilter, filesfilterBox);
-    setText(f.foldersFilter, foldersfilterBox);
-    setText(f.defaultFileMask, deffileBox);
-    setText(f.dontCountAsDownloadMask, dontconsiderBox);
-    setText(f.diffTpl, difftplBox);
-
-    setFlag(FA_HIDDENTREE, hidetreeChk);
-    setFlag(FA_HIDE_EXT, hideextChk);
-    setFlag(FA_BROWSABLE, browsableChk);
-    setFlag(FA_ARCHIVABLE, archivableChk);
-    setFlag(FA_HIDE_EMPTY_FOLDERS, hideemptyChk);
-
-    end;
-
-  // collect usernames
   for act:=low(act) to high(act) do
-    addUniqueArray(users[act], f.accounts[act]);
-  end;
+    begin
+    savePerm[act]:=FALSE;
+    if act in actions then
+      actionTabs.tabs.add(FILEACTION2STR[act]);
+    end;
 
-for act:=low(act) to high(act) do
-  begin
-  savePerm[act]:=FALSE;
-  if act in actions then
-    actionTabs.tabs.add(FILEACTION2STR[act]);
-  end;
+  if mainFrm.easyMode then
+    onlyForExperts(mainFrm.easyMode, [browsableChk, commentTab, realmBox, dontconsiderChk, maskTab, dontlogChk, hideextChk]);
 
-if easyMode then
-  onlyForExperts([browsableChk, commentTab, realmBox, dontconsiderChk, maskTab, dontlogChk, hideextChk]);
+  actionTabs.tabIndex := 0;
+  actionTabsChange(NIL);
+  setCaption();
+  pages.TabIndex := 0;
+end;
 
-actionTabs.tabIndex:=0;
-actionTabsChange(NIL);
-setCaption();
-pages.TabIndex:=0;
+procedure TfilepropFrm.FormShow(Sender: TObject);
+begin
+  DoShow(mainFrm.filesBox, mainFrm.selectedFile, mainFrm.fileSrv);
 end;
 
 procedure TfilepropFrm.goToAccountsBtnClick(Sender: TObject);
 begin
-showOptions(optionsFrm.accountsPage);
+showOptions(optionsFrm.accountsPage, mainfrm.modalOptionsChk.checked);
 updateAccountsBox();
 actionTabsChange(NIL);
 end;

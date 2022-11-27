@@ -29,8 +29,8 @@ implementation
 
 procedure TlonginputFrm.bottomPnlResize(Sender: TObject);
 begin
-okBtn.left:=(bottomPnl.Width-cancelBtn.BoundsRect.right+okBtn.BoundsRect.left) div 2;
-cancelBtn.left:=okBtn.BoundsRect.Right+10;
+  okBtn.left := (bottomPnl.Width-cancelBtn.BoundsRect.right+okBtn.BoundsRect.left) div 2;
+  cancelBtn.left := okBtn.BoundsRect.Right+10;
 end;
 
 procedure TlonginputFrm.inputBoxKeyDown(Sender: TObject; var Key: Word;

@@ -3,11 +3,16 @@ unit hfsGlobal;
 
 interface
 uses
-  graphics, Types, SysUtils, srvConst;
+  System.UITypes,
+ {$IFDEF FMX}
+  FMX.Graphics,
+ {$ELSE ~FMX}
+  Graphics,
+ {$ENDIF FMX}
+  Types, SysUtils, srvConst;
 
 const
 {$I RnQBuiltTime.inc}
-  CURRENT_VFS_FORMAT :integer = 1;
   CRLF = #13#10;
   CRLFA = RawByteString(#13#10);
   TAB = #9;
@@ -24,7 +29,6 @@ const
   PREVIOUS_VERSION = 'hfs.old.exe';
   PROTECTED_FILES_MASK = 'hfs.*;*.htm*;descript.ion;*.comment;*.md5;*.corrupted;*.lnk';
   G_VAR_PREFIX = '#';
-  ETA_FRAME = 5; // time frame for ETA (in seconds)
   DOWNLOAD_MIN_REFRESH_TIME :Tdatetime = 1/(5*SECONDS); // 5 Hz
   BYTES_GROUPING_THRESHOLD :Tdatetime = 1/SECONDS; // group bytes in log
   IPS_THRESHOLD = 50;  // used to avoid an external file for few IPs (ipsEverConnected list)
@@ -42,26 +46,10 @@ const
   HFS_GUIDE_URL = 'http://www.rejetto.com/hfs/guide/';
 
   ALWAYS_ON_WEB_SERVER = 'google.com';
-  ADDRESS_COLOR = clGreen;
+  ADDRESS_COLOR = TColors.Green;
   BG_ERROR = $BBBBFF;
   ENCODED_TABLE_HEADER = 'this is an encoded table'+CRLF;
   TRAY_ICON_SIZE = 32;
-
-  DEFAULT_MIME_TYPES: array [0..25] of string = (
-    '*.htm;*.html', 'text/html',
-    '*.jpg;*.jpeg;*.jpe', 'image/jpeg',
-    '*.gif', 'image/gif',
-    '*.png', 'image/png',
-    '*.bmp', 'image/bmp',
-    '*.ico', 'image/x-icon',
-    '*.mpeg;*.mpg;*.mpe', 'video/mpeg',
-    '*.avi', 'video/x-msvideo',
-    '*.txt', 'text/plain',
-    '*.css', 'text/css',
-    '*.js',  'text/javascript',
-    '*.mkv', 'video/x-matroska',
-    '*.webp', 'image/webp'
-  );
 
   // messages
 resourcestring
@@ -86,7 +74,6 @@ resourcestring
     +#13'Continue?';
   MSG_CONTINUE = 'Continue?';
   MSG_PROCESSING = 'Processing...';
-  MSG_SPEED_KBS = '%.1f kB/s';
   MSG_OPTIONS_SAVED = 'Options saved';
   MSG_SOME_LOCKED = 'Some items were not affected because locked';
   MSG_ITEM_LOCKED = 'The item is locked';
@@ -119,12 +106,6 @@ type
   Thelp = ( HLP_NONE, HLP_TPL );
 
   TpreReply =  (PR_NONE, PR_BAN, PR_OVERLOAD);
-
-  TuploadResult = record
-    fn, reason:string;
-    speed:integer;
-    size: int64;
-    end;
 
 type
   TTrayShows = (TS_downloads, TS_connections, TS_uploads, TS_hits, TS_ips, TS_ips_ever, TS_none);

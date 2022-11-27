@@ -2,8 +2,8 @@ object mainFrm: TmainFrm
   Left = 293
   Top = 219
   Caption = 'HFS ~ HTTP File Server'
-  ClientHeight = 391
-  ClientWidth = 783
+  ClientHeight = 422
+  ClientWidth = 893
   Color = clBtnFace
   Constraints.MinHeight = 260
   Constraints.MinWidth = 390
@@ -13,7 +13,6 @@ object mainFrm: TmainFrm
   Font.Name = 'Tahoma'
   Font.Style = []
   KeyPreview = True
-  OldCreateOrder = False
   Position = poDesigned
   OnAfterMonitorDpiChanged = FormAfterMonitorDpiChanged
   OnClose = FormClose
@@ -23,12 +22,11 @@ object mainFrm: TmainFrm
   OnKeyUp = FormKeyUp
   OnResize = FormResize
   OnShow = FormShow
-  PixelsPerInch = 96
   TextHeight = 13
   object graphSplitter: TSplitter
     Left = 0
-    Top = 109
-    Width = 783
+    Top = 78
+    Width = 893
     Height = 5
     Cursor = crVSplit
     Align = alTop
@@ -42,8 +40,8 @@ object mainFrm: TmainFrm
   end
   object graphBox: TPaintBox
     Left = 0
-    Top = 79
-    Width = 783
+    Top = 48
+    Width = 893
     Height = 30
     Hint = 'Pink = Out'#13#10'Yellow = In'
     Align = alTop
@@ -57,8 +55,8 @@ object mainFrm: TmainFrm
   object topToolbar: TToolBar
     Left = 0
     Top = 0
-    Width = 783
-    Height = 55
+    Width = 893
+    Height = 24
     AutoSize = True
     ButtonWidth = 150
     Caption = 'topToolbar'
@@ -125,18 +123,17 @@ object mainFrm: TmainFrm
       OnClick = modeBtnClick
     end
     object ToolButton1: TToolButton
-      Left = 0
+      Left = 309
       Top = 0
       Width = 9
       Caption = 'ToolButton1'
       ImageIndex = 13
       ImageName = '13'
-      Wrap = True
       Style = tbsSeparator
     end
     object startBtn: TToolButton
-      Left = 0
-      Top = 31
+      Left = 318
+      Top = 0
       Hint = 'Click to switch ON'#13'F4 on keyboard'
       AutoSize = True
       Caption = 'Server is currently OFF'
@@ -147,8 +144,8 @@ object mainFrm: TmainFrm
       OnClick = startBtnClick
     end
     object abortBtn: TToolButton
-      Left = 154
-      Top = 31
+      Left = 472
+      Top = 0
       AutoSize = True
       Caption = 'Abort file addition'
       ImageIndex = 25
@@ -157,8 +154,8 @@ object mainFrm: TmainFrm
       OnClick = abortBtnClick
     end
     object restoreCfgBtn: TToolButton
-      Left = 282
-      Top = 31
+      Left = 600
+      Top = 0
       Caption = 'Restore my options'
       ImageIndex = 34
       ImageName = '34'
@@ -166,8 +163,8 @@ object mainFrm: TmainFrm
       OnClick = restoreCfgBtnClick
     end
     object updateBtn: TToolButton
-      Left = 432
-      Top = 31
+      Left = 750
+      Top = 0
       AutoSize = True
       Caption = 'Update now'
       ImageIndex = 10
@@ -178,8 +175,8 @@ object mainFrm: TmainFrm
   end
   object urlToolbar: TToolBar
     Left = 0
-    Top = 55
-    Width = 783
+    Top = 24
+    Width = 893
     Height = 24
     AutoSize = True
     ButtonWidth = 122
@@ -224,9 +221,9 @@ object mainFrm: TmainFrm
   end
   object centralPnl: TPanel
     Left = 0
-    Top = 114
-    Width = 783
-    Height = 277
+    Top = 83
+    Width = 893
+    Height = 339
     Align = alClient
     BevelOuter = bvNone
     Font.Charset = DEFAULT_CHARSET
@@ -239,7 +236,7 @@ object mainFrm: TmainFrm
     object splitV: TSplitter
       Left = 313
       Top = 0
-      Height = 166
+      Height = 228
       Beveled = True
       Constraints.MaxWidth = 3
       Constraints.MinWidth = 3
@@ -249,8 +246,8 @@ object mainFrm: TmainFrm
     end
     object splitH: TSplitter
       Left = 0
-      Top = 166
-      Width = 783
+      Top = 228
+      Width = 893
       Height = 5
       Cursor = crVSplit
       Align = alBottom
@@ -264,16 +261,16 @@ object mainFrm: TmainFrm
     object logPnl: TPanel
       Left = 316
       Top = 0
-      Width = 467
-      Height = 166
+      Width = 577
+      Height = 228
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 1
       object logBox: TRichEdit
         Left = 0
         Top = 23
-        Width = 467
-        Height = 143
+        Width = 577
+        Height = 205
         Align = alClient
         Font.Charset = RUSSIAN_CHARSET
         Font.Color = clWindowText
@@ -287,14 +284,13 @@ object mainFrm: TmainFrm
         ScrollBars = ssBoth
         TabOrder = 0
         WordWrap = False
-        Zoom = 100
         OnChange = logBoxChange
         OnMouseDown = logBoxMouseDown
       end
       object logTitle: TPanel
         Left = 0
         Top = 0
-        Width = 467
+        Width = 577
         Height = 23
         Align = alTop
         BevelOuter = bvNone
@@ -302,7 +298,7 @@ object mainFrm: TmainFrm
         object titlePnl: TPanel
           Left = 0
           Top = 0
-          Width = 207
+          Width = 317
           Height = 23
           Align = alClient
           BevelOuter = bvNone
@@ -310,7 +306,7 @@ object mainFrm: TmainFrm
           TabOrder = 0
         end
         object logToolbar: TPanel
-          Left = 207
+          Left = 317
           Top = 0
           Width = 260
           Height = 23
@@ -334,24 +330,10 @@ object mainFrm: TmainFrm
               Height = 23
               Hint = 'Expand toolbar'
               Align = alClient
+              ImageIndex = 0
+              ImageName = 'expand'
+              Images = BtnImages
               Flat = True
-              Glyph.Data = {
-                EE010000424DEE0100000000000036000000280000000D0000000B0000000100
-                180000000000B801000000000000000000000000000000000000C8D0D4C8D0D4
-                C8D0D4C8D0D4C8D0D49A775AC8D0D4C8D0D4C8D0D4C8D0D49A775AC8D0D4C8D0
-                D473C8D0D4C8D0D4C8D0D4C8D0D49A775A8C05009A775AC8D0D4C8D0D49A775A
-                8C05009A775AC8D0D473C8D0D4C8D0D4C8D0D4AC76578C05009A775AC8D0D4C8
-                D0D4AC76578C05009A775AC8D0D4C8D0D473C8D0D4C8D0D49A775A8C05009A77
-                5AC8D0D4C8D0D49A775A8C05009A775AC8D0D4C8D0D4C8D0D473C8D0D49A775A
-                8C05009A775AC8D0D4C8D0D49A775A8C05009A775AC8D0D4C8D0D4C8D0D4C8D0
-                D4739A775A8C0500B37E5FC8D0D4C8D0D49A775A8C0500B37E5FC8D0D4C8D0D4
-                C8D0D4C8D0D4C8D0D473C8D0D4B17C5C8C05009A775AC8D0D4C8D0D4B17C5C8C
-                05009A775AC8D0D4C8D0D4C8D0D4C8D0D473C8D0D4C8D0D49A775A8C0500AF79
-                5AC8D0D4C8D0D49A775A8C0500AF795AC8D0D4C8D0D4C8D0D473C8D0D4C8D0D4
-                C8D0D49A775A8C05009A775AC8D0D4C8D0D49A775A8C05009A775AC8D0D4C8D0
-                D473C8D0D4C8D0D4C8D0D4C8D0D49A775A8C05009A775AC8D0D4C8D0D49A775A
-                8C05009A775AC8D0D473C8D0D4C8D0D4C8D0D4C8D0D4C8D0D49A775AC8D0D4C8
-                D0D4C8D0D4C8D0D49A775AC8D0D4C8D0D473}
               ParentShowHint = False
               ShowHint = True
               OnClick = expandBtnClick
@@ -374,59 +356,12 @@ object mainFrm: TmainFrm
               Height = 23
               Hint = 'Copy to editor only lines matched by the search pattern'
               Align = alRight
+              DisabledImageName = 'OpenFilteredLogDisabled'
+              ImageIndex = 3
+              ImageName = 'OpenFilteredLog'
+              Images = BtnImages
               Enabled = False
               Flat = True
-              Glyph.Data = {
-                36060000424D3606000000000000360000002800000020000000100000000100
-                18000000000000060000C21E0000C21E00000000000000000000FF00FFFF00FF
-                FF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF00
-                FF979697756A67A3A2A2FF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF
-                00FFFF00FFFF00FFFF00FFFF00FFFF00FFAEAEAE989898B5B5B5FF00FFFF00FF
-                FF00FFFF00FFFF00FFC9A9A3D0AFA9E0B2A8E0B2A8E0B2A8E0B2A8E0B2A88B89
-                8A9C6F757890DB749AB5FF00FFFF00FFFF00FFFF00FFFF00FFB8B8B8BCBCBCBD
-                BDBDBDBDBDBDBDBDBDBDBDBDBDBDA8A8A89D9D9DB5B5B5B3B3B3FF00FFFF00FF
-                FF00FFFF00FFFF00FFCDABA3E4D4C7F6EFE7F6EFE7F6EFE7F6EFE79291939D70
-                747185D340B4FF89D1F5FF00FFFF00FFFF00FFFF00FFFF00FFB9B9B9CCCCCCDA
-                DADADADADADADADADADADAADADAD9E9E9EB0B0B0C5C5C5CFCFCFFF00FFFF00FF
-                FF00FFFF00FFFF00FFCFB0AAEAD8CBF9EADAFBE7D3FBE4CDA7A9AB966C746F89
-                DB3DBFFF97D5F3FF00FFFF00FFFF00FFFF00FFFF00FFFF00FFBCBCBCCECECED7
-                D7D7D5D5D5D3D3D3B8B8B89C9C9CB3B3B3C9C9C9CFCFCFFF00FFFF00FFC2A5A2
-                C29790C29790C29790BC91886A5D5C8473707F6C69837D805A52546886CD2EB2
-                FF5B8FAFD9B39CFF00FFFF00FFB7B7B7B0B0B0B0B0B0B0B0B0ADADAD9292929D
-                9D9D9B9B9BA3A3A38D8D8DB0B0B0C5C5C5AEAEAEBCBCBCFF00FFFF00FFC2A5A2
-                F8E6DDF8E6DDF8E6DDA2817CFFFFFAFFFFFFFFFFECFFE8B8BD91859AB6C78CB9
-                D1F5E8D7DCB79EFF00FFFF00FFB7B7B7D6D6D6D6D6D6D6D6D6A5A5A5E2E2E2E2
-                E2E2E0E0E0D3D3D3ADADADC0C0C0C2C2C2D6D6D6BEBEBEFF00FFFF00FFC5A7A2
-                F6EDE2F8E9D8847876FFFFF9F4FBFFEEF3DFF0F3CDF5F7C4EECBA4CCBBB9FBD7
-                B3F7E7D5DDB8A0FF00FFFF00FFB7B7B7D9D9D9D6D6D6A0A0A0E2E2E2E1E1E1DB
-                DBDBD8D8D8DADADAC6C6C6C1C1C1CCCCCCD6D6D6BEBEBEFF00FFFF00FFCDABA3
-                F8E5D1FED1A5BEAD94F8FEEAE2E5E5DFE1D9DEE1C5DBCEA6E3D5A8D1B8A7FBE3
-                C9F7EBDDE0BBA3FF00FFFF00FFB9B9B9D4D4D4C9C9C9B8B8B8E0E0E0D6D6D6D3
-                D3D3D1D1D1C7C7C7CACACABEBEBED3D3D3D8D8D8C0C0C0FF00FFFF00FFCEADA7
-                F7EDE3F8E9D8D0BE9DEFF6D3DFE4CFDAE0C8D9DCB9D7C7A0DBCEA3D8C3ADFED8
-                B2F8E7D5E0BBA3FF00FFFF00FFBABABAD9D9D9D6D6D6C0C0C0DBDBDBD3D3D3D1
-                D1D1CECECEC4C4C4C7C7C7C3C3C3CCCCCCD6D6D6C0C0C0FF00FFFF00FFD1B3AD
-                FAE7D4FED1A5BB9B81FDFECBE3E1BCE0DFB9DFD5A8DECDABE6E4BDD1BDABFEEF
-                DFF7D4C9E2A398FF00FFFF00FFBDBDBDD5D5D5C9C9C9B0B0B0DDDDDDD0D0D0CF
-                CFCFCACACAC8C8C8D1D1D1C1C1C1DADADACDCDCDB7B7B7FF00FFFF00FFDCBBAB
-                FAF4EFFEEFE0A18D8EEBCC9DF4EDB7EDD5A1EDE0B9ECF2F6DBCAC2C7C0BFE5D0
-                C8C48F77BE8D7FFF00FFFF00FFC1C1C1DDDDDDDADADAABABABC5C5C5D5D5D5CA
-                CACACFCFCFDDDDDDC8C8C8C4C4C4CBCBCBABABABABABABFF00FFFF00FFE3C1AD
-                FBEDDEFED1A5FED1A5B59B97E3C5A5EFD8ABE4D5AFD3C3BAC0B7B9F5F3F1DECC
-                C8D8A582FF00FFFF00FFFF00FFC3C3C3D8D8D8C9C9C9C9C9C9B2B2B2C4C4C4CC
-                CCCCCACACAC4C4C4BFBFBFDDDDDDCACACAB5B5B5FF00FFFF00FFFF00FFE9C7B0
-                FCFCFDFFFEFEFEFCF8F6DFC9C2C5D0BCB4BCB0A8AEC0C5CCD7A990E7C5AFDEBC
-                ABFF00FFFF00FFFF00FFFF00FFC5C5C5E1E1E1E2E2E2E1E1E1D1D1D1C8C8C8BF
-                BFBFB8B8B8C7C7C7B7B7B7C5C5C5C1C1C1FF00FFFF00FFFF00FFFF00FFECCBB3
-                FEFDFDFFFFFEFEFEFEFEFCFAFEF8F1FEF5EAC89C8EBF8E80CDABA3FF00FFFF00
-                FFFF00FFFF00FFFF00FFFF00FFC8C8C8E2E2E2E2E2E2E2E2E2E1E1E1DFDFDFDD
-                DDDDB2B2B2ABABABB9B9B9FF00FFFF00FFFF00FFFF00FFFF00FFFF00FFF3D3B6
-                FEFEFEFEFEFEFDFEFDFCFCFCFCFAF7FCF7F0C9957AE3B58FFF00FFFF00FFFF00
-                FFFF00FFFF00FFFF00FFFF00FFCACACAE2E2E2E2E2E2E2E2E2E1E1E1E0E0E0DE
-                DEDEAEAEAEBCBCBCFF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF00FFF3D3B6
-                E7C4AEE7C4AEE6C4ADE5C2ACE5C2ACE5C1A9C49788FF00FFFF00FFFF00FFFF00
-                FFFF00FFFF00FFFF00FFFF00FFCACACAC4C4C4C4C4C4C4C4C4C3C3C3C3C3C3C3
-                C3C3AFAFAFFF00FFFF00FFFF00FFFF00FFFF00FFFF00FFFF00FF}
               NumGlyphs = 2
               ParentShowHint = False
               ShowHint = True
@@ -439,42 +374,10 @@ object mainFrm: TmainFrm
               Height = 23
               Hint = 'Copy to editor'
               Align = alRight
+              ImageIndex = 2
+              ImageName = 'openLog'
+              Images = BtnImages
               Flat = True
-              Glyph.Data = {
-                36040000424D3604000000000000360000002800000010000000100000000100
-                2000000000000004000000000000000000000000000000000000FF00FF00FF00
-                FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00
-                FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00
-                FF00FF00FF00FF00FF00FF00FF00C9A9A300D0AFA900E0B2A800E0B2A800E0B2
-                A800E0B2A800E0B2A800E0B2A800E0B2A800C4958E00FF00FF00FF00FF00FF00
-                FF00FF00FF00FF00FF00FF00FF00CDABA300E4D4C700F6EFE700F6EFE700F6EF
-                E700F6EFE700F6EFE700F6EFE700F6EFE700D8B29B00FF00FF00FF00FF00FF00
-                FF00FF00FF00FF00FF00FF00FF00CFB0AA00EAD8CB00F9EADA00FBE7D300FBE4
-                CD00FBE3C900FBE3C900FBDFBF00F7E9D900D8B29B00FF00FF00FF00FF00C2A5
-                A200C2979000C2979000C2979000BC918800E7DBD400F9DFC400FBD7B300FBD7
-                B300FBD7B300FBD7B300FDD7B200F7E7D500D9B39C00FF00FF00FF00FF00C2A5
-                A200F8E6DD00F8E6DD00F8E6DD00D6B0A100EDDFD500F9E4CC00FBDFBF00FBDF
-                BF00FBDFBF00FBDFBF00F5DBB800F5E8D700DCB79E00FF00FF00FF00FF00C5A7
-                A200F6EDE200F8E9D800F9E9D700DAB49E00EFE3DB00F9DFC400FBD7B300FBD7
-                B300FBD7B300FBD7B300FBD7B300F7E7D500DDB8A000FF00FF00FF00FF00CDAB
-                A300F8E5D100FED1A500FED1A300E3B28E00F2E9E000FAE8D600FBE3C900FBE3
-                C900FBE3C900FBE3C900FBE3C900F7EBDD00E0BBA300FF00FF00FF00FF00CEAD
-                A700F7EDE300F8E9D800F8E9D800E5BDA200F4ECE400FDE6CF00FEDCBB00FDDB
-                B900FEDAB500FED9B400FED8B200F8E7D500E0BBA300FF00FF00FF00FF00D1B3
-                AD00FAE7D400FED1A500FED1A500EAB99400F8F0E900FFFEFE00FEFEFE00FEFA
-                F900FEF8EF00FEF4EA00FEEFDF00F7D4C900E2A39800FF00FF00FF00FF00DCBB
-                AB00FAF4EF00FEEFE000FEECD900EEC7A800FAF2EA00FDFEFE00FEFEFE00FEFE
-                FD00FEFBF900FEF9F100E5D0C800C48F7700BE8D7F00FF00FF00FF00FF00E3C1
-                AD00FBEDDE00FED1A500FED1A500F2C39800FDF4EA00FDFEFC00FAFBFA00FAF8
-                F800F6F6F600F5F3F100DECCC800D8A58200FF00FF00FF00FF00FF00FF00E9C7
-                B000FCFCFD00FFFEFE00FEFCF800F6DFC900E7C2A800E7C0A600E2B69A00DAA8
-                8B00D7A99000E7C5AF00DEBCAB00FF00FF00FF00FF00FF00FF00FF00FF00ECCB
-                B300FEFDFD00FFFFFE00FEFEFE00FEFCFA00FEF8F100FEF5EA00C89C8E00BF8E
-                8000CDABA300FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00F3D3
-                B600FEFEFE00FEFEFE00FDFEFD00FCFCFC00FCFAF700FCF7F000C9957A00E3B5
-                8F00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00F3D3
-                B600E7C4AE00E7C4AE00E6C4AD00E5C2AC00E5C2AC00E5C1A900C4978800FF00
-                FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00FF00}
               ParentShowHint = False
               ShowHint = True
               OnClick = openLogBtnClick
@@ -486,24 +389,10 @@ object mainFrm: TmainFrm
               Height = 23
               Hint = 'Collapse toolbar'
               Align = alRight
+              ImageIndex = 1
+              ImageName = 'collapse'
+              Images = BtnImages
               Flat = True
-              Glyph.Data = {
-                EE010000424DEE0100000000000036000000280000000D0000000B0000000100
-                180000000000B801000000000000000000000000000000000000C8D0D4C8D0D4
-                9A775AC8D0D4C8D0D4C8D0D4C8D0D49A775AC8D0D4C8D0D4C8D0D4C8D0D4C8D0
-                D400C8D0D49A775A8C05009A775AC8D0D4C8D0D49A775A8C05009A775AC8D0D4
-                C8D0D4C8D0D4C8D0D400C8D0D4C8D0D49A775A8C0500AC7657C8D0D4C8D0D49A
-                775A8C0500AC7657C8D0D4C8D0D4C8D0D400C8D0D4C8D0D4C8D0D49A775A8C05
-                009A775AC8D0D4C8D0D49A775A8C05009A775AC8D0D4C8D0D400C8D0D4C8D0D4
-                C8D0D4C8D0D49A775A8C05009A775AC8D0D4C8D0D49A775A8C05009A775AC8D0
-                D400C8D0D4C8D0D4C8D0D4C8D0D4C8D0D4B37E5F8C05009A775AC8D0D4C8D0D4
-                B37E5F8C05009A775A00C8D0D4C8D0D4C8D0D4C8D0D49A775A8C0500B17C5CC8
-                D0D4C8D0D49A775A8C0500B17C5CC8D0D400C8D0D4C8D0D4C8D0D4AF795A8C05
-                009A775AC8D0D4C8D0D4AF795A8C05009A775AC8D0D4C8D0D400C8D0D4C8D0D4
-                9A775A8C05009A775AC8D0D4C8D0D49A775A8C05009A775AC8D0D4C8D0D4C8D0
-                D400C8D0D49A775A8C05009A775AC8D0D4C8D0D49A775A8C05009A775AC8D0D4
-                C8D0D4C8D0D4C8D0D400C8D0D4C8D0D49A775AC8D0D4C8D0D4C8D0D4C8D0D49A
-                775AC8D0D4C8D0D4C8D0D4C8D0D4C8D0D400}
               ParentShowHint = False
               ShowHint = True
               OnClick = collapseBtnClick
@@ -542,6 +431,7 @@ object mainFrm: TmainFrm
                 ParentShowHint = False
                 ShowHint = True
                 TabOrder = 0
+                Text = ''
                 OnChange = logSearchBoxChange
                 OnKeyPress = logSearchBoxKeyPress
               end
@@ -565,7 +455,7 @@ object mainFrm: TmainFrm
       Left = 0
       Top = 0
       Width = 313
-      Height = 166
+      Height = 228
       Align = alLeft
       BevelOuter = bvNone
       Caption = 'filesPnl'
@@ -574,7 +464,7 @@ object mainFrm: TmainFrm
         Left = 0
         Top = 23
         Width = 313
-        Height = 143
+        Height = 205
         Align = alClient
         BevelInner = bvLowered
         BevelOuter = bvSpace
@@ -624,8 +514,8 @@ object mainFrm: TmainFrm
     end
     object connPnl: TPanel
       Left = 0
-      Top = 171
-      Width = 783
+      Top = 233
+      Width = 893
       Height = 106
       Align = alBottom
       BevelOuter = bvNone
@@ -633,7 +523,7 @@ object mainFrm: TmainFrm
       object sbar: TStatusBar
         Left = 0
         Top = 87
-        Width = 783
+        Width = 893
         Height = 19
         Panels = <
           item
@@ -645,7 +535,7 @@ object mainFrm: TmainFrm
       object connBox: TListView
         Left = 0
         Top = 0
-        Width = 783
+        Width = 893
         Height = 87
         Align = alClient
         Columns = <
@@ -1974,8 +1864,8 @@ object mainFrm: TmainFrm
     end
   end
   object graphMenu: TPopupMenu
-    Left = 504
-    Top = 48
+    Left = 536
+    Top = 140
     object Reset1: TMenuItem
       Caption = 'Reset'
       OnClick = Reset1Click
@@ -1984,5 +1874,39 @@ object mainFrm: TmainFrm
       Caption = 'Hide'
       OnClick = HideClick
     end
+  end
+  object BtnImages: TVirtualImageList
+    Images = <
+      item
+        CollectionIndex = 1
+        CollectionName = 'expand'
+        Name = 'expand'
+      end
+      item
+        CollectionIndex = 0
+        CollectionName = 'collapse'
+        Name = 'collapse'
+      end
+      item
+        CollectionIndex = 4
+        CollectionName = 'openLog'
+        Name = 'openLog'
+      end
+      item
+        CollectionIndex = 2
+        CollectionName = 'OpenFilteredLog'
+        Name = 'OpenFilteredLog'
+      end
+      item
+        CollectionIndex = 3
+        CollectionName = 'OpenFilteredLogDisabled'
+        Disabled = True
+        Name = 'OpenFilteredLog_Disabled'
+      end>
+    ImageCollection = IconsDM.BtnImgCollection
+    Width = 28
+    Height = 28
+    Left = 176
+    Top = 123
   end
 end

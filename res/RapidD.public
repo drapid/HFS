@@ -1,0 +1,12 @@
+{
+	"Version": 1,
+	"Serial": "44069D67AF0C8D47260FC6D54CF8D7D8",
+	"Issuer": "rapid d",
+	"IssueDate": "2022-05-18",
+	"ValidityStart": "2022-05-01",
+	"ValidityEnd": "2036-01-08",
+	"AuthoritySerial": "44069D67AF0C8D47260FC6D54CF8D7D8",
+	"AuthorityIssuer": "rapid d",
+	"IsSelfSigned": true,
+	"Base64": "AQBECDMIuxtEBp1nrwyNRyYPxtVM+NfYUOxkkSAAAAAAAAAAAAAAAEQGnWevDI1HJg/G1Uz419hQ7GSRIAAAAAAAAAAAAAAAAjFtx1cv3TMLgsf6vpKPe0Fyn3N+lBcvJ5p0wsR30LN50kuPgTMOvB5xVtagqaKSWs3uCEmOvwPLXMLPbMZaQM9o9p+Pucwtd8RgSEfIJR8rIBrfXQQjAJn1t6pvam9YhyXGsWIgAAAA+1Bfb+5Ie5viQLWyC/36BXo5/Xs1DRtEVhE+U8Pwm7w="
+}

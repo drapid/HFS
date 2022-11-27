@@ -25,155 +25,93 @@ interface
 
 uses
   iniFiles, types, strUtils, sysUtils, classes,
-  system.Generics.Collections,
+ {$IFDEF FMX}
+  ics.fmx.OverbyteIcsWSocket, ics.fmx.OverbyteIcshttpProt,
+ {$ELSE ~FMX}
   OverbyteIcsWSocket, OverbyteIcshttpProt,
+ {$ENDIF FMX}
   hslib, srvConst, srvClassesLib;
 
 type
-  Tip2av = Tdictionary<string,Tdatetime>;
-  TantiDos = class
-    const MAX_CONCURRENTS = 3;
-  class var
-    folderConcurrents: integer;
-    ip2availability: Tip2av;
-    class constructor Create;
-  protected
-    accepted: boolean;
-    Paddress: string;
-  public
-    constructor create;
-    destructor Destroy; override;
-    function accept(conn:ThttpConn; address:string=''):boolean;
-    end;
-
 
   TperIp = class // for every different address, we have an object of this class. These objects are never freed until hfs is closed.
-  public
+   public
     limiter: TspeedLimiter;
     customizedLimiter: boolean;
     constructor create();
     destructor Destroy; override;
-    end;
+   end;
 
   ThttpClient = class(TSslHttpCli)
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; OverRide;
-    class function createURL(url:string):ThttpClient;
-    end;
+    class function createURL(const url: String): ThttpClient;
+   end;
 
-
+  function objByIP(const ip: String): TperIp;
 
 implementation
 
 uses
-  windows, dateUtils, forms, ansiStrings,
+  windows, dateUtils,
+ {$IFDEF FMX}
+  FMX.Forms,
+ {$ELSE ~FMX}
+  Forms,
+ {$ENDIF FMX}
+  ansiStrings,
   RDFileUtil, RDUtils,
   utilLib, hfsGlobal, hfsVars,
   srvUtils, srvVars;
 
 
-class constructor TantiDos.Create;
-begin
-  ip2availability := NIL;
-  folderConcurrents := 0;
-end;
-
-constructor TantiDos.create();
+class function ThttpClient.createURL(const url: String): ThttpClient;
 begin
-accepted:=FALSE;
-end;
-
-function TantiDos.accept(conn:ThttpConn; address:string=''):boolean;
-
-  procedure reject();
-  resourcestring
-    MSG_ANTIDOS_REPLY = 'Please wait, server busy';
-  begin
-  conn.reply.mode:=HRM_OVERLOAD;
-  conn.addHeader(ansistring('Refresh: '+intToStr(1+random(2)))); // random for less collisions
-  conn.reply.body:=UTF8Encode(MSG_ANTIDOS_REPLY);
-  end;
-
-begin
-if address= '' then
-  address:=conn.address;
-if ip2availability = NIL then
-  ip2availability:=Tip2av.create();
-try
-  if ip2availability.ContainsKey(address) then
-   if ip2availability[address] > now() then // this specific address has to wait?
-    begin
-    reject();
-    exit(FALSE);
-    end;
-except
-  end;
-if folderConcurrents >= MAX_CONCURRENTS then   // max number of concurrent folder loading, others are postponed
-  begin
-  reject();
-  exit(FALSE);
-  end;
-inc(folderConcurrents);
-Paddress:=address;
-ip2availability.AddOrSetValue(address, now()+1/HOURS);
-accepted:=TRUE;
-Result:=TRUE;
-end;
-
-destructor TantiDos.Destroy;
-var
-  pair: Tpair<string,Tdatetime>;
-  t: Tdatetime;
-begin
-if not accepted then
-  exit;
-t:=now();
-if folderConcurrents = MAX_CONCURRENTS then // serving multiple addresses at max capacity, let's give a grace period for others
-  ip2availability[Paddress]:=t + 1/SECONDS
-else
-  ip2availability.Remove(Paddress);
-dec(folderConcurrents);
-// purge leftovers
- for pair in ip2availability do
-  if pair.Value < t then
-    ip2availability.Remove(pair.Key);
-end;
-
-class function ThttpClient.createURL(url:string):ThttpClient;
-begin
-if startsText('https://', url)
-and not httpsCanWork() then
-  exit(NIL);
-result:=ThttpClient.Create(NIL);
-result.URL:=url;
+  if startsText('https://', url)
+   and not httpsCanWork() then
+    exit(NIL);
+  result := ThttpClient.Create(NIL);
+  result.URL := url;
 end;
 
 constructor ThttpClient.create(AOwner: TComponent);
 begin
-inherited;
-followRelocation:=TRUE;
-agent:=HFS_HTTP_AGENT;
-SslContext := TSslContext.Create(NIL);
+  inherited;
+  followRelocation:=TRUE;
+  agent:=HFS_HTTP_AGENT;
+  SslContext := TSslContext.Create(NIL);
 end; // create
 
 destructor ThttpClient.Destroy;
 begin
-SslContext.free;
-SslContext:=NIl;
-inherited destroy;
+  SslContext.free;
+  SslContext:=NIl;
+  inherited destroy;
 end;
 
 constructor TperIp.create();
 begin
-limiter:=TspeedLimiter.create();
-srv.limiters.add(limiter);
+  limiter:=TspeedLimiter.create();
+  srv.limiters.add(limiter);
 end;
 
 destructor TperIp.Destroy;
 begin
-srv.limiters.remove(limiter);
-limiter.free;
+  srv.limiters.remove(limiter);
+  limiter.free;
 end;
+
+function objByIP(const ip: String): TperIp;
+var
+  i: integer;
+begin
+  i := ip2obj.indexOf(ip);
+  if i < 0 then
+    i := ip2obj.add(ip);
+  if ip2obj.objects[i] = NIL then
+    ip2obj.objects[i] := TperIp.create();
+  result := ip2obj.objects[i] as TperIp;
+end; // objByIP
 
 
 

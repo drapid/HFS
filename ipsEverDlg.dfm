@@ -3,7 +3,7 @@ object ipsEverFrm: TipsEverFrm
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Addresses ever connected'
-  ClientHeight = 271
+  ClientHeight = 236
   ClientWidth = 286
   Color = clBtnFace
   Constraints.MaxHeight = 300
@@ -13,13 +13,12 @@ object ipsEverFrm: TipsEverFrm
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = False
   Position = poMainFormCenter
   OnShow = FormShow
+  PixelsPerInch = 96
   DesignSize = (
     286
-    271)
-  PixelsPerInch = 96
+    236)
   TextHeight = 13
   object totalLbl: TLabel
     Left = 197

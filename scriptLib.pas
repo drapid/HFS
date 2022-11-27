@@ -19,42 +19,42 @@ This file is part of HFS ~ HTTP File Server.
 }
 unit scriptLib;
 {$I NoRTTI.inc}
+   {~$DEFINE HFS_SERVICE}
 
 interface
 
 uses
-  iniFiles, types, srvConst, srvClassesLib, fileLib, HSLib;
-
-type
-  TmacroData = record
-    cd: TconnDataMain;
-    tpl: Ttpl;
-    folder, f: Tfile;
-    afterTheList, archiveAvailable, hideExt, breaking: boolean;
-    aliases, tempVars: THashedStringList;
-    table: TStringDynArray;
-    logTS: boolean;
-    end;
+  iniFiles, types,
+  RegExpr,
+  srvConst, srvClassesLib, fileLib, HSLib, serverLib;
 
 var
   defaultAlias: THashedStringList;
   staticVars : THashedStringList; // these scripting variables are held for the whole run-time
   eventScripts: Ttpl;
 
-function tryApplyMacrosAndSymbols(var txt:string; var md:TmacroData; removeQuotings:boolean=true):boolean;
-function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL):string;
-function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnDataMain=NIL):string;
+function tryApplyMacrosAndSymbols(fs: TFileServer; var txt: String; var md: TmacroData; removeQuotings: Boolean=true): Boolean;
+function runScript(fs: TFileServer; const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL): String;
+function runEventScript(fs: TFileServer; const event: String; table: TStringDynArray=NIL; cd: TconnDataMain=NIL): String;
 procedure resetLog();
+procedure runTimedEvents(fs: TFileServer);
 
 implementation
 
 uses
   windows, graphics, classes, sysutils, StrUtils,
   comctrls, math, controls, forms, clipbrd, MMsystem, contnrs,
-  Generics.Collections,
+  DateUtils,
   RnQtrayLib, RDFileUtil, RDUtils, RnQCrypt,
   srvUtils, srvVars,
-  utilLib, parserLib, main, hfsVars, hfsGlobal;
+  utilLib,
+  netUtils, classesLib,
+   {$IFDEF HFS_SERVICE}
+   {$ELSE ~HFS_SERVICE}
+  main,
+   {$ENDIF HFS_SERVICE}
+  parserLib,
+  hfsVars, hfsGlobal;
 
 const
   HEADER: RawByteString = RawByteString('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><style>'
@@ -64,19 +64,22 @@ const
 var
   stopOnMacroRename: boolean; // this ugly global var is used to avoid endless recursion on a renaming rename event. this method won't work on a multithreaded system, but i opted for it because otherwise the changes would have been big.
   cachedTpls: TcachedTpls;
+var
+  timedEventsRE: TRegExpr;
+  eventsLastRun: TstringToIntHash;
 
-function macrosLog(const textIn, textOut:string; ts:boolean=FALSE):boolean;
+function macrosLog(const textIn, textOut: String; ts: Boolean=FALSE): Boolean;
 var
   s: string;
 begin
-s:='';
-if ts then
-    s:='<hr>'+dateTimeToStr(now())+CRLF;
-s:=s+#13'<dt>'+htmlEncode(textIn)+'</dt><dd>'+htmlEncode(textOut)+'</dd>';
-if sizeOfFile(MACROS_LOG_FILE) = 0 then
-  saveFileA(MACROS_LOG_FILE, header, True);
-//result := appendFile(MACROS_LOG_FILE, UTF8Encode(s))
-result:=saveFileU(MACROS_LOG_FILE, s, True);
+  s:='';
+  if ts then
+      s:='<hr>'+dateTimeToStr(now())+CRLF;
+  s:=s+#13'<dt>'+htmlEncode(textIn)+'</dt><dd>'+htmlEncode(textOut)+'</dd>';
+  if sizeOfFile(MACROS_LOG_FILE) = 0 then
+    saveFileA(MACROS_LOG_FILE, header, True);
+  //result := appendFile(MACROS_LOG_FILE, UTF8Encode(s))
+  result := saveFileU(MACROS_LOG_FILE, s, True);
 end; // macrosLog
 
 procedure resetLog();
@@ -129,18 +132,19 @@ s:=reReplace(s,'%([-a-z0-9]+%)','&#37;$1', 'mi');
 result:=s;
 end; // noMacrosAllowed
 
-function cbMacros(const fullMacro:string; pars: TPars; cbData:pointer):string;
+function cbMacros(fs: TFileServer; const fullMacro: String; pars: TPars; cbData: Pointer): String;
 var
   md: ^TmacroData;
   name, p: string;
   unnamedPars: integer; // this is a guessing of the number of unnamed parameters. just guessing because there's no true distinction between a parameter "value" named "key", and parameter "key=value"
   lp: TLoadPrefs;
+  SP: TShowPrefs;
 
   procedure macroError(const msg:string);
   begin result:='<div class=macroerror>macro error: '+name+nonEmptyConcat('<br>',msg)+'</div>' end;
 
   procedure deprecatedMacro(const what:string=''; instead:string='');
-  begin mainfrm.add2log('WARNING, deprecated macro: '+first(what, name)+nonEmptyConcat(' - Use instead: ',instead), NIL, clRed) end;
+  begin add2log('WARNING, deprecated macro: '+first(what, name)+nonEmptyConcat(' - Use instead: ',instead), NIL, clRed) end;
 
   procedure unsatisfied(b:boolean=TRUE);
   begin
@@ -701,14 +705,14 @@ var
         e:=excludeTrailingPathDelimiter(e);
       if e <> fld.resource then
         begin
-        fld := Tfile.createTemp(mainFrm.filesBox, e, md.f);
+        fld := Tfile.createTemp(md.f.mainTree, e, md.f);
         freeIt:=TRUE;
         end
       end;
     end;
 
   if not satisfied(fld) then exit;
-  e:=htmlEncode(encodeMarkers(mainFrm.fileSrv.url(fld, TRUE)));
+  e:=htmlEncode(encodeMarkers(fs.url(fld, TRUE)));
   d:=htmlEncode(encodeMarkers(fld.getFolder()+fld.name+'/'));
   ae:=split('/', e);
   ad:=split('/', d);
@@ -800,68 +804,72 @@ var
       i: integer;
       parentF: Tfile;
     begin
-    result:=TRUE;
-    i:=lastDelimiter('/',name);
-    if i = 0 then exit;
-    result:=FALSE;
-    parentf := mainfrm.fileSrv.findFilebyURL(chop(i+1, 0, name), LP, NIL, FALSE);
-    if parentf = NIL then exit;
-    parent:=parentf.node; // ok, this is where we'll add the folder
-    result:=TRUE;
+      result:=TRUE;
+      i:=lastDelimiter('/',name);
+      if i = 0 then exit;
+      result:=FALSE;
+      parentf := fs.findFilebyURL(chop(i+1, 0, name), LP, NIL, FALSE);
+      if parentf = NIL then exit;
+      parent:=parentf.node; // ok, this is where we'll add the folder
+      result:=TRUE;
     end; // validateAndExtractParent
 
   begin
-  result:='';
-  if not stringExists(p, ['real','virtual']) then exit;
+    result:='';
+    if not stringExists(p, ['real','virtual']) then exit;
 
-  parent:=NIL;
-  if assigned(md.folder) then
-    parent:=md.folder.node;
+    parent:=NIL;
+    if assigned(md.folder) then
+      parent:=md.folder.node;
 
-  if p = 'virtual' then
-    begin
-    name:=par(1);
-    if not validateAndExtractParent() then exit;
-    f:=Tfile.createVirtualFolder(mainFrm.filesBox, name);
-    end
-  else
-    begin
-    fn:=uri2diskMaybe(par(1));
-    if not isAbsolutePath(fn) and assigned(md.folder) then
-      fn:=expandFileName(md.folder.resource+'\'+fn);
-    if not directoryExists(fn) then exit; // the real folder must exists on disk
-
-    // is a name specified in the third parameter, or should we deduce it from the disk path?
-    name:=par(2);
-    if (name = '') or containsStr(name,'=') then
-      name:=extractFileName(fn);
-
-    if not validateAndExtractParent() then exit;
-    f:=Tfile.create(mainFrm.filesBox, fn);
-    f.name:=name;
-    end;
-
-  if not validFilename(f.name) then
-    begin
-    f.free;
-    exit;
-    end;
-
-  old := mainfrm.fileSrv.findFilebyURL(f.name, LP, nodeToFile(parent), FALSE);
-  if assigned(old) then
-    if not old.isRoot()
-    and (not parExist('overwrite') or isTrue(par('overwrite'))) then
-      try old.node.delete() except end // delete existing one
+    if p = 'virtual' then
+      begin
+      name:=par(1);
+      if not validateAndExtractParent() then exit;
+      f:=Tfile.createVirtualFolder(fs.rootFile.mainTree, name);
+      end
     else
+      begin
+      fn:=uri2diskMaybe(par(1));
+      if not isAbsolutePath(fn) and assigned(md.folder) then
+        fn:=expandFileName(md.folder.resource+'\'+fn);
+      if not directoryExists(fn) then exit; // the real folder must exists on disk
+
+      // is a name specified in the third parameter, or should we deduce it from the disk path?
+      name:=par(2);
+      if (name = '') or containsStr(name,'=') then
+        name:=extractFileName(fn);
+
+      if not validateAndExtractParent() then exit;
+      f:=Tfile.create(fs.rootFile.mainTree, fn);
+      f.name:=name;
+      end;
+
+    if not validFilename(f.name) then
       begin
       f.free;
       exit;
       end;
 
-  if mainfrm.addFile(f, parent, TRUE) = NIL then
-    f.free
-  else
-    spaceIf(TRUE)
+    old := fs.findFilebyURL(f.name, LP, nodeToFile(parent), FALSE);
+    if assigned(old) then
+      if not old.isRoot()
+      and (not parExist('overwrite') or isTrue(par('overwrite'))) then
+        try old.node.delete() except end // delete existing one
+      else
+        begin
+        f.free;
+        exit;
+        end;
+
+   {$IFDEF HFS_SERVICE}
+    if fs.addFileRecur(f, parent) = NIL then
+   {$ELSE ~HFS_SERVICE}
+    if mainfrm.addFile(f, parent, TRUE) = NIL then
+   {$ENDIF HFS_SERVICE}
+      f.free
+    else
+      spaceIf(TRUE)
   end; // addFolder
 
   procedure setItem();
@@ -869,7 +877,7 @@ var
     f: Tfile;
     act: TfileAction;
 
-    function get(prefix:string):TStringDynArray;
+    function get(const prefix:string):TStringDynArray;
     begin
     result:=onlyExistentAccounts(split(';', parEx(prefix+FILEACTION2STR[act])));
     uniqueStrings(result);
@@ -887,77 +895,87 @@ var
     end; // setAttr
 
   begin
-  result:='';
-    LP := mainFrm.getLP;
-  f := mainfrm.fileSrv.findFileByURL(p, LP, md.folder);
-  if f = NIL then exit; // doesn't exist
+    result := '';
+    f := fs.findFileByURL(p, LP, md.folder);
+    if f = NIL then exit; // doesn't exist
 
-  if parExist('comment') then
-   try
-     f.setDynamicComment(LP, macroDequote(parEx('comment')))
-   except end;
-  try
-    f.name:=parEx('name');
-    if assigned(f.node) then
-      f.node.text:=f.name;
-  except end;
-  try f.resource:=parEx('resource') except end;
-  try f.diffTpl:=parEx('diff template') except end;
-  try f.filesFilter:=parEx('files filter') except end;
-  try f.foldersFilter:=parEx('folders filter') except end;
+    if parExist('comment') then
+     try
+       f.setDynamicComment(LP, macroDequote(parEx('comment')))
+     except end;
+    try
+      f.name:=parEx('name');
+      if assigned(f.node) then
+        f.node.text:=f.name;
+    except end;
+    try f.resource:=parEx('resource') except end;
+    try f.diffTpl:=parEx('diff template') except end;
+    try f.filesFilter:=parEx('files filter') except end;
+    try f.foldersFilter:=parEx('folders filter') except end;
 
-  // following commands make no sense on temporary items
-  if freeIfTemp(f) then exit;
+    // following commands make no sense on temporary items
+    if freeIfTemp(f) then exit;
 
-  setAttr(FA_HIDDEN, 'hide');
-  setAttr(FA_HIDDENTREE, 'hide tree');
-  setAttr(FA_DONT_LOG, 'no log');
-  setAttr(FA_ARCHIVABLE, 'archivable');
-  setAttr(FA_BROWSABLE, 'browsable');
-  setAttr(FA_DL_FORBIDDEN, 'download forbidden');
-  if f.isFolder() then
-    try f.dontCountAsDownloadMask:=parEx('not as download') except end
-  else
-    setAttr(FA_DONT_COUNT_AS_DL, 'not as download');
+    setAttr(FA_HIDDEN, 'hide');
+    setAttr(FA_HIDDENTREE, 'hide tree');
+    setAttr(FA_DONT_LOG, 'no log');
+    setAttr(FA_ARCHIVABLE, 'archivable');
+    setAttr(FA_BROWSABLE, 'browsable');
+    setAttr(FA_DL_FORBIDDEN, 'download forbidden');
+    if f.isFolder() then
+      try f.dontCountAsDownloadMask:=parEx('not as download') except end
+    else
+      setAttr(FA_DONT_COUNT_AS_DL, 'not as download');
 
-  for act:=low(act) to high(act) do
-    begin
-    try f.accounts[act]:=get('') except end;
-    try addUniqueArray(f.accounts[act], get('add ')) except end;
-    try removeArray(f.accounts[act], get('remove ')) except end;
-    end;
-  VFSmodified:=TRUE;
-  mainfrm.filesBox.repaint();
+    for act:=low(act) to high(act) do
+      begin
+        try f.accounts[act]:=get('') except end;
+        try addUniqueArray(f.accounts[act], get('add ')) except end;
+        try removeArray(f.accounts[act], get('remove ')) except end;
+      end;
+    VFSmodified:=TRUE;
+   {$IFNDEF HFS_SERVICE}
+    mainfrm.filesBox.repaint();
+   {$ENDIF ~HFS_SERVICE}
   end; // setItem
 
-  function getItemIcon(f:Tfile):string;
+  function getItemIcon(f: Tfile): string;
   begin
-  if f = NIL then
-    result:=''
-  else if (f.icon >= 0) or (mainfrm.useSystemIconsChk.checked and f.isFile()) then
-    result:='/~img'+intToStr(f.getSystemIcon())
-  else if f.isFile() then
-    result:='/~img_file'
-  else if f.isFolder() then
-    if FA_UNIT in f.flags then
-      result:=format('/~img%d', [md.f.getIconForTreeview(mainfrm.useSystemIconsChk.checked)])
+    if f = NIL then
+      result:=''
+    else if (f.icon >= 0) or ((spUseSysIcons in SP) and f.isFile() and f.gotSystemIcon()) then
+      result:='/~img'+intToStr(f.getSystemIcon())
+    else if ((spUseSysIcons in SP) and f.isFile()) and (spNoWaitSysIcons in SP) then
+      result := f.relativeURL() + '?mode=icon'
+    else if (f.icon >= 0) or ((spUseSysIcons in SP) and f.isFile()) then
+      result:='/~img'+intToStr(f.getSystemIcon())
+    else if f.isFile() then
+      result:='/~img_file'
+    else if f.isFolder() then
+      if FA_UNIT in f.flags then
+        result:=format('/~img%d', [md.f.getIconForTreeview(spUseSysIcons in SP)])
+      else
+        result:='/~img_folder'
+    else if f.isLink() then
+      result:='/~img_link'
     else
-      result:='/~img_folder'
-  else if f.isLink() then
-    result:='/~img_link'
-  else
-    result:='';
+      result:='';
   end; // getItemIcon
 
   procedure deleteItem();
   var
     f: Tfile;
   begin
-  f:=mainfrm.fileSrv.findFileByURL(p, LP);
-  spaceIf(assigned(f)); // so you can know if something really has been deleted
-  if f = NIL then exit; // doesn't exist
-  mainFrm.remove(f);
-  VFSmodified:=TRUE;
+    f:= fs.findFileByURL(p, LP);
+    spaceIf(assigned(f)); // so you can know if something really has been deleted
+    if f = NIL then
+      exit; // doesn't exist
+   {$IFDEF HFS_SERVICE}
+   fs.removeFile(f);
+   {$ELSE ~HFS_SERVICE}
+    mainFrm.remove(f);
+   {$ENDIF HFS_SERVICE}
+    VFSmodified := TRUE;
   end; // deleteItem
 
   procedure getItem();
@@ -975,7 +993,7 @@ var
 
   begin
   result:='';
-  f:=mainfrm.fileSrv.findFileByURL(p, LP, md.folder);
+  f := fs.findFileByURL(p, LP, md.folder);
   if f = NIL then exit; // doesn't exist
 
   try
@@ -987,7 +1005,7 @@ var
     else if w = 'resource' then
       result:=f.resource
     else if w = 'icon' then
-      result:=getItemIcon(f)
+      result := getItemIcon(f)
     else if getAttr('hide', FA_HIDDEN)
       or getAttr('hide tree', FA_HIDDENTREE)
       or getAttr('no log', FA_DONT_LOG) then
@@ -1020,7 +1038,7 @@ var
         begin
         setVar(p, par(i));
         s:=code;
-        applyMacrosAndSymbols(s, cbMacros, cbData);
+        applyMacrosAndSymbols(fs, s, cbMacros, cbData);
         append(s);
         end;
       result:=reset();
@@ -1048,7 +1066,7 @@ var
           end;
         setVar('line', line);
         run:=code;
-        applyMacrosAndSymbols(run, cbMacros, cbData);
+        applyMacrosAndSymbols(fs, run, cbMacros, cbData);
         append(run);
         end;
       result:=reset();
@@ -1082,7 +1100,7 @@ var
           begin
           setVar(p, intToStr(b));
           s:=code;
-          applyMacrosAndSymbols(s, cbMacros, cbData);
+          applyMacrosAndSymbols(fs, s, cbMacros, cbData);
           append(s);
           inc(b, d);
           end;
@@ -1127,11 +1145,11 @@ var
       else
         begin
         s:=bTest;
-        applyMacrosAndSymbols(s, cbMacros, cbData);
+        applyMacrosAndSymbols(fs, s, cbMacros, cbData);
         end;
       if isFalse(trim(s)) then break;
       s:=bDo;
-      applyMacrosAndSymbols(s, cbMacros, cbData);
+      applyMacrosAndSymbols(fs, s, cbMacros, cbData);
       res.append(s);
       never:=FALSE;
       until false;
@@ -1147,7 +1165,7 @@ var
     end;
   end; // while_
 
-  procedure setEncodedTable(varname, txt:string);
+  procedure setEncodedTable(varname, txt: string);
   var
     space, h: ThashedStringList;
     i: integer;
@@ -1178,7 +1196,7 @@ var
   space.objects[i]:=h;
   end; // setEncodedTable
 
-  procedure load(fn:string; varname:string='');
+  procedure load(const fn: String; const varname: string='');
   var
     from, size: int64;
   begin
@@ -1478,21 +1496,21 @@ var
     i: integer;
     ipmask, portmask: string;
   begin
-  if pars.count = 0 then
-    begin
-    if satisfied(md.cd) then
-      md.cd.conn.disconnect();
-    exit;
-    end;
-  ipmask:=par(0,'ip');
-  portmask:=par(1,'port');
-  if ipmask = '' then exit;
-  for i:=0 to srv.conns.count-1 do
-    with conn2data(i) do
-      if addressmatch(ipmask, address)
-      and ((portmask = '') or filematch(portmask, conn.port)) then
-        conn.disconnect();
-  result:='';
+    if pars.count = 0 then
+      begin
+      if satisfied(md.cd) then
+        md.cd.conn.disconnect();
+      exit;
+      end;
+    ipmask:=par(0,'ip');
+    portmask:=par(1,'port');
+    if ipmask = '' then exit;
+    for i:=0 to srv.conns.count-1 do
+      with conn2dataMain(i) do
+        if addressmatch(ipmask, address)
+        and ((portmask = '') or filematch(portmask, conn.port)) then
+          conn.disconnect();
+    result:='';
   end; // disconnect
 
   procedure vardomain();
@@ -1589,7 +1607,7 @@ var
         end
        else
         begin
-          f := mainfrm.fileSrv.findFileByURL(s, LP, md.folder);
+          f := fs.findFileByURL(s, LP, md.folder);
           if f = NIL then
             exit;
           local:=TRUE;
@@ -1740,9 +1758,9 @@ var
   // it only upon request. others are for centralization.
 
   if ansiStartsText('%sym-', name) then // legacy: surpassed by {.section.}
-    result:=tpl[substr(name,2,-1)]
+    result := fs.tpl[substr(name,2,-1)]
   else if name = '%item-icon%' then
-    result:=first(getItemIcon(md.f), name)
+    result := first(getItemIcon(md.f), name)
   else if name = '%item-archive%' then
     if assigned(md.f) and assigned(md.tpl) and md.f.hasRecursive(FA_ARCHIVABLE) then result:=md.tpl['item-archive']
     else result:=''
@@ -1752,7 +1770,7 @@ var
   else if name = '%connections%' then
     result:=intToStr(srv.conns.count)
   else if name = '%style%' then
-    result:=tpl['style']
+    result := fs.tpl['style']
   else if name = '%timestamp%' then
     result:= dateTimeToStr(now())
   else if name = '%date%' then
@@ -1812,11 +1830,11 @@ var
     else if name = '%user%' then
       result:= macroQuote(usr)
     else if name = '%password%' then
-      result:=macroQuote(md.cd.conn.request.pwd)
+      result := macroQuote(md.cd.conn.request.pwd)
     else if name = '%loggedin%' then
-      result:=if_(usr>'', tpl['loggedin'])
+      result := if_(usr>'', fs.tpl['loggedin'])
     else if name = '%login-link%' then
-      result:=if_(usr='', tpl['login-link'])
+      result := if_(usr='', fs.tpl['login-link'])
     else if name = '%user-notes%' then
       if md.cd.account = NIL then result:=''
       else result:=md.cd.account.notes
@@ -1834,16 +1852,16 @@ var
       begin
       result:=md.folder.getDynamicComment(LP);
       if result > '' then
-        result:= xtpl(tpl['folder-comment'], [ '%item-comment%', result ]);
+        result := xtpl(fs.tpl['folder-comment'], [ '%item-comment%', result ]);
       end
     else if name = '%diskfree%' then
       result:=smartSize(diskSpaceAt(md.folder.resource)-minDiskSpace*MEGA)
     else if name = '%up%' then
       result:=if_(assigned(md.tpl) and not md.folder.isRoot(), md.tpl['up'])
     else if name = '%encoded-folder%' then
-      result:= mainFrm.fileSrv.url(md.folder, TRUE)
+      result := fs.url(md.folder, TRUE)
     else if name = '%parent-folder%' then
-      result:= mainFrm.fileSrv.parentURL(md.folder)
+      result := fs.parentURL(md.folder)
     else if name = '%folder-name%' then
       result:= md.folder.name
     else if name = '%folder-resource%' then
@@ -1890,7 +1908,7 @@ var
     else if name = '%item-comment%' then
       result:= md.f.getDynamicComment(LP, TRUE)
     else if name = '%item-url%' then
-      result:=macroQuote(mainFrm.fileSrv.url(md.f))
+      result:=macroQuote(fs.url(md.f))
   ;
 
   if assigned(md.f) and assigned(md.tpl) then
@@ -1945,6 +1963,10 @@ try
   assert(assigned(cbData), 'cbMacros: cbData=NIL');
   md:=cbData;
   if md.breaking then exit;
+
+  LP := fs.getLP;
+  SP := fs.getSP;
+
   try
 
     name:=fullmacro;
@@ -2132,28 +2154,31 @@ try
     if name = 'sha256' then
       result:=strSHA256(p)
      else
+   {$IFNDEF HFS_SERVICE}
     if name = 'vfs select' then
       begin
         if pars.count = 0 then
-          try result:= mainFrm.fileSrv.url(selectedFile)
+          try result:= fs.url(mainFrm.selectedFile)
           except result:='' end
         else if p = 'next' then
-          if selectedFile = NIL then
+          if mainFrm.selectedFile = NIL then
             spaceIf(FALSE)
           else
             begin
-            with mainFrm.filesBox do selected:=selected.getNext();
+            with mainFrm.filesBox do
+              selected:=selected.getNext();
             spaceIf(TRUE);
             end
         else
           try
             s:=parEx('path');
             spaceIf(FALSE);
-            mainFrm.filesBox.selected := mainFrm.fileSrv.findFilebyURL(s, LP, NIL, FALSE).node;
+            mainFrm.filesBox.selected := fs.findFilebyURL(s, LP, NIL, FALSE).node;
             spaceIf(TRUE);
           except end;
       end
      else
+   {$ENDIF ~HFS_SERVICE}
     if name = 'break' then
       begin
         result:='';
@@ -2184,7 +2209,7 @@ try
       begin
       try s:=getVar(parEx('var'))
       except s:=p end;
-      mainfrm.add2log(s, md.cd, stringToColorEx(par(1,'color'), clDefault));
+      add2log(s, md.cd, stringToColorEx(par(1,'color'), clDefault));
       result:='';
       end
      else
@@ -2217,22 +2242,22 @@ try
       trueIf(anyMacroMarkerIn(first(loadfile(uri2diskMaybe(p)), p)))
      else
     if name = 'random' then
-      result:=randomFrom(pars.ToArray)
+      result := randomFrom(pars.ToArray)
      else
     if name = 'random number' then
      begin
       if pars.count = 1 then
-        result:=intToStr(random(1+parI(0)))
+        result := intToStr(random(1+parI(0)))
       else
-        result:=intToStr(parI(0)+random(1+parI(1)-parI(0)));
+        result := intToStr(parI(0)+random(1+parI(1)-parI(0)));
      end else
     if name = 'force ansi' then
      begin
       if satisfied(md.tpl) then //and md.tpl.utf8 then
 //        result:=noMacrosAllowed(UTF8toAnsi(p))
-        result:=noMacrosAllowed(AnsiString(p))
+        result := noMacrosAllowed(AnsiString(p))
       else
-        result:=p;
+        result := p;
      end else
     if name = 'maybe utf8' then
      begin
@@ -2339,7 +2364,7 @@ try
      else
     if name = 'get' then
       try
-        if p = 'can recur' then trueIf(mainFrm.recursiveListingChk.Checked)
+        if p = 'can recur' then trueIf(lpRecurListing in lp)// mainFrm.recursiveListingChk.Checked)
         else if p = 'can upload' then actionAllowed(FA_UPLOAD)
         else if p = 'can delete' then actionAllowed(FA_DELETE)
         else if p = 'can access' then actionAllowed(FA_ACCESS)
@@ -2388,7 +2413,7 @@ try
     if name ='quote' then
       begin
         p:=macroDequote(p);
-        applyMacrosAndSymbols(p, cbMacros, cbData);
+        applyMacrosAndSymbols(fs, p, cbMacros, cbData);
         result:=macroQuote(p);
       end
      else
@@ -2425,7 +2450,7 @@ try
      else
     if name = 'exists' then
       if ansiContainsStr(p, '/') then
-        trueIf(fileExistsByURL(p))
+        trueIf(fs.fileExistsByURL(p, lp))
       else
         trueIf(fileOrDirExists(p))
      else
@@ -2590,7 +2615,7 @@ try
         try
           // by default, we'll stop after first stacked [on macro rename], but recursive=1 will remove this limit
           stopOnMacroRename:=isFalse(par('recursive'));
-          runEventScript('on macro rename', toSA(['%old-name%',p,'%new-name%',par(1)]), md.cd);
+          runEventScript(fs, 'on macro rename', toSA(['%old-name%',p,'%new-name%',par(1)]), md.cd);
         finally
           stopOnMacroRename:=FALSE;
           end;
@@ -2716,7 +2741,7 @@ except
   end;
 end; // cbMacros
 
-function tryApplyMacrosAndSymbols(var txt:string; var md:TmacroData; removeQuotings:boolean=true):boolean;
+function tryApplyMacrosAndSymbols(fs: TFileServer; var txt:string; var md:TmacroData; removeQuotings:boolean=true):boolean;
 var
   s: string;
 begin
@@ -2744,7 +2769,7 @@ try
   md.breaking:=FALSE;
 
   try
-    applyMacrosAndSymbols(txt, cbMacros, @md, removeQuotings);
+    applyMacrosAndSymbols(fs, txt, cbMacros, @md, removeQuotings);
     result:=TRUE;
   except
     on e:EtplError do mainFrm.setStatusBarText(format('Template error at %d,%d: %s: %s ...', [e.row,e.col,e.message,e.code]), 1000);
@@ -2757,7 +2782,7 @@ finally
   end;
 end; // tryApplyMacrosAndSymbols
 
-function runScript(const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL):string;
+function runScript(fs: TFileServer; const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL):string;
 var
   md: TmacroData;
 begin
@@ -2765,19 +2790,90 @@ begin
   if result = '' then
     exit;
   ZeroMemory(@md, sizeOf(md));
-  md.tpl:=first(tpl_, tpl);
+  md.tpl := first(tpl_, fs.tpl);
   md.f:=f;
   md.folder:=folder;
   md.cd:=cd;
   md.table:=table;
-  tryApplyMacrosAndSymbols(result, md);
+  tryApplyMacrosAndSymbols(fs, result, md);
 end; // runScript
 
-function runEventScript(const event:string; table:TStringDynArray=NIL; cd:TconnDataMain=NIL):string;
+function runEventScript(fs: TFileServer; const event:string; table:TStringDynArray=NIL; cd:TconnDataMain=NIL):string;
 begin
 addArray(table, ['%event%', event]);
-result:=runScript(eventScripts[event], table, eventScripts, NIL, NIL, cd);
+result:=runScript(fs, eventScripts[event], table, eventScripts, NIL, NIL, cd);
 end; // runEventScript
+
+procedure runTimedEvents(fs: TFileServer);
+var
+  i: integer;
+  sections: TStringDynArray;
+  re: TRegExpr;
+  t, last: Tdatetime;
+  section: string;
+
+  procedure handleAtCase();
+  begin
+    t := now();
+    // we must convert the format, because our structure stores integers
+    last := unixToDatetime(eventsLastRun.getInt(section));
+    if (strToInt(re.match[9]) = hourOf(t))
+    and (strtoInt(re.match[10]) = minuteOf(t))
+    and (t-last > 0.9) then // approximately 1 day should have been passed
+      begin
+       eventsLastRun.setInt(section, datetimeToUnix(t));
+       runEventScript(fs, section);
+      end;
+  end; // handleAtCase
+
+  procedure handleEveryCase();
+  begin
+  // get the XX:YY:ZZ
+  t:=strToFloat(re.match[2]);
+  if re.match[4] > '' then
+    t:=t*60+strToInt(re.match[4]);
+  if re.match[6] > '' then
+    t:=t*60+strToInt(re.match[6]);
+  // apply optional time unit
+  case upcase(getFirstChar(re.match[7])) of
+    'M': t:=t*60;
+    'H': t:=t*60*60;
+    end;
+  // now "t" is in seconds
+  if (t > 0) and ((clock div 10) mod round(t) = 0) then
+    runEventScript(fs, section);
+  end; // handleEveryCase
+
+begin
+  if timedEventsRE = NIL then
+   begin
+    timedEventsRE:=TRegExpr.create; // yes, i know, this is never freed, but we need it for the whole time
+    timedEventsRE.expression:='(every +([0-9.]+)(:(\d+)(:(\d+))?)? *([a-z]*))|(at (\d+):(\d+))';
+    timedEventsRE.modifierI:=TRUE;
+    timedEventsRE.compile();
+   end;
+
+  if eventsLastRun = NIL then
+    eventsLastRun:=TstringToIntHash.create; // yes, i know, this is never freed, but we need it for the whole time
+
+  re := timedEventsRE; // a shortcut
+  sections := eventScripts.getSections();
+  if length(sections) > 0 then
+   for i:=0 to length(sections)-1 do
+    begin
+     section := sections[i]; // a shortcut
+     if not re.exec(section) then
+       continue;
+
+      try
+        if re.match[1] > '' then
+          handleEveryCase()
+         else
+          handleAtCase();
+       except
+      end; // ignore exceptions
+    end;
+end; // runTimedEvents
 
 initialization
 cachedTpls:=TcachedTpls.create();

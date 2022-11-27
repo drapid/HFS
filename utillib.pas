@@ -25,18 +25,32 @@ unit utilLib;
 interface
 
 uses
-  types, Windows, graphics, dialogs, registry, classes, dateUtils,
-  comCtrls, shlobj, shellapi, activex, comobj, forms, stdctrls, controls, psAPI,
-  menus, math, iniFiles, richedit, sysutils, strutils,
+  types, Windows,
+ {$IFDEF FMX}
+  FMX.Forms,
+  FMX.Graphics, System.UITypes,
+  FMX.Menus,
+  FMX.Controls,
+  FMX.StdCtrls,
+  FMX.Dialogs,
+  FMX.TreeView,
+ {$ELSE ~FMX}
+  Graphics,
+  Forms,
+  dialogs, menus, stdctrls, controls,
+  ComCtrls,
+ {$ENDIF FMX}
+  registry, classes, dateUtils,
+  shlobj, shellapi, activex, comobj, psAPI,
+  math, iniFiles, richedit, sysutils, strutils,
   OverbyteIcsWSocket, OverbyteIcshttpProt,
+   //RegularExpressions,
   regexpr,
   longinputDlg,
-  hslib, srvClassesLib, fileLib, hfsGlobal, srvConst;
+  hslib, srvClassesLib, fileLib, hfsGlobal, srvConst, serverLib;
 
 const
   ILLEGAL_FILE_CHARS = [#0..#31,'/','\',':','?','*','"','<','>','|'];
-  DOW2STR: array [1..7] of string=( 'Sun','Mon','Tue','Wed','Thu','Fri','Sat' );
-  MONTH2STR: array [1..12] of string = ( 'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec' );
 var
   GMToffset: integer; // in minutes
   inputQueryLongdlg: TlonginputFrm;
@@ -46,10 +60,10 @@ type
   TnameExistsFun = function(user:string):boolean;
 
 procedure doNothing(); inline; // useful for readability
+procedure add2Log(lines: String; cd: TconnDataMain=NIL; clr: Tcolor= Graphics.clDefault; doSync: Boolean = false);
 function httpsCanWork():boolean;
 procedure fixFontFor(frm:Tform);
 function hostFromURL(s:string):string;
-function hostToIP(name: string):string;
 function allocatedMemory():int64;
 {$IFDEF MSWINDOWS}
 function currentStackUsage: NativeUInt;
@@ -57,14 +71,14 @@ function currentStackUsage: NativeUInt;
 function maybeUnixTime(t:Tdatetime):Tdatetime;
 function localToGMT(d:Tdatetime):Tdatetime;
 function onlyExistentAccounts(a:TstringDynArray):TstringDynArray;
-procedure onlyForExperts(controls:array of Tcontrol);
+procedure onlyForExperts(p_easymode: Boolean; controls: array of Tcontrol);
 function createAccountOnTheFly():Paccount;
 function newMenuSeparator(lbl:string=''):Tmenuitem;
 function accountIcon(isEnabled, isGroup:boolean):integer; overload;
 function accountIcon(a:Paccount):integer; overload;
 function evalFormula(s:string):real;
 function boolOnce(var b:boolean):boolean;
-procedure drawCentered(cnv:Tcanvas; r:Trect; text:string);
+procedure drawCentered(cnv: Tcanvas; r: Trect; const text: String);
 function minmax(min, max, v:integer):integer;
 function isLocalIP(const ip:string):boolean;
 function clearAndReturn(var v:string):string;
@@ -75,46 +89,34 @@ function blend(from,to_:Tcolor; perc:real):Tcolor;
 function isNT():boolean;
 function setClip(const s:string):boolean;
 function eos(s:Tstream):boolean;
-function safeDiv(a,b:real; default:real=0):real; overload;
-function safeDiv(a,b:int64; default:int64=0):int64; overload;
-function safeMod(a,b:int64; default:int64=0):int64;
-function smartsize(size:int64):string;
-function httpGetStr(url:string; from:int64=0; size:int64=-1):string;
-function httpGet(const url:string; from:int64=0; size:int64=-1): RawByteString;
-function httpGetFile(url, filename:string; tryTimes:integer=1; notify:TdocDataEvent=NIL):boolean;
-function httpFileSize(url:string):int64;
-function getIPs():TStringDynArray;
+function httpGetFile(const url, filename: string; tryTimes: integer=1; notify: TdocDataEvent=NIL): Boolean;
+function httpGetFileWithCheck(const url, filename: string; tryTimes: integer=1; notify: TdocDataEvent=NIL): Boolean;
 function getPossibleAddresses():TstringDynArray;
 function whatStatusPanel(statusbar:Tstatusbar; x:integer):integer;
 function getExternalAddress(var res:string; provider:Pstring=NIL):boolean;
-function checkAddressSyntax(address:string; mask:boolean=TRUE):boolean;
 function inputQueryLong(const caption, msg:string; var value:string; ofs:integer=0):boolean;
 procedure purgeVFSaccounts();
 function exec(cmd:string; pars:string=''; showCmd:integer=SW_SHOW):boolean;
 function execNew(cmd:string):boolean;
 function captureExec(const DosApp: string; out output:string; out exitcode:cardinal; timeout:real=0):boolean;
 function openURL(const url: string):boolean;
-function getRes(name:pchar; const typ:string='TEXT'): RawByteString;
 function msgDlg(msg:string; code:integer=0; title:string=''):integer;
 // file
-function getEtag(const filename:string):string;
 function getDrive(fn:string):string;
 function deltree(path:string):boolean;
 function newMtime(fn:string; var previous:Tdatetime):boolean;
-function dirCrossing(s:string):boolean;
 function forceDirectory(path:string):boolean;
 function moveToBin(fn:string; force:boolean=FALSE):boolean; overload;
 function moveToBin(files:TstringDynArray; force:boolean=FALSE):boolean; overload;
-function uri2disk(url:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
-function uri2diskMaybe(path:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
-function isAbsolutePath(path:string):boolean;
+function uri2disk(url: String; parent: Tfile=NIL; resolveLnk: Boolean=TRUE): String;
+function uri2diskMaybe(const path:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
+function isAbsolutePath(const path:string):boolean;
 function getTempDir():string;
 function createShellLink(linkFN:WideString; destFN:string):boolean;
 function readShellLink(linkFN:WideString):string;
 function getShellFolder(const id: String): String;
 function getTempFilename():string;
-function saveTempFile(data:string):string;
-function fileOrDirExists(fn:string):boolean;
+function saveTempFile(const data:string):string;
 function sizeOfFile(fn:string):int64; overload;
 function sizeOfFile(fh:Thandle):int64; overload;
 //function loadFile(fn:string; from:int64=0; size:int64=-1):ansistring;  // Use RDFileUtil instead!
@@ -130,7 +132,7 @@ function appendFileU(fn:string; data:string):boolean;
 function appendFileA(fn:string; data:RawByteString):boolean;
 function getFilename(var f:file):string;
 function filenameToDriveByte(fn:string):byte;
-function selectFile(var fn:string; title:string=''; filter:string=''; options:TOpenOptions=[]):boolean;
+function selectFile(var fn:string; const title:string=''; const filter:string=''; options:TOpenOptions=[]):boolean;
 function selectFiles(caption:string; var files:TStringDynArray):boolean;
 function selectFolder(const caption: String; var folder:string):boolean;
 function selectFileOrFolder(caption:string; var fileOrFolder:string):boolean;
@@ -139,62 +141,55 @@ function loadregistry(const key, value: String; root: HKEY=0): string;
 function saveregistry(const key, value, data: string; root: HKEY=0): boolean;
 function deleteRegistry(const key, value: string; root: HKEY=0): boolean; overload;
 function deleteRegistry(key: String; root:HKEY=0): boolean; overload;
-// strings array
-function listToArray(l:Tstrings):TstringDynArray;
-function arrayToList(a:TStringDynArray; list:TstringList=NIL):TstringList;
 // convert
 function rectToStr(r:Trect):string;
 function strToRect(s:string):Trect;
 function strToUInt(s:string): UInt;
-function elapsedToStr(t:Tdatetime):string;
-function dateToHTTP(gmtTime:Tdatetime):string; overload;
-function dateToHTTP(const filename:string):string; overload;
-function dateToHTTPr(const filename: string): RawByteString; overload;
-function dateToHTTPr(gmtTime: Tdatetime): RawByteString; overload;
-function stringToColorEx(s:string; default:Tcolor=clNone):Tcolor;
 // misc string
-procedure excludeTrailingString(var s:string; ss:string);
 function getUniqueName(const start:string; exists:TnameExistsFun):string;
-function popTLV(var s,data: RawByteString):integer;
-function getCRC(const data: RawByteString):integer;
-function dotted(i:int64):string;
-function validUsername(s:string; acceptEmpty:boolean=FALSE):boolean;
-function int0(i,digits:integer):string;
+function popTLV(var s,data: RawByteString): integer;
+function dotted(i: int64): String;
+function validUsername(s: String; acceptEmpty: Boolean=FALSE): Boolean;
+function int0(i, digits: integer): String;
 //function optUTF8(bool:boolean; s:string):string; overload;
 //function optUTF8(tpl:Ttpl; s:string):string; overload;
 function optAnsi(bool:boolean; s:string):string;
 function utf8Test(const s:string):boolean; OverLoad;
 function utf8Test(const s: RawByteString): boolean; OverLoad;
-function jsEncode(s, chars:string):string;
 function nonEmptyConcat(const pre,s:string; const post:string=''):string;
 function countSubstr(const ss:string; const s:string):integer;
 function trim2(const s:string; chars:TcharsetW):string;
 procedure urlToStrings(const s:string; sl:Tstrings); OverLoad;
 procedure urlToStrings(const s: RawByteString; sl:Tstrings); OverLoad;
 function reCB(const expr, subj:string; cb:TreCB; data:pointer=NIL):string;
-function reGet(const s, exp:string; subexpIdx:integer=1; mods:string='!mi'; ofs:integer=1):string;
 function getFirstChar(const s:string):char;
 function bmp2ico32(bitmap: Tbitmap): HICON;
 function bmp2ico24(bitmap: Tbitmap): HICON;
 procedure ico2bmp2(pIcon: HIcon; bmp: TBitmap);
-
+procedure apacheLogCb(re: TregExpr; var res: String; data: pointer);
 
 implementation
 
 uses
-  clipbrd, CommCtrl, //System.Hash,
-  AnsiClasses, ansiStrings,
+ {$IFDEF FMX}
+  FMX.Clipboard,
+ {$ELSE ~FMX}
+  clipbrd, CommCtrl, CommDlg, //System.Hash,
+  winsock,
+ {$ENDIF FMX}
+//  AnsiClasses,
+  ansiStrings,
   OverbyteIcsSSLEAY,
   {$IFDEF HAS_FASTMM}
   fastmm4,
   {$ENDIF HAS_FASTMM}
-  RDUtils, RDFileUtil, RnQCrypt,
-  HFSJclNTFS, hfsJclOthers,
-  main, srvUtils, classesLib, srvVars,
-  hfsVars, parserLib, newuserpassDlg, winsock;
-
-var
-  onlyDotsRE: TRegExpr;
+  RDUtils, RDFileUtil, RnQDialogs, RnQCrypt,
+//  HFSJclNTFS,
+  hfsJclOthers,
+  main,
+  srvUtils, classesLib, srvVars,
+  netUtils,
+  hfsVars, parserLib, scriptLib, newuserpassDlg;
 
 // method TregExpr.ReplaceEx does the same thing, but doesn't allow the extra data field (sometimes necessary).
 // Moreover, here i use the TfastStringAppend that will give us good performance with many replacements.
@@ -256,6 +251,16 @@ while i > 0 do
   end;
 result:='';
 end; // hasJunction
+
+function NtfsFileHasReparsePoint(const Path: string): Boolean;
+var
+  Attr: DWORD;
+begin
+  Result := False;
+  Attr := GetFileAttributes(PChar(Path));
+  if Attr <> DWORD(-1) then
+    Result := (Attr and FILE_ATTRIBUTE_REPARSE_POINT) <> 0;
+end;
 
 // this is a fixed version of the one contained in JclNTFS.pas
 function NtfsGetJunctionPointDestination(const Source: string; var Destination: widestring): Boolean;
@@ -378,23 +383,15 @@ end; // movefile
 function copyFile(src, dst:string):boolean;
 begin result:=movefile(src, dst, FO_COPY) end;
 
-function reGet(const s, exp:string; subexpIdx:integer=1; mods:string='!mi'; ofs:integer=1):string;
-var
-  se: TstringDynArray;
-begin
-if reMatch(s, exp, mods, ofs, @se) > 0 then
-  result:=se[subexpIdx]
-else
-  result:='';
-end; // reGet
-
 function strToUInt(s:string): UInt;
 begin
-s:=trim(s);
-if s='' then result:=0
-else result:= SysUtils.StrToUInt(s);
-if result < 0 then
-  raise Exception.Create('strToUInt: Signed value not accepted');
+  s := trim(s);
+  if s='' then
+    result := 0
+   else
+    result := SysUtils.StrToUInt(s);
+  if result < 0 then
+    raise Exception.Create('strToUInt: Signed value not accepted');
 end; // strToUInt
 
 
@@ -409,27 +406,6 @@ while i > 1 do
   dec(i,3);
   end;
 end; // dotted
-
-function getRes(name:pchar; const typ:string='TEXT'): RawByteString;
-var
-  h1, h2: Thandle;
-  p: pByte;
-  l: integer;
-  ansi: RawByteString;
-begin
-  result:='';
-  h1:=FindResource(HInstance, name, pchar(typ));
-  h2:=LoadResource(HInstance, h1);
-  if h2=0 then
-    exit;
-  l:=SizeOfResource(HInstance, h1);
-  p := LockResource(h2);
-  setLength(ansi, l);
-  move(p^, ansi[1], l);
-  UnlockResource(h2);
-  FreeResource(h2);
-  result := ansi;
-end; // getRes
 
 function rectToStr(r:Trect):string;
 begin result:=format('%d,%d,%d,%d',[r.left,r.top,r.right,r.bottom]) end;
@@ -452,33 +428,23 @@ data:=copy(s,9,Pinteger(@s[5])^);
 delete(s,1,8+length(data));
 end; // popTLV
 
-function getCRC(const data: RawByteString):integer;
-var
-  i:integer;
-  p:Pinteger;
-begin
-result:=0;
-p:=@data[1];
-for i:=1 to length(data) div 4 do
-  begin
-  inc(result, p^);
-  inc(p);
-  end;
-end; // crc
-
 function msgDlg(msg:string; code:integer=0; title:string=''):integer;
 var
   parent: Thandle;
 begin
-result:=0;
-if msg='' then exit;
-if code = 0 then code:=MB_OK+MB_ICONINFORMATION;
-if screen.ActiveCustomForm = NIL then parent:=0
-else parent:=screen.ActiveCustomForm.handle;
-application.restore();
-application.BringToFront();
-title:=application.Title+nonEmptyConcat(' -- ', title);
-result:=messageBox(parent, pchar(msg), pchar(title), code)
+  result := 0;
+  if msg='' then
+    exit;
+  if code = 0 then
+    code := MB_OK+MB_ICONINFORMATION;
+  if screen.ActiveCustomForm = NIL then
+    parent := 0
+   else
+    parent := screen.ActiveCustomForm.handle;
+  application.restore();
+  application.BringToFront();
+  title := application.Title+nonEmptyConcat(' -- ', title);
+  result := messageBox(parent, pchar(msg), pchar(title), code)
 end; // msgDlg
 
 function validUsername(s:string; acceptEmpty:boolean=FALSE):boolean;
@@ -664,11 +630,11 @@ begin
     setLength(result, StrLen(PChar(@result[1])));
 end; // getTempFilename
 
-function saveTempFile(data:string):string;
+function saveTempFile(const data: String): String;
 begin
   result:=getTempFilename();
   if result > '' then
-    saveFile2(result, UTF8ToStr(data));
+    saveFile2(result, StrToUTF8(data));
 end; // saveTempFile
 
 function loadregistry(const key, value: String; root: HKEY=0): string;
@@ -815,34 +781,7 @@ begin
 end; // execNew
 
 
-function checkAddressSyntax(address:string; mask:boolean=TRUE):boolean;
-var
-  a1, a2: string;
-  sf: TSocketFamily;
-begin
-if not mask then
-  exit(WSocketIsIPEx(address, sf));
-result:=FALSE;
-if address = '' then exit;
-while (address > '') and (address[1] = '\') do
-  delete(address,1,1);
-while address > '' do
-  begin
-  a2:=chop(';', address);
-  if sameText(a2, 'lan') then
-    continue;
-  a1:=chop('-', a2);
-  if a2 > '' then
-    if not checkAddressSyntax(a1, FALSE)
-    or not checkAddressSyntax(a2, FALSE) then
-      exit;
-  if reMatch(a1, '^[?*a-f0-9\.:]+$', '!') = 0 then
-    exit;
-  end;
-result:=TRUE;
-end; // checkAddressSyntax
-
-function uri2disk(url:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
+function uri2disk(url: string; parent: Tfile=NIL; resolveLnk: boolean=TRUE): string;
 var
   fi: Tfile;
   i: integer;
@@ -860,7 +799,7 @@ begin
       delete(url, i, MaxInt);
     end;
 try
-  fi:= mainFrm.fileSrv.findFilebyURL(url, mainFrm.getLP, parent);
+  fi:= mainFrm.fileSrv.findFilebyURL(url, parent);
   if fi <> NIL then
     try
       result:=ifThen(resolveLnk or (fi.lnk=''), fi.resource, fi.lnk) +append;
@@ -872,10 +811,12 @@ try
 except result:='' end;
 end; // uri2disk
 
-function uri2diskMaybe(path:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
+function uri2diskMaybe(const path:string; parent:Tfile=NIL; resolveLnk:boolean=TRUE):string;
 begin
-if ansiContainsStr(path, '/') then result:=uri2disk(path, parent, resolveLnk)
-else result:=path;
+  if ansiContainsStr(path, '/') then
+    result := uri2disk(path, parent, resolveLnk)
+   else
+    result := path;
 end; // uri2diskmaybe
 
 function sizeOfFile(fh:Thandle):int64; overload;
@@ -902,37 +843,17 @@ result:=sizeOfFile(h);
 fileClose(h);
 end; // sizeOfFile
 
-function isAbsolutePath(path:string):boolean;
+function isAbsolutePath(const path:string):boolean;
 begin result:=(path > '') and (path[1] = '\') or (length(path) > 1) and (path[2] = ':') end;
 
 function min(a,b:integer):integer; inline;
 begin if a>b then result:=b else result:=a end;
-
-function fileOrDirExists(fn:string):boolean;
-begin
-result:=fileExists(fn) or directoryExists(fn);
-{** first i used this way, because faster, but it proved to not always work: http://www.rejetto.com/forum/index.php/topic,10825.0.html
-var
-  sr:TsearchRec;
-begin
-result:= 0=findFirst(ExcludeTrailingPathDelimiter(fn),faAnyFile,sr);
-if result then FindClose(sr);
-}
-end; // fileOrDirExists
 
 function int0(i,digits:integer):string;
 begin
 result:=intToStr(i);
 result:=stringOfChar('0',digits-length(result))+result;
 end; // int0
-
-function elapsedToStr(t:Tdatetime):string;
-var
-  sec: integer;
-begin
-sec:=trunc(t*SECONDS);
-result:=format('%d:%.2d:%.2d', [sec div 3600, sec div 60 mod 60, sec mod 60] );
-end; // elapsedToStr
 
 // ensure f.accounts does not store non-existent users
 function cbPurgeVFSaccounts(f:Tfile; callingAfterChildren:boolean; par, par2: IntPtr):TfileCallbackReturn;
@@ -1024,147 +945,26 @@ var
   files: array of string; // = ['libcrypto-1_1.dll','libssl-1_1.dll'];
   missing: TStringDynArray;
 begin
-missing:=NIL;
+  missing := NIL;
   SetLength(files, 2);
-  files[0] := GLIBEAY_110DLL_Name;
-  files[1] := GSSLEAY_110DLL_Name;
-for var s in files do
-  if not FileExists(s) and not dllIsPresent(s) then
-    addString(s, missing);
-if missing=NIL then
-  exit(TRUE);
-if msgDlg(MSG_NO_DLL, MB_OKCANCEL+MB_ICONQUESTION) <> MROK then
-  exit(FALSE);
-for var s in missing do
-  if not httpGetFile(LIBS_DOWNLOAD_URL + s, s, 2, mainfrm.statusBarHttpGetUpdate) then
-    begin
-    msgDlg(MSG_DNL_FAIL, MB_ICONERROR);
+  files[0] := GLIBEAY_300DLL_Name;
+  files[1] := GSSLEAY_300DLL_Name;
+  for var s in files do
+    if not FileExists(s) and not dllIsPresent(s) then
+      addString(s, missing);
+  if missing=NIL then
+    exit(TRUE);
+  if msgDlg(MSG_NO_DLL, MB_OKCANCEL+MB_ICONQUESTION) <> MROK then
     exit(FALSE);
-    end;
-mainfrm.setStatusBarText(MSG_DNL_OK);
-result:=TRUE;
-end; // httpsCanWork
-
-function httpGetStr(url:string; from:int64=0; size:int64=-1):string;
-var
-  reply: Tstringstream;
-begin
-if size = 0 then
-  exit('');
-reply:=TStringStream.Create('');
-with ThttpClient.createURL(url) do
-  try
-    rcvdStream:=reply;
-    if (from <> 0) or (size > 0) then
-      contentRangeBegin:=intToStr(from);
-    if size > 0 then
-      contentRangeEnd:=intToStr(from+size-1);
-    get();
-    result:=reply.dataString;
-    if sameText('utf-8', reGet(ContentType, '; *charset=(.+) *($|;)')) then
-      Result:=UTF8ToString(result);
-  finally
-    reply.free;
-    Free;
-    end
-end; // httpGetStr
-
-function httpGet(const url:string; from:int64=0; size:int64=-1): RawByteString;
-var
-  fs: TMemoryStream;
-  httpCli: ThttpClient;
-begin
-if size = 0 then
-  begin
-  result:='';
-  exit;
-  end;
-
-//  Result := LoadFromURLStr(url, from, size);
-  fs := nil;
-  Result := '';
-  httpCli := ThttpClient.createURL(url);
-  if Assigned(httpCli) then
-with httpCli do
-  try
-    fs := TMemoryStream.Create;
-    rcvdStream:=fs;
-    if (from <> 0) or (size > 0) then
-      contentRangeBegin:=intToStr(from);
-    if size > 0 then
-      contentRangeEnd:=intToStr(from+size-1);
-
-      if size >= 0 then
+  for var s in missing do
+    if not httpGetFileWithCheck(LIBS_DOWNLOAD_URL + s, s, 2, mainfrm.statusBarHttpGetUpdate) then
       begin
-        httpCli.Head;
-        if httpCli.ContentLength < from then
-          Exit;
+      msgDlg(MSG_DNL_FAIL, MB_ICONERROR);
+      exit(FALSE);
       end;
-
-    get();
-        if fs.Size > 0 then
-        begin
-          SetLength(Result, fs.Size);
-          fs.Seek(0, soFromBeginning);
-          fs.Read(Result[1], Length(Result));
-        end;
-  finally
-    fs.free;
-    Free;
-    end
-
-
-end; // httpGet
-
-function httpFileSize(url:string):int64;
-var
-  httpCli: ThttpClient;
-begin
-  Result := -1;
-  httpCli := ThttpClient.createURL(url);
-  if Assigned(httpCli) then
-with httpCli do
-  try
-    try
-      head();
-      result:=contentLength
-     except result:=-1
-      end;
-  finally free
-    end;
-end; // httpFileSize
-
-function httpGetFile(url, filename:string; tryTimes:integer=1; notify:TdocDataEvent=NIL):boolean;
-var
-  httpCli: ThttpClient;
-  supposed: int64;
-  reply: Tfilestream;
-begin
-  supposed := 0;
-  httpCli := ThttpClient.createURL(url);
-  if Assigned(httpCli) then
-with httpCli do
-  try
-    reply:=TfileStream.Create(filename, fmCreate);
-    rcvdStream:=reply;
-    onDocData:=notify;
-    result:=TRUE;
-    try get()
-    except result:=FALSE
-      end;
-    supposed:=ContentLength;
-  finally
-    reply.free;
-    free;
-    end;
-result:= result and (sizeOfFile(filename)=supposed);
-if not result then
-  deleteFile(filename);
-
-if not result and (tryTimes > 1) then
-  result:=httpGetFile(url, filename, tryTimes-1, notify);
-end; // httpGetFile
-
+  mainfrm.setStatusBarText(MSG_DNL_OK);
+  result:=TRUE;
+end; // httpsCanWork
 function getExternalAddress(var res:string; provider:Pstring=NIL):boolean;
 
   procedure loadIPservices(src:string='');
@@ -1176,7 +976,8 @@ function getExternalAddress(var res:string; provider:Pstring=NIL):boolean;
     begin
     if now()-IPservicesTime < 1 then exit; // once a day
     IPservicesTime:=now();
-    try sA:=trim(httpGet(IP_SERVICES_URL));
+    try
+      sA := trim(httpGet(IP_SERVICES_URL));
     except exit end;
      src := (UnUTF(sA));
     end;
@@ -1195,43 +996,96 @@ var
   sA: RawByteString;
   i: integer;
 begin
-result:=FALSE;
-if customIPservice > '' then s:=customIPservice
-else
-  begin
-  loadIPservices();
-  if IPservices = NIL then
-    loadIPservices(UnUTF(getRes('IPservices')));
-  if IPservices = NIL then exit;
+  result := FALSE;
+  if customIPservice > '' then
+    s := customIPservice
+  else
+    begin
+      loadIPservices();
+      if IPservices = NIL then
+        loadIPservices(UnUTF(getRes('IPservices')));
+      if IPservices = NIL then
+        exit;
 
-    repeat
-    s:=IPservices[random(length(IPservices))];
-    until s <> lastProvider;
-  lastProvider:=s;
+      repeat
+        s := IPservices[random(length(IPservices))];
+      until s <> lastProvider;
+      lastProvider:=s;
+    end;
+  addr:=chop('|',s);
+  if assigned(provider) then
+    provider^:=addr;
+  mark := s;
+  try
+    sA := httpGet(addr);
+    s := UnUTF(sA);
+   except exit
   end;
-addr:=chop('|',s);
-if assigned(provider) then provider^:=addr;
-mark:=s;
-try
-  sA:=httpGet(addr);
-  s:=UnUTF(sA);
-except exit end;
-if mark > '' then chop(mark, s);
-s:=trim(s);
-if s = '' then exit;
-// try to determine length
-i:=1;
-while (i < length(s)) and (i < 15) and (s[i+1] in ['0'..'9','.']) do
-  inc(i);
-while (i > 0) and (s[i] = '.') do
-  dec(i);
-setLength(s,i);
-result:= checkAddressSyntax(s, false) and not HSlib.isLocalIP(s);
-if not result then exit;
-if (res <> s) and mainFrm.logOtherEventsChk.checked then
-  mainFrm.add2log('New external address: '+s+' via '+hostFromURL(addr));
-res:=s;
+  if mark > '' then
+    chop(mark, s);
+  s := trim(s);
+  if s = '' then
+    exit;
+  // try to determine length
+  i := 1;
+  while (i < length(s)) and (i < 15) and (s[i+1] in ['0'..'9','.']) do
+    inc(i);
+  while (i > 0) and (s[i] = '.') do
+    dec(i);
+  setLength(s,i);
+  result := checkAddressSyntax(s, false) and not HSlib.isLocalIP(s);
+  if not result then
+    exit;
+  if (res <> s) and mainFrm.logOtherEventsChk.checked then
+    add2log('New external address: '+s+' via '+hostFromURL(addr));
+  res := s;
 end; // getExternalAddress
+
+function httpGetFile(const url, filename: string; tryTimes: integer=1; notify: TdocDataEvent=NIL): Boolean;
+var
+  errMsg: String;
+begin
+  Result := netUtils.httpGetFile(url, filename, errMsg, notify);
+
+  if not Result then
+    begin
+      if errMsg > '' then
+        add2log(errMsg);
+      while not Result and (tryTimes > 1) do
+       begin
+        Result := netUtils.httpGetFile(url, filename, errMsg, notify);
+        if not Result and (errMsg > '') then
+          begin
+            if errMsg > '' then
+              add2log(errMsg);
+            dec(tryTimes);
+          end;
+       end;
+    end;
+end;
+
+function httpGetFileWithCheck(const url, filename: string; tryTimes: integer=1; notify: TdocDataEvent=NIL): Boolean;
+var
+  errMsg: String;
+begin
+  Result := netUtils.httpGetFileWithCheck(url, filename, errMsg, notify);
+
+  if not Result then
+    begin
+      if errMsg > '' then
+        add2log(errMsg);
+      while not Result and (tryTimes > 1) do
+       begin
+        Result := netUtils.httpGetFileWithCheck(url, filename, errMsg, notify);
+        if not Result and (errMsg > '') then
+          begin
+            if errMsg > '' then
+              add2log(errMsg);
+            dec(tryTimes);
+          end;
+       end;
+    end;
+end;
 
 function whatStatusPanel(statusbar:Tstatusbar; x:integer):integer;
 var
@@ -1245,25 +1099,6 @@ while (x > x1) and (result < statusbar.Panels.Count-1) do
   inc(x1, statusbar.panels[result].width);
   end;
 end; // whatStatusPanel
-
-function getIPs():TStringDynArray;
-var
-  a6: TStringDynArray;
-  I: Integer;
-begin
-  try
-    result := listToArray(localIPlist(sfIPv4));
-    a6 := listToArray(localIPlist(sfIPv6));
-    if Length(a6) > 0 then
-      begin
-        for I := Low(a6) to High(a6) do
-          a6[i] := '[' + a6[i] + ']';
-        Result := Result + a6;
-      end;
-   except
-     result := NIL
-  end;
-end;
 
 function getPossibleAddresses():TstringDynArray;
 begin // next best
@@ -1287,18 +1122,6 @@ if fn = '' then
 else
   result:=ord(upcase(fn[1]))-ord('A')+1;
 end; // filenameToDriveByte
-
-function smartsize(size:int64):string;
-begin
-if size < 0 then result:='N/A'
-else
-  if size < 1 shl 10 then result:=intToStr(size)
-  else
-    if size < 1 shl 20 then result:=format('%.1f K',[size/(1 shl 10)])
-    else
-      if size < 1 shl 30 then result:=format('%.1f M',[size/(1 shl 20)])
-      else result:=format('%.1f G',[size/(1 shl 30)])
-end; // smartsize
 
 function cbSelectFolder(wnd:HWND; uMsg:UINT; lp,lpData:LPARAM):LRESULT; stdcall;
 begin
@@ -1344,8 +1167,8 @@ begin result:=selectWrapper(caption, folder) end;
 // works only on XP
 function selectFileOrFolder(caption:string; var fileOrFolder:string):boolean;
 begin result:=selectWrapper(caption, fileOrFolder, BIF_BROWSEINCLUDEFILES) end;
-
-function selectFile(var fn:string; title, filter:string; options:TOpenOptions):boolean;
+{
+function selectFile(var fn:string; const title, filter:string; options:TOpenOptions):boolean;
 var
   dlg: TopenDialog;
 begin
@@ -1365,48 +1188,42 @@ try
   result:=TRUE;
 finally dlg.free end;
 end; // selectFile
-
-function safeMod(a,b:int64; default:int64=0):int64;
-begin if b=0 then result:=default else result:=a mod b end;
-
-function safeDiv(a,b:int64; default:int64=0):int64; inline;
-begin if b=0 then result:=default else result:=a div b end;
-
-function safeDiv(a,b:real; default:real=0):real; inline;
-begin if b=0 then result:=default else result:=a/b end;
-
-function dateToHTTP(const filename:string):string; overload;
-begin result:=dateToHTTP(getMtimeUTC(filename)) end;
-
-function dateToHTTP(gmtTime:Tdatetime):string; overload;
-begin
-result:=formatDateTime('"'+DOW2STR[dayOfWeek(gmtTime)]+'," dd "'+MONTH2STR[monthOf(gmtTime)]
-  +'" yyyy hh":"nn":"ss "GMT"', gmtTime);
-end; // dateToHTTP
-
-function dateToHTTPr(const filename: string): RawByteString; overload;
-begin result:=dateToHTTPr(getMtimeUTC(filename)) end;
-
-function dateToHTTPr(gmtTime: Tdatetime): RawByteString;
-begin
-  result := RawByteString(formatDateTime('"'+DOW2STR[dayOfWeek(gmtTime)]+'," dd "'+MONTH2STR[monthOf(gmtTime)]
-  +'" yyyy hh":"nn":"ss "GMT"', gmtTime));
-end; // dateToHTTP
-
-
-function getEtag(const filename: string): string;
+}
+function selectFile(var fn: string; const title, filter: string; options: TOpenOptions): boolean;
+const
+  OpenOptions: array [TOpenOption] of DWORD = (
+    OFN_READONLY, OFN_OVERWRITEPROMPT, OFN_HIDEREADONLY,
+    OFN_NOCHANGEDIR, OFN_SHOWHELP, OFN_NOVALIDATE, OFN_ALLOWMULTISELECT,
+    OFN_EXTENSIONDIFFERENT, OFN_PATHMUSTEXIST, OFN_FILEMUSTEXIST,
+    OFN_CREATEPROMPT, OFN_SHAREAWARE, OFN_NOREADONLYRETURN,
+    OFN_NOTESTFILECREATE, OFN_NONETWORKBUTTON, OFN_NOLONGNAMES,
+    OFN_EXPLORER, OFN_NODEREFERENCELINKS, OFN_ENABLEINCLUDENOTIFY,
+    OFN_ENABLESIZING, OFN_DONTADDTORECENT, OFN_FORCESHOWHIDDEN);
 var
-  sr: TsearchRec;
-  st: TSystemTime;
+//  dlg: TopenDialog;
+  hndl: THandle;
+  initDir: String;
+  Option: TOpenOption;
+  Flags: Cardinal;
 begin
-  result:='';
-  if findFirst(filename, faAnyFile, sr) <> 0 then
-    exit;
-  FileTimeToSystemTime(sr.FindData.ftLastWriteTime, st);
-  result:=intToStr(sr.Size)+':'+floatToStr(SystemTimeToDateTime(st))+':'+expandFileName(filename);
-  findClose(sr);
-  result := MD5PassHS(result);
-end; // getEtag
+  result := FALSE;
+//  dlg:=TopenDialog.create(screen.activeForm);
+  if Assigned(screen.activeForm) then
+    hndl := screen.activeForm.Handle
+   else
+    hndl := 0;
+  initDir := exePath;
+  if fn > '' then
+  begin
+    if isAbsolutePath(fn) then
+      initDir := ExtractFilePath(fn)
+  end;
+  flags := 0;
+  for Option := Low(Option) to High(Option) do
+    if Option in options then
+      Flags := Flags or OpenOptions[Option];
+  Result := OpenSaveFileDialog(hndl, '', filter, initDir, title, fn, True, false, flags)
+end; // selectFile
 
 function getShellFolder(const id: String): String;
 begin
@@ -1515,28 +1332,6 @@ for i:=0 to 2 do
   inc(result, min($FF, round(((from shr (i*8)) and $FF)*(1-perc)
     +((to_ shr (i*8)) and $FF)*perc)) shl (i*8));
 end; // blend
-
-function listToArray(l:Tstrings):TstringDynArray;
-var
-  i: integer;
-begin
-try
-  setLength(result, l.Count);
-  for i:=0 to l.Count-1 do
-    result[i]:=l[i];
-except
-  result:=NIL
-  end
-end; // listToArray
-
-function jsEncode(s, chars:string):string;
-var
-  i: integer;
-begin
-for i:=1 to length(chars) do
-  s:=ansiReplaceStr(s, chars[i], '\x'+intToHex(ord(chars[i]),2));
-result:=s;
-end; // jsEncode
 
 function holdingKey(key:integer):boolean;
 begin result:=getAsyncKeyState(key) and $8000 <> 0 end;
@@ -1681,8 +1476,10 @@ result:=v;
 v:='';
 end;
 
-procedure drawCentered(cnv:Tcanvas; r:Trect; text:string);
-begin drawText(cnv.Handle, pchar(text), length(text), r, DT_CENTER+DT_NOPREFIX+DT_VCENTER+DT_END_ELLIPSIS) end;
+procedure drawCentered(cnv: Tcanvas; r: Trect; const text: String);
+begin
+  drawText(cnv.Handle, pchar(text), length(text), r, DT_CENTER+DT_NOPREFIX+DT_VCENTER+DT_END_ELLIPSIS)
+end;
 
 function minmax(min, max, v:integer):integer; inline;
 begin
@@ -1771,6 +1568,14 @@ end; // urlToStrings
 
 procedure doNothing();
 begin end;
+
+procedure add2Log(lines: String; cd: TconnDataMain=NIL; clr: Tcolor= Graphics.clDefault; doSync: Boolean = false);
+begin
+  if not doSync then
+    mainFrm.add2log(lines, cd, clr)
+   else
+    mainFrm.add2log(lines, cd, clr);
+end;
 
 // calculates the value of a constant formula
 function evalFormula(s:string):real;
@@ -1891,25 +1696,13 @@ begin result:=if_(isGroup, if_(isEnabled,29,40), if_(isEnabled,27,28)) end;
 function accountIcon(a:Paccount):integer; overload;
 begin result:=accountIcon(a.enabled, a.group) end;
 
-function newMenuSeparator(lbl:string=''):Tmenuitem;
+function newMenuSeparator(lbl: string=''): Tmenuitem;
 begin
-result:=newItem('-',0,FALSE,TRUE,NIL,0,'');
-result.hint:=lbl;
-result.onDrawItem:=mainfrm.menuDraw;
-result.OnMeasureItem:=mainfrm.menuMeasure;
+  result := newItem('-',0,FALSE,TRUE,NIL,0,'');
+  result.hint := lbl;
+  result.onDrawItem := mainfrm.menuDraw;
+  result.OnMeasureItem := mainfrm.menuMeasure;
 end; // newMenuSeparator
-
-function arrayToList(a:TStringDynArray; list:TstringList=NIL):TstringList;
-var
-  i: integer;
-begin
-if list = NIL then
-  list:=ThashedStringList.create;
-result:=list;
-list.Clear();
-for i:=0 to length(a)-1 do
-  list.add(a[i]);
-end; // arrayToList
 
 function createAccountOnTheFly():Paccount;
 var
@@ -1932,15 +1725,15 @@ accounts[i]:=acc;
 result:=@accounts[i];
 end; // createAccountOnTheFly
 
-procedure onlyForExperts(controls:array of Tcontrol);
+procedure onlyForExperts(p_easymode: Boolean; controls: array of Tcontrol);
 var
   i: integer;
 begin
-for i:=0 to length(controls)-1 do
-  controls[i].visible:=not easyMode;
+  for i:=0 to length(controls)-1 do
+    controls[i].visible:=not p_easymode;
 end; // onlyForExperts
 
-function onlyExistentAccounts(a:TstringDynArray):TstringDynArray;
+function onlyExistentAccounts(a: TstringDynArray): TstringDynArray;
 var
   i: integer;
   s: string;
@@ -1955,24 +1748,6 @@ for i:=0 to length(a)-1 do
   end;
 result:=a;
 end; // onlyExistentAccounts
-
-// recognize strings containing pieces (separated by backslash) made of only dots
-function dirCrossing(s:string):boolean;
-begin
-result:=FALSE;
-
-if onlyDotsRE = NIL then
-  begin
-  onlyDotsRE:=TRegExpr.Create;
-  onlyDotsRE.modifierM:=TRUE;
-  onlyDotsRE.expression:='(^|\\)\.\.+($|\\)';
-  onlyDotsRE.compile();
-  end;
-
-with onlyDotsRE do
-  try result:=exec(s);
-  except end;
-end; // dirCrossing
 
 // this will tell if the file has changed
 function newMtime(fn:string; var previous:Tdatetime):boolean;
@@ -2000,15 +1775,6 @@ function maybeUnixTime(t:Tdatetime):Tdatetime;
 begin
 if t > 1000000 then result:=unixToDateTime(round(t))
 else result:=t
-end;
-
-procedure excludeTrailingString(var s:string; ss:string);
-var
-  i: integer;
-begin
-i:=length(s)-length(ss);
-if copy(s, i+1, length(ss)) = ss then
-  setLength(s, i);
 end;
 
 function deltree(path:string):boolean;
@@ -2082,54 +1848,6 @@ asm
   {$ENDIF}
 {$ENDIF}
 end;
-
-function removeStartingStr(ss,s:string):string;
-begin
-if ansiStartsStr(ss, s) then
-  result:=substr(s, 1+length(ss))
-else
-  result:=s
-end; // removeStartingStr
-
-function stringToColorEx(s:string; default:Tcolor=clNone):Tcolor;
-begin
-try
-  if reMatch(s, '#?[0-9a-f]{3,6}','!i') > 0 then
-    begin
-    s:=removeStartingStr('#', s);
-    case length(s) of
-      3: s:=s[3]+s[3]+s[2]+s[2]+s[1]+s[1];
-      6: s:=s[5]+s[6]+s[3]+s[4]+s[1]+s[2];
-      end;
-    end;
-  result:=stringToColor('$'+s)
-except
-  try result:=stringToColor('cl'+s);
-  except
-    if default = clNone then
-      result:=stringToColor(s)
-    else
-      try result:=stringToColor(s)
-      except result:=default end;
-    end;
-  end;
-end; // stringToColorEx
-
-// this is a blocking method for dns resolving. The Wsocket.DnsLookup() method provided by ICS is non-blocking
-function hostToIP(name: string):string;
-type
-  Tbytes = array [0..3] of byte;
-var
-  hostEnt: PHostEnt;
-  addr: ^Tbytes;
-begin
-result:='';
-hostEnt:=gethostbyname(Pansichar(ansiString(name)));
-if (hostEnt = NIL) or (hostEnt^.h_addr_list = NIL) then exit;
-addr:=pointer(hostEnt^.h_addr_list^);
-if addr = NIL then exit;
-result:=format('%d.%d.%d.%d', [addr[0], addr[1], addr[2], addr[3]]);
-end; // hostToIP
 
 function hostFromURL(s:string):string;
 begin result:=reGet(s, '([a-z]+://)?([^/]+@)?([^/]+)', 3) end;
@@ -2205,8 +1923,74 @@ begin
   bmp.Transparent := True;
 end;
 
+procedure apacheLogCb(re: TregExpr; var res: String; data: pointer);
+const
+  APACHE_TIMESTAMP_FORMAT = 'dd"/!!!/"yyyy":"hh":"nn":"ss';
 var
-  TZinfo:TTimeZoneInformation;
+  code, codes, par: string;
+  cmd: char;
+  cd: TconnData;
+
+  procedure extra();
+  begin
+    // apache log standard for "nothing" is "-", but "-" is a valid filename
+    res := '';
+    if cd.uploadResults = NIL then
+      exit;
+    for var i: Integer :=0 to length(cd.uploadResults)-1 do
+      with cd.uploadResults[i] do
+        if reason = '' then
+          res := res+fn+'|';
+    setLength(res, length(res)-1);
+  end; // extra
+
+begin
+  cd := data;
+  if cd = NIL then
+    exit; // something's wrong
+  code := intToStr(HRM2CODE[cd.conn.reply.mode]);
+  // first parameter specifies http code to match as CSV, with leading '!' to invert logic
+  codes := re.match[1];
+  if (codes > '') and ((pos(code, codes) > 0) = (codes[1] = '!')) then
+    begin
+     res := '-';
+     exit;
+    end;
+  par := re.match[3];
+  cmd := re.match[4][1]; // it's case sensitive
+  try
+    case cmd of
+      'a', 'h': res:=cd.address;
+      'l': res:='-';
+      'u': res:=first(cd.usr, '-');
+      't': res:='['
+        +xtpl(formatDatetime(APACHE_TIMESTAMP_FORMAT, now()),
+           ['!!!',MONTH2STR[monthOf(now())]])
+        +' '+logfile.apacheZoneString+']';
+      'r': res:= UnUTF(getTill(CRLFA, cd.conn.request.full));
+      's': res:=code;
+      'B': res:=intToStr(cd.conn.bytesSentLastItem);
+      'b': if cd.conn.bytesSentLastItem = 0 then res:='-' else res:=intToStr(cd.conn.bytesSentLastItem);
+      'i': res:=cd.conn.getHeader(par);
+      'm': res:=METHOD2STR[cd.conn.request.method];
+      'c': if (cd.conn.bytesToSend > 0) and (cd.conn.state = HCS_DISCONNECTED) then res:='X'
+            else if cd.disconnectAfterReply then res:='-'
+            else res:='+';
+      'e': res:=getEnvironmentVariable(par);
+      'f': res := cd.lastFile.name;
+      'H': res:='HTTP'; // no way
+      'p': res:=srv.port;
+      'z': extra(); // extra information specific for hfs
+      else
+        res := 'UNSUPPORTED';
+      end;
+   except
+    res:='ERROR'
+  end;
+end; // apacheLogCb
+
+var
+  TZinfo: TTimeZoneInformation;
 
 INITIALIZATION
 //  sysutils.DecimalSeparator:='.'; // standardize

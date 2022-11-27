@@ -3,7 +3,16 @@ unit hfsVars;
 
 interface
 uses
-  Graphics, Classes, Controls, Types, iniFiles, hsLib, srvClassesLib, hfsGlobal;
+ {$IFDEF FMX}
+  FMX.Graphics, System.UITypes,
+  FMX.TreeView,
+ {$ELSE ~FMX}
+  Graphics,
+//  Forms,
+  Controls,
+  ComCtrls,
+ {$ENDIF FMX}
+  Classes, Types, iniFiles, hsLib, srvClassesLib, hfsGlobal;
 
 // global variables
 var
@@ -20,7 +29,7 @@ var
   lastGoodLogWidth, lastGoodConnHeight: integer;
   tray_ico: Ticon;             // the actual icon shown in tray
   usingFreePort: boolean=TRUE; // the actual server port set was 0
-  upTime: Tdatetime;           // the server is up since...
+//  upTime: Tdatetime;           // the server is up since...
   trayed: boolean;             // true if the window has been minimized to tray
   flashOn: string;             // describes when to flash the taskbar
   addFolderDefault: string;    // how to default adding a folder (real/virtual)
@@ -33,7 +42,7 @@ var
   maxContempDLsUser: integer;  // ...from a single user
   maxIPs: integer;             // max number of different addresses connected
   maxIPsDLing: integer;        // max number of different addresses downloading
-  autoFingerprint: integer;    // create fingerprint on file addition
+//  autoFingerprint: integer;    // create fingerprint on file addition
   renamePartialUploads: string;
   allowedReferer: string;      // check over the Refer header field
   altPressedForMenu: boolean;  // used to enable the menu on ALT key
@@ -44,15 +53,14 @@ var
   lastActivityTime: Tdatetime;  // used for the "no download timeout"
   recentFiles: TStringDynArray; // recently loaded files
   addingItemsCounter: integer = -1; // -1 is disabled
-  stopAddingItems, queryingClose: boolean;
-  port: string;
+//  stopAddingItems,
+  queryingClose: boolean;
 //  tpl_help: string;
   lastWindowRect: Trect;
   tplEditor: string;
   tplLast: Tdatetime;
   tplImport: boolean;
   eventScriptsLast, runScriptLast: Tdatetime;
-  usersInVFS: TusersInVFS;    // keeps track of user/pwd in the VFS
   graphInEasyMode: boolean;
   cfgPath, tmpPath: string;
   logMaxLines: integer;     // number of lines
@@ -78,7 +86,6 @@ var
   startupFilename: string;
   trustedFiles, filesToAddQ: TstringDynArray;
   setThreadExecutionState: function(d:dword):dword; stdcall; // as variable, because not available on Win95
-  listenOn: string;  // interfaces HFS should listen on
   backuppedCfg: string;
   updateASAP: string;
   refusedUpdate: string;
@@ -94,23 +101,11 @@ var
     apacheFormat: string;
     apacheZoneString: string;
     end;
-  loadingVFS: record
-    resetLetBrowse, unkFK, disableAutosave, visOnlyAnon, bakAvailable, useBackup, macrosFound: boolean;
-    build: string;
-    end;
   userIcsBuffer, userSocketBuffer: integer;
   searchLogTime, searchLogWhiteTime, timeTookToSearchLog: TdateTime;
   sbarTextTimeout: Tdatetime;
   sbarIdxs: record  // indexes within the statusbar
     totalIn, totalOut, banStatus, customTpl, oos, out, notSaved: integer;
-    end;
-  graph: record
-  	rate: integer;    // update speed
-    lastOut, lastIn: int64; // save bytesSent and bytesReceived last values
-    maxV: integer;    // max value in scale
-    size: integer;    // height of the box
-    samplesIn, samplesOut: array [0..3000] of integer; // 1 sample, 1 pixel
-    beforeRecalcMax: integer;  // countdown
     end;
   cachedIPs: String; // To optimize
 

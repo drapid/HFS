@@ -11,13 +11,11 @@ object optionsFrm: ToptionsFrm
   Font.Height = -11
   Font.Name = 'MS Sans Serif'
   Font.Style = []
-  OldCreateOrder = False
   Position = poMainFormCenter
   OnActivate = FormActivate
   OnCreate = FormCreate
   OnResize = FormResize
   OnShow = FormShow
-  PixelsPerInch = 96
   TextHeight = 13
   object pageCtrl: TPageControl
     Left = 0
@@ -215,6 +213,7 @@ object optionsFrm: ToptionsFrm
           EditLabel.Caption = '&Password'
           PasswordChar = '*'
           TabOrder = 3
+          Text = ''
           OnEnter = pwdBoxEnter
           OnExit = pwdBoxExit
         end
@@ -227,6 +226,7 @@ object optionsFrm: ToptionsFrm
           EditLabel.Height = 13
           EditLabel.Caption = 'After login, redirect to'
           TabOrder = 4
+          Text = ''
           OnChange = redirBoxChange
         end
         object accountLinkBox: TLabeledEdit
@@ -238,6 +238,7 @@ object optionsFrm: ToptionsFrm
           EditLabel.Height = 13
           EditLabel.Caption = 'Member of'
           TabOrder = 5
+          Text = ''
           OnExit = accountLinkBoxExit
         end
         object groupChk: TCheckBox

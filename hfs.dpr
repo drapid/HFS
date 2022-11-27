@@ -53,14 +53,18 @@ uses
   runscriptDlg in 'runscriptDlg.pas' {runScriptFrm},
   scriptLib in 'scriptLib.pas',
   hfsJclOthers in 'hfsJclOthers.pas',
-  FileLib in 'FileLib.pas',
+  fileLib in 'srv\fileLib.pas',
   hfsGlobal in 'hfsGlobal.pas',
   hfsVars in 'hfsVars.pas',
   langLib in 'langLib.pas',
   progFrmLib in 'progFrmLib.pas',
   srvUtils in 'srv\srvUtils.pas',
-  serverLib in 'serverLib.pas',
-  IconsLib in 'srv\IconsLib.pas' {IconsDM: TDataModule};
+  serverLib in 'srv\serverLib.pas',
+  IconsLib in 'srv\IconsLib.pas' {IconsDM: TDataModule},
+  srvClassesLib in 'srv\srvClassesLib.pas',
+  srvConst in 'srv\srvConst.pas',
+  srvVars in 'srv\srvVars.pas',
+  netUtils in 'netUtils.pas';
 
 {$R *.res}
 

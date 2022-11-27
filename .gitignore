@@ -18,6 +18,7 @@ hfs.tpl
 hfs_project.tvsconfig
 data.res
 macros-log.html
+RnQBuiltTime.inc
 #################
 ## Delphi
 #################

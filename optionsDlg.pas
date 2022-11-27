@@ -24,7 +24,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Math,
   Dialogs, ExtCtrls, StdCtrls, Grids, ComCtrls, ValEdit, types, CheckLst,
-  hfsGlobal, IconsLib;
+  hfsGlobal, IconsLib, Vcl.Mask;
 
 type
   ToptionsFrm = class(TForm)
@@ -154,6 +154,8 @@ type
     procedure selectAccount(i:integer; saveBefore:boolean=TRUE);
   end;
 
+  procedure showOptions(page: TTabSheet; isModalOptions: Boolean);
+
 var
   optionsFrm: ToptionsFrm;
 
@@ -163,6 +165,7 @@ implementation
 
 uses
   utilLib, HSlib, strUtils, classesLib, listSelectDlg, fileLib, main,
+  netUtils,
   srvConst, srvUtils, srvVars;
 
 var
@@ -170,6 +173,21 @@ var
   tempAccounts: Taccounts; // the GUI part can't store the temp data
   tempIcons: array of integer;
   renamingAccount: boolean;
+
+procedure showOptions(page: TTabSheet; isModalOptions: Boolean);
+var
+  was: boolean;
+begin
+  optionsFrm.pageCtrl.ActivePage := page;
+  was := page.TabVisible;
+  page.TabVisible := TRUE;
+//  if mainfrm.modalOptionsChk.checked and not optionsFrm.visible then
+  if isModalOptions and not optionsFrm.visible then
+    optionsFrm.showModal()
+   else
+    optionsFrm.show();
+  page.TabVisible := was;
+end;
 
 procedure ToptionsFrm.selectAccount(i:integer; saveBefore:boolean=TRUE);
 begin
@@ -474,10 +492,15 @@ var
   s: string;
   a, other: Paccount;
 begin
-accountAccessBox.items.clear();
-if lastAccountSelected < 0 then exit;
-a:=@tempAccounts[lastAccountSelected];
-n:=rootNode;
+  accountAccessBox.items.clear();
+  if lastAccountSelected < 0 then
+    exit;
+  a := @tempAccounts[lastAccountSelected];
+  f := mainFrm.fileSrv.rootFile;
+  if assigned(f) then
+    n := f.node
+   else
+    n := NIL;
 while n <> NIL do
   begin
   f:=Tfile(n.data);
@@ -511,7 +534,7 @@ end; // updateAccessBox
 procedure ToptionsFrm.checkRedir();
 begin // mod by mars
 redirBox.color:=blend(clWindow, clRed,
-  ifThen((redirBox.text >'') and not fileExistsByURL(redirBox.text), 0.5, 0) );
+  ifThen((redirBox.text >'') and not mainFrm.fileExistsByURL(redirBox.text), 0.5, 0) );
 end; // checkRedir
 
 procedure ToptionsFrm.loadAccountProperties();

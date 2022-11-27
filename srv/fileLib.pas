@@ -5,7 +5,16 @@ interface
 
 uses
   // delphi libs
-  Windows, Messages, Graphics, Forms, ComCtrls, math, Types, SysUtils, JSON,
+  Windows, Messages,
+ {$IFDEF FMX}
+  FMX.Graphics, System.UITypes,
+  FMX.TreeView,
+ {$ELSE ~FMX}
+  Graphics,
+  Forms,
+  ComCtrls,
+ {$ENDIF FMX}
+  math, Types, SysUtils, JSON,
   HSLib, srvClassesLib;
 
 type
@@ -15,7 +24,7 @@ type
     FA_VIRTUAL,      // does not exist on disc
     FA_ROOT,         // only the root item has this attribute
     FA_BROWSABLE,    // permit listing of this folder (not recursive, only dir)
-    FA_HIDDEN,       // hidden iterms won't be shown to browsers (not recursive)
+    FA_HIDDEN,       // hidden items won't be shown to browsers (not recursive)
     { no more used attributes have to stay for backward compatibility with
     { VFS files }
     FA_NO_MORE_USED1,
@@ -35,19 +44,27 @@ type
   );
   TfileAttributes = set of TfileAttribute;
 
+ {$IFDEF FMX}
+  TFileTree = TTreeView;
+  TFileNode = TTreeViewItem;
+ {$ELSE ~FMX}
+  TFileTree = TTreeView;
+  TFileNode = TTreeNode;
+ {$ENDIF FMX}
+
   Tfile = class;
 //  TconnData = class;
 
   TfileCallbackReturn = set of (FCB_NO_DEEPER, FCB_DELETE, FCB_RECALL_AFTER_CHILDREN); // use FCB_* flags
 
   // returning FALSE stops recursion
-  TfileCallback = function(f:Tfile; childrenDone:boolean; par, par2: IntPtr): TfileCallbackReturn;
+  TfileCallback = function(f: Tfile; childrenDone: boolean; par, par2: IntPtr): TfileCallbackReturn;
 
   TfileAction = (FA_ACCESS, FA_DELETE, FA_UPLOAD);
 
   TLoadPrefs = set of (lpION, lpHideProt, lpSysAttr, lpHdnAttr, lpSnglCmnt, lpFingerPrints, lpRecurListing, lpOEMForION);
 
-  TFindFileNode = function(f: TFile): TTreeNode;
+  TFindFileNode = function(f: TFile): TFileNode;
 
   TIconsIdxArray = array of integer;
 
@@ -55,12 +72,12 @@ type
   Tfile = class (Tobject)
   private
 //    fFilesTree: TFilesTree;
-    fMainTreeView: TTreeView;
+    fMainTreeView: TFileTree;
     fLocked: boolean;
     FDLcount: integer;
     tempParent: TFile;
 //    fGetFileNode: TFindFileNode;
-//    fNode: Ttreenode;
+//    fNode: TFileNode;
     function  getParent():Tfile;
     function  getDLcount():integer;
     procedure setDLcount(i:integer);
@@ -76,10 +93,10 @@ type
     accounts: array [TfileAction] of TStringDynArray;
     filesFilter, foldersFilter, realm, diffTpl,
     defaultFileMask, dontCountAsDownloadMask, uploadFilterMask: string;
-    constructor create(pTree: TTreeView; fullpath: String);
-    constructor createTemp(pTree: TTreeView; const fullpath: String; pParentFile: TFile = NIL);
-    constructor createVirtualFolder(pTree: TTreeView; const name:string);
-    constructor createLink(pTree: TTreeView; const name: String);
+    constructor create(pTree: TFileTree; const fullpath: String);
+    constructor createTemp(pTree: TFileTree; const fullpath: String; pParentFile: TFile = NIL);
+    constructor createVirtualFolder(pTree: TFileTree; const name:string);
+    constructor createLink(pTree: TFileTree; const name: String);
     function  toggle(att:TfileAttribute):boolean;
     function  isFolder():boolean; inline;
     function  isFile():boolean; inline;
@@ -91,65 +108,69 @@ type
     function  isLink():boolean; inline;
     function  isTemp():boolean; inline;
     function  isNew():boolean;
-    function  isDLforbidden():boolean;
-    function  relativeURL(fullEncode:boolean=FALSE):string;
+    function  isDLforbidden(): Boolean;
+    function  relativeURL(fullEncode: Boolean=FALSE): String;
     procedure setupImage(sysIcons: Boolean; newIcon: integer); overload;
-    procedure setupImage(sysIcons: Boolean; pNode: TTreeNode = NIL); overload;
+    procedure setupImage(sysIcons: Boolean; pNode: TFileNode = NIL); overload;
     function  getSystemIcon(): integer;
-    function  getAccountsFor(action:TfileAction; specialUsernames:boolean=FALSE; outInherited:Pboolean=NIL):TstringDynArray;
-    function  accessFor(username, password:string):boolean; overload;
-    function  accessFor(cd:TconnDataMain):boolean; overload;
-    function  hasRecursive(attributes: TfileAttributes; orInsteadOfAnd:boolean=FALSE; outInherited:Pboolean=NIL):boolean; overload;
-    function  hasRecursive(attribute: TfileAttribute; outInherited:Pboolean=NIL):boolean; overload;
-    function  getIconForTreeview(sysIcons: Boolean):integer;
-    function  getFolder():string;
-    function  getRecursiveFileMask():string;
-    function  shouldCountAsDownload():boolean;
-    function  getDefaultFile():Tfile;
+    function  gotSystemIcon(): boolean;
+    function  getAccountsFor(action: TfileAction; specialUsernames: Boolean=FALSE; outInherited: Pboolean=NIL): TstringDynArray;
+    function  accessFor(const username, password: String): Boolean; overload;
+    function  accessFor(cd: TconnDataMain): Boolean; overload;
+    function  hasRecursive(attributes: TfileAttributes; orInsteadOfAnd: Boolean=FALSE; outInherited: Pboolean=NIL): Boolean; overload;
+    function  hasRecursive(attribute: TfileAttribute; outInherited: Pboolean=NIL): Boolean; overload;
+    function  getIconForTreeview(sysIcons: Boolean): Integer;
+    function  getFolder(): String;
+    function  getRecursiveFileMask(): String;
+    function  shouldCountAsDownload(): Boolean;
+    function  getDefaultFile(): Tfile;
     procedure recursiveApply(callback: TfileCallback; par: IntPtr=0; par2: IntPtr=0);
-    procedure getFiltersRecursively(var files,folders:string);
-    function  diskfree():int64;
-    function  same(f:Tfile):boolean;
+    procedure getFiltersRecursively(var files, folders: String);
+    function  diskfree(): int64;
+    function  same(f:Tfile): boolean;
     procedure setName(const name: String);
-    procedure setResource(res: string);
-    function  getDynamicComment(loadPrefs: TLoadPrefs; skipParent:boolean=FALSE):string;
-    procedure setDynamicComment(loadPrefs: TLoadPrefs; cmt:string);
-    function  getRecursiveDiffTplAsStr(outInherited:Pboolean=NIL; outFromDisk:Pboolean=NIL):string;
+    procedure setResource(res: String);
+    function  getDynamicComment(loadPrefs: TLoadPrefs; skipParent: Boolean=FALSE): String;
+    procedure setDynamicComment(loadPrefs: TLoadPrefs; cmt: String);
+    function  getRecursiveDiffTplAsStr(outInherited: Pboolean=NIL; outFromDisk: Pboolean=NIL): String;
     function  getVFS(): RawByteString;
-    function  getVFSJ(): RawByteString;
-    function  getVFSJV(): TJSONObject;
     function  getVFSZ(): RawByteString;
     function  getVFSJZ(var p_icons: TIconsIdxArray): TJSONObject;
      // locking prevents modification of all its ancestors and descendants
     procedure lock();
     procedure unlock();
-    procedure SyncNode(pNode: Ttreenode);
-    function  findNode: TTreeNode;
-    function  getNode: TTreeNode;
+    procedure SyncNode(pNode: TFileNode);
+    function  findNode: TFileNode;
+    function  getNode: TFileNode;
+    procedure DeleteChildren;
     function  isLocked():boolean;
     function  getFirstChild: TFile;
     function  getNextSibling: TFile;
     function  getMainFile: TFile;
-    property  parent:Tfile read getParent;
-    property  DLcount:integer read getDLcount write setDLcount;
-    property  node: Ttreenode read getNode;
+    function  setBrowsable(childrenDone: Boolean; par, par2: IntPtr): TfileCallbackReturn;
+    property  parent: Tfile read getParent;
+    property  DLcount: Integer read getDLcount write setDLcount;
+    property  node: TFileNode read getNode;
     property  locked: Boolean read fLocked;
 //    property  mainTree: TFilesTree read fFilesTree;
-    property  mainTree: TTreeView read fMainTreeView;
+    property  mainTree: TFileTree read fMainTreeView;
 //    property  onGetFileNode: TFindFileNode read fGetFileNode write fGetFileNode;
    end; // Tfile
 
-function nodeToFile(n:TtreeNode):Tfile;
-function isCommentFile(const lp: TLoadPrefs; const fn: string): boolean;
-function isFingerprintFile(const lp: TLoadPrefs; const fn: string): boolean;
-function hasRightAttributes(const lp: TLoadPrefs; const fn: string): boolean; overload;
-function hasRightAttributes(const lp: TLoadPrefs; attr:integer): boolean; overload;
-function findNameInDescriptionFile(const txt, name:string):integer;
-function freeIfTemp(var f:Tfile):boolean; inline;
-function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
-function str_(fa:TfileAttributes): RawByteString; overload;
+function nodeToFile(n: TFileNode): Tfile;
+function nodeIsLocked(n: TFileNode): Boolean;
+function isCommentFile(const lp: TLoadPrefs; const fn: string): Boolean;
+function isFingerprintFile(const lp: TLoadPrefs; const fn: string): Boolean;
+function hasRightAttributes(const lp: TLoadPrefs; const fn: string): Boolean; overload;
+function hasRightAttributes(const lp: TLoadPrefs; attr: Integer): Boolean; overload;
+function findNameInDescriptionFile(const txt, name: String): Integer;
+function freeIfTemp(var f: Tfile): Boolean; inline;
+function accountAllowed(action: TfileAction; cd: TconnDataMain; f: Tfile): Boolean;
+function str_(fa: TfileAttributes): RawByteString; overload;
 
 function loadMD5for(const fn: String): String;
+function loadFingerprint(const fn: String): String;
+function setBrowsable(f: Tfile; childrenDone: Boolean; par, par2: IntPtr): TfileCallbackReturn;
 
 const
   FILEACTION2STR: array [TfileAction] of string = ('Access', 'Delete', 'Upload');
@@ -209,7 +230,9 @@ implementation
 uses
   strutils, iniFiles, Classes,
   RegExpr,
-  RDUtils, RDFileUtil, RDSysUtils, RnQZip,
+  RDUtils, RDFileUtil,
+  RDSysUtils,
+  RnQZip, RnQCrypt,
   serverLib,
   srvConst, srvUtils, srvVars, IconsLib,
   parserLib
@@ -229,7 +252,7 @@ begin
     Result := UnUTF(sa);
 end; // loadDescriptionFile
 
-function escapeIon(const s:string):string;
+function escapeIon(const s: String): String;
 begin
 // this escaping method (and also the 2-bytes marker) was reverse-engineered from Total Commander
 result:=escapeNL(s);
@@ -237,7 +260,7 @@ if result <> s then
   result:=result+#4#$C2;
 end; // escapeIon
 
-function unescapeIon(s:string):string;
+function unescapeIon(s: String): String;
 begin
 if ansiEndsStr(#4#$C2, s) then
   begin
@@ -247,7 +270,7 @@ if ansiEndsStr(#4#$C2, s) then
 result:=s;
 end; // unescapeIon
 
-procedure loadIon(const lp: TLoadPrefs; const path:string; comments:TstringList);
+procedure loadIon(const lp: TLoadPrefs; const path: String; comments: TStringList);
 var
   s, l, fn: string;
 begin
@@ -262,28 +285,28 @@ while s > '' do
   end;
 end; // loadIon
 
-function isCommentFile(const lp: TLoadPrefs; const fn:string):boolean;
+function isCommentFile(const lp: TLoadPrefs; const fn: String): Boolean;
 begin
 result:=(fn=COMMENTS_FILE)
   or (lpSnglCmnt in lp) and isExtension(fn, COMMENT_FILE_EXT)
   or (lpION in lp) and sameText('descript.ion',fn)
 end; // isCommentFile
 
-function isFingerprintFile(const lp: TLoadPrefs; const fn:string):boolean;
+function isFingerprintFile(const lp: TLoadPrefs; const fn: String): Boolean;
 begin
   result := (lpFingerPrints in lp)and isExtension(fn, '.md5')
 end; // isFingerprintFile
 
-function hasRightAttributes(const lp: TLoadPrefs; attr:integer):boolean; overload;
+function hasRightAttributes(const lp: TLoadPrefs; attr: Integer): Boolean; overload;
 begin
 result:=((lpHdnAttr in lp)or (attr and faHidden = 0))
   and ((lpSysAttr in lp) or (attr and faSysFile = 0));
 end; // hasRightAttributes
 
-function hasRightAttributes(const lp: TLoadPrefs; const fn: string):boolean; overload;
+function hasRightAttributes(const lp: TLoadPrefs; const fn: String): Boolean; overload;
 begin result:=hasRightAttributes(lp, GetFileAttributes(pChar(fn))) end;
 
-function getFiles(const mask:string):TStringDynArray;
+function getFiles(const mask: String): TStringDynArray;
 var
   sr: TSearchRec;
 begin
@@ -303,134 +326,143 @@ try
 except result:=FALSE end;
 end; // freeIfTemp
 
-function accountAllowed(action:TfileAction; cd:TconnDataMain; f:Tfile):boolean;
+function accountAllowed(action: TfileAction; cd: TconnDataMain; f: Tfile): Boolean;
 var
   a: TStringDynArray;
 begin
-result:=FALSE;
-if f = NIL then exit;
-if action = FA_ACCESS then
-  begin
-  result:= f.accessFor(cd);
-  exit;
-  end;
-if f.isTemp() then
-  f:=f.parent;
-if (action = FA_UPLOAD) and not f.isRealFolder() then exit;
+  result := FALSE;
+  if f = NIL then
+    exit;
+  if action = FA_ACCESS then
+    begin
+      result := f.accessFor(cd);
+      exit;
+    end;
+  if f.isTemp() then
+    f := f.parent;
+  if (action = FA_UPLOAD) and not f.isRealFolder() then
+    exit;
 
   repeat
-  a:=f.accounts[action];
-  if assigned(a)
-  and not ((action = FA_UPLOAD) and not f.isRealFolder()) then break;
-  f:=f.parent;
-  if f = NIL then exit;
+    a := f.accounts[action];
+    if assigned(a)
+    and not ((action = FA_UPLOAD) and not f.isRealFolder()) then
+      break;
+    f := f.parent;
+    if f = NIL then
+      exit;
   until false;
 
-result:=TRUE;
-if stringExists(USER_ANYONE, a, TRUE) then exit;
-result:=(cd.usr = '') and stringExists(USER_ANONYMOUS, a, TRUE)
-  or assigned(cd.account) and stringExists(USER_ANY_ACCOUNT, a, TRUE)
-  or (NIL <> findEnabledLinkedAccount(cd.account, a, TRUE));
+  result := TRUE;
+  if stringExists(USER_ANYONE, a, TRUE) then
+    exit;
+  result := (cd.usr = '') and stringExists(USER_ANONYMOUS, a, TRUE)
+    or assigned(cd.account) and stringExists(USER_ANY_ACCOUNT, a, TRUE)
+    or (NIL <> findEnabledLinkedAccount(cd.account, a, TRUE));
 end; // accountAllowed
 
 // converts from TfileAttributes to string[4]
-function str_(fa:TfileAttributes): RawByteString; overload;
-begin result:=str_(integer(fa)) end;
+function str_(fa: TfileAttributes): RawByteString; overload;
+begin
+  result := str_(integer(fa))
+end;
 
 ////////////---------------------------------------------///////////////
-constructor Tfile.create(pTree: TTreeView; fullpath: String);
+constructor Tfile.create(pTree: TFileTree; const fullpath: String);
+var
+  fp: String;
 begin
-  fullpath:=ExcludeTrailingPathDelimiter(fullpath);
-  icon:=-1;
-  size:=-1;
-  atime:=now();
-  mtime:=atime;
-  flags:=[];
+  fp := ExcludeTrailingPathDelimiter(fullpath);
+  icon := -1;
+  size := -1;
+  atime := now();
+  mtime := atime;
+  flags := [];
   fMainTreeView := pTree;
-  setResource(fullpath);
+  setResource(fp);
   if (resource > '') and sysutils.directoryExists(resource) then
-    flags:=flags+[FA_FOLDER, FA_BROWSABLE];
+    flags := flags+[FA_FOLDER, FA_BROWSABLE];
 end; // create
 
-constructor Tfile.createTemp(pTree: TTreeView; const fullpath: String; pParentFile: TFile = NIL);
+constructor Tfile.createTemp(pTree: TFileTree; const fullpath: String; pParentFile: TFile = NIL);
 begin
-create(pTree, fullpath);
-include(flags, FA_TEMP);
+  create(pTree, fullpath);
+  include(flags, FA_TEMP);
   if Assigned(pParentFile) then
     tempParent := pParentFile.getMainFile
    else
     tempParent := NIL;
 end; // createTemp
 
-constructor Tfile.createVirtualFolder(pTree: TTreeView; const name: string);
+constructor Tfile.createVirtualFolder(pTree: TFileTree; const name: string);
 begin
   fMainTreeView := pTree;
-icon:=-1;
-setResource('');
-flags:=[FA_FOLDER, FA_VIRTUAL, FA_BROWSABLE];
-self.name:=name;
-atime:=now();
-mtime:=atime;
+  icon := -1;
+  setResource('');
+  flags := [FA_FOLDER, FA_VIRTUAL, FA_BROWSABLE];
+  self.name := name;
+  atime := now();
+  mtime := atime;
 end; // createVirtualFolder
 
-constructor Tfile.createLink(pTree: TTreeView; const name: String);
+constructor Tfile.createLink(pTree: TFileTree; const name: String);
 begin
   fMainTreeView := pTree;
-icon:=-1;
-setName(name);
-atime:=now();
-mtime:=atime;
-flags:=[FA_LINK, FA_VIRTUAL];
+  icon := -1;
+  setName(name);
+  atime := now();
+  mtime := atime;
+  flags := [FA_LINK, FA_VIRTUAL];
 end; // createLink
 
-procedure Tfile.setResource(res:string);
+procedure Tfile.setResource(res: String);
 
-  function sameDrive(const f1,f2: string): boolean;
+  function sameDrive(const f1, f2: string): boolean;
   begin
-  result:=(length(f1) >= 2) and (length(f2) >= 2) and (f1[2] = ':')
-    and (f2[2] = ':') and (upcase(f1[1]) = upcase(f2[1]));
+    result := (length(f1) >= 2) and (length(f2) >= 2) and (f1[2] = ':')
+      and (f2[2] = ':') and (upcase(f1[1]) = upcase(f2[1]));
   end; // sameDrive
 
 var
-  s: string;
+  s: String;
 begin
-if isExtension(res, '.lnk') or fileExists(res+'\target.lnk') then
-  begin
-  s:=extractFileName(res);
-  if isExtension(s, '.lnk') then
-    setLength(s, length(s)-4);
-  setName(s);
-  lnk:=res;
-  res:=resolveLnk(res);
-  include(flags, FA_SOLVED_LNK);
-  end
-else
-  exclude(flags, FA_SOLVED_LNK);
-res:=ExcludeTrailingPathDelimiter(res);
+  if isExtension(res, '.lnk') or fileExists(res+'\target.lnk') then
+    begin
+      s := extractFileName(res);
+      if isExtension(s, '.lnk') then
+        setLength(s, length(s)-4);
+      setName(s);
+      lnk := res;
+      res := resolveLnk(res);
+      include(flags, FA_SOLVED_LNK);
+    end
+  else
+    exclude(flags, FA_SOLVED_LNK);
+  res := ExcludeTrailingPathDelimiter(res);
 
-// in this case, drive letter may change. useful with pendrives.
-if runningOnRemovable and sameDrive(exePath, res) then
-  delete(res, 1,2);
+  // in this case, drive letter may change. useful with pendrives.
+  if runningOnRemovable and sameDrive(exePath, res) then
+    delete(res, 1,2);
 
-resource:=res;
-if (length(res) = 2) and (res[2] = ':') then // logical unit
-  begin
-  include(flags, FA_UNIT);
-  if not isRoot() and not (FA_SOLVED_LNK in flags) then
-    setName(res);
-  end
-else
-  begin
-  exclude(flags, FA_UNIT);
-  if not isRoot() and not (FA_SOLVED_LNK in flags) then
-    setName(extractFileName(res));
-  end;
-size:=-1;
+  resource := res;
+  if (length(res) = 2) and (res[2] = ':') then // logical unit
+    begin
+      include(flags, FA_UNIT);
+      if not isRoot() and not (FA_SOLVED_LNK in flags) then
+        setName(res);
+    end
+  else
+    begin
+      exclude(flags, FA_UNIT);
+      if not isRoot() and not (FA_SOLVED_LNK in flags) then
+        setName(extractFileName(res));
+    end;
+  size := -1;
 end; // setResource
 
 procedure Tfile.setName(const name: String);
 var
-  n: TTreeNode;
+  n: TFileNode;
 begin
   if self.name <> name then
    begin
@@ -483,11 +515,15 @@ begin
 
   result:='';
   if self.isRoot() then
-    result:=result+TLV(FK_ROOT, commonFields );
+    result := result+TLV(FK_ROOT, commonFields );
   for i:=0 to node.Count-1 do
     begin
     var
+  {$IFDEF FMX}
+      ff: TFile := nodetofile(node.items[i]);
+  {$ELSE ~FMX}
       ff: TFile := nodetofile(node.item[i]);
+  {$ENDIF FMX}
       if Assigned(ff) then
          result := result+ ff.getVFS(); // recursion
     end;
@@ -516,101 +552,6 @@ begin
           );
 end;
 
-function TFile.getVFSJ(): RawByteString;
-begin
-  Result := StrToUTF8(getVFSJV.ToString);
-end;
-
-function TFile.getVFSJV(): TJSONObject;
-
-  function getAutoupdatedFilesJ(): RawByteString;
-  var
-    i: integer;
-    fn: string;
-  begin
-  result := '';
-  i := 0;
-  while i < autoupdatedFiles.Count do
-    begin
-      fn := autoupdatedFiles[i];
-      result := result+TLV(FK_NODE, TLV(FK_NAME, StrToUTF8(fn))
-        + TLV(FK_DLCOUNT, str_(autoupdatedFiles.getInt(fn))) );
-      inc(i);
-    end;
-  end; // getAutoupdatedFiles
-
-  procedure addval(var o: TJSONObject; key: Integer; val: RawByteString); OverLoad;
-  begin
-    if val > '' then
-      begin
-        o.AddPair(IntToStr(key), str2hexU(val));
-      end;
-  end;
-  procedure addval(var o: TJSONObject; key: Integer; val: String); OverLoad;
-  begin
-    if val > '' then
-      begin
-        o.AddPair(IntToStr(key), val);
-      end;
-  end;
-var
-  i: integer;
-  commonFields: TJSONObject;
-  subFiles: TJSONArray;
-begin
-//  nn := node;
-  commonFields := TJSONObject.Create;
-  addval(commonFields, FK_FLAGS, str_(self.flags));
-  addval(commonFields, FK_RESOURCE, self.resource);
-  addval(commonFields, FK_COMMENT, self.comment);
-  if self.user>'' then
-    begin
-      addval(commonFields, FK_USERPWD_UTF8, b64utf8(self.user+':'+self.pwd));
-    end;
-  addval(commonFields, FK_ACCOUNTS, join(';', self.accounts[FA_ACCESS]));
-  addval(commonFields, FK_UPLOADACCOUNTS, join(';', self.accounts[FA_UPLOAD]));
-  addval(commonFields, FK_DELETEACCOUNTS, join(';', self.accounts[FA_DELETE]));
-  addval(commonFields, FK_FILESFILTER, self.filesfilter);
-  addval(commonFields, FK_FOLDERSFILTER, self.foldersfilter);
-  addval(commonFields, FK_REALM, self.realm);
-  addval(commonFields, FK_DEFAULTMASK, self.defaultFileMask);
-  addval(commonFields, FK_UPLOADFILTER, self.uploadFilterMask);
-  addval(commonFields, FK_DONTCOUNTASDOWNLOADMASK, self.dontCountAsDownloadMask);
-  addval(commonFields, FK_DIFF_TPL, self.diffTpl);
-
-  Result := TJSONObject.Create;
-  if self.isRoot() then
-    Result.AddPair(IntToStr(FK_ROOT), commonFields);
-
-  subFiles := TJSONArray.Create;
-  if node.Count > 0 then
-    begin
-      for i:=0 to node.Count-1 do
-        begin
-        var
-          ff: TFile := nodetofile(node.item[i]);
-          if Assigned(ff) then
-             subFiles.Add(ff.getVFSJV()); // recursion
-        end;
-    end;
-  if self.isRoot() then
-    begin
-      Result.AddPair('nodes', subFiles);
-      addval(Result, FK_AUTOUPDATED_FILES, getAutoupdatedFilesJ() );
-      exit;
-    end;
-
-//  addVal(Result, FK_NODE, commonFields);
-  Result.AddPair(IntToStr(FK_NODE), commonFields);
-  addVal(Result, FK_NAME, self.name);
-  addVal(Result, FK_ADDEDTIME, str_(self.atime));
-  addVal(Result, FK_ICON_PNG, pic2str(self.icon, 16));
-  addVal(Result, FK_ICON32_PNG, pic2str(self.icon, 32));
-  if self.isFile() then
-    addVal(Result, FK_DLCOUNT, str_(self.DLcount));
-  Result.AddPair('nodes', subFiles);
-end;
-
 function TFile.getVFSZ(): RawByteString;
 var
   ResJ: TJSONObject;
@@ -637,7 +578,8 @@ begin
   stream := TBytesStream.create();
   ResZ.SaveToStream(stream);
   setLength(result, stream.size);
-  move(stream.bytes[0], result[1], stream.size);
+  if stream.Size > 0 then
+    move(stream.bytes[0], result[1], stream.size);
   stream.free;
   ResZ.Free;
   ResJ.Free;
@@ -645,30 +587,66 @@ end;
 
 function TFile.getVFSJZ(var p_icons: TIconsIdxArray): TJSONObject;
 
-  function getAutoupdatedFiles(): RawByteString;
+  function getAutoupdatedFilesJSON(): TJSONArray;
   var
-    i: integer;
-    fn: string;
+    i: Integer;
+    fn: String;
+    fj: TJSONObject;
   begin
-  result:='';
-  i:=0;
-  while i < autoupdatedFiles.Count do
-    begin
-    fn:=autoupdatedFiles[i];
-    result:=result+TLV(FK_NODE, TLV(FK_NAME, StrToUTF8(fn))
-      + TLV(FK_DLCOUNT, str_(autoupdatedFiles.getInt(fn))) );
-    inc(i);
-    end;
+    result := NIL;
+    if autoupdatedFiles.Count = 0 then
+      Exit;
+    i := 0;
+    Result := TJSONArray.Create;// TJSONObject.Create;
+    while i < autoupdatedFiles.Count do
+      begin
+        fn := autoupdatedFiles[i];
+        fj := TJSONObject.Create;
+        fj.AddPair(IntToStr(FK_NAME), fn);
+        fj.AddPair(IntToStr(FK_DLCOUNT), autoupdatedFiles.getInt(fn));
+        Result.AddElement(fj);
+        inc(i);
+      end;
   end; // getAutoupdatedFiles
-
-  procedure addval(var o: TJSONObject; key: Integer; val: RawByteString); OverLoad;
+  //
+  procedure addval(var o: TJSONObject; const key: Integer; const val: TJSONValue); OverLoad;
+  begin
+    if val <> NIL then
+      begin
+        o.AddPair(IntToStr(key), val);
+      end;
+  end;
+  //
+  procedure addval(var o: TJSONObject; const key: Integer; const val: TStringDynArray); OverLoad;
+  var
+    va: TJSONArray;
+  begin
+    if (val <> NIL) and (Length(val) > 0) then
+      begin
+        va := TJSONArray.Create;
+        for var i := 0 to Length(val)-1 do
+          va.Add(val[i]);
+        o.AddPair(IntToStr(key), va);
+      end;
+  end;
+  //
+  procedure addval(var o: TJSONObject; const key: Integer; const val: Integer); OverLoad;
+  begin
+    if val >= 0 then
+      begin
+        o.AddPair(IntToStr(key), val);
+      end;
+  end;
+  //
+  procedure addval(var o: TJSONObject; const key: Integer; const val: RawByteString); OverLoad;
   begin
     if val > '' then
       begin
         o.AddPair(IntToStr(key), str2hexU(val));
       end;
   end;
-  procedure addval(var o: TJSONObject; key: Integer; val: String); OverLoad;
+  //
+  procedure addval(var o: TJSONObject; const key: Integer; const val: String); OverLoad;
   begin
     if val > '' then
       begin
@@ -685,66 +663,83 @@ function TFile.getVFSJZ(var p_icons: TIconsIdxArray): TJSONObject;
     SetLength(p_icons, Length(p_icons) + 1);
     p_icons[Length(p_icons)-1] := ic;
   end;
+  //
+  function getCommonFields(): TJSONObject;
+  begin
+    Result := TJSONObject.Create;
+    addval(Result, FK_FLAGS, integer(self.flags));
+    addval(Result, FK_RESOURCE, self.resource);
+    addval(Result, FK_COMMENT, self.comment);
+    if self.user>'' then
+      begin
+        addval(Result, FK_USERPWD, b64utf8W(self.user+':'+self.pwd));
+      end;
+    addval(Result, FK_ACCOUNTS, self.accounts[FA_ACCESS]);
+    addval(Result, FK_UPLOADACCOUNTS, self.accounts[FA_UPLOAD]);
+    addval(Result, FK_DELETEACCOUNTS, self.accounts[FA_DELETE]);
+    addval(Result, FK_FILESFILTER, self.filesfilter);
+    addval(Result, FK_FOLDERSFILTER, self.foldersfilter);
+    addval(Result, FK_REALM, self.realm);
+    addval(Result, FK_DEFAULTMASK, self.defaultFileMask);
+    addval(Result, FK_UPLOADFILTER, self.uploadFilterMask);
+    addval(Result, FK_DONTCOUNTASDOWNLOADMASK, self.dontCountAsDownloadMask);
+    addval(Result, FK_DIFF_TPL, self.diffTpl);
+  end;
 var
   i: integer;
   commonFields: TJSONObject;
   subFiles: TJSONArray;
 begin
 //  nn := node;
-  commonFields := TJSONObject.Create;
-  addval(commonFields, FK_FLAGS, str_(self.flags));
-  addval(commonFields, FK_RESOURCE, self.resource);
-  addval(commonFields, FK_RESOURCE, self.resource);
-  addval(commonFields, FK_COMMENT, self.comment);
-  if self.user>'' then
-    begin
-      addval(commonFields, FK_USERPWD_UTF8, b64utf8(self.user+':'+self.pwd));
-    end;
-  addval(commonFields, FK_ACCOUNTS, join(';', self.accounts[FA_ACCESS]));
-  addval(commonFields, FK_UPLOADACCOUNTS, join(';', self.accounts[FA_UPLOAD]));
-  addval(commonFields, FK_DELETEACCOUNTS, join(';', self.accounts[FA_DELETE]));
-  addval(commonFields, FK_FILESFILTER, self.filesfilter);
-  addval(commonFields, FK_FOLDERSFILTER, self.foldersfilter);
-  addval(commonFields, FK_REALM, self.realm);
-  addval(commonFields, FK_DEFAULTMASK, self.defaultFileMask);
-  addval(commonFields, FK_UPLOADFILTER, self.uploadFilterMask);
-  addval(commonFields, FK_DONTCOUNTASDOWNLOADMASK, self.dontCountAsDownloadMask);
-  addval(commonFields, FK_DIFF_TPL, self.diffTpl);
+//  commonFields := TJSONObject.Create;
 
-  Result := TJSONObject.Create;
-  if self.isRoot() then
-    Result.AddPair(IntToStr(FK_ROOT), commonFields);
+  commonFields := getCommonFields;
 
-  subFiles := TJSONArray.Create;
+  subFiles := NIL;
   if node.Count > 0 then
     begin
+      subFiles := TJSONArray.Create;
       for i:=0 to node.Count-1 do
         begin
         var
+ {$IFDEF FMX}
+          ff: TFile := nodetofile(node.items[i]);
+ {$ELSE ~FMX}
           ff: TFile := nodetofile(node.item[i]);
+ {$ENDIF FMX}
           if Assigned(ff) then
-             subFiles.Add(ff.getVFSJV()); // recursion
+            subFiles.Add(ff.getVFSJZ(p_icons)); // recursion
         end;
     end;
+
+  Result := TJSONObject.Create;
+
   if self.isRoot() then
     begin
-      Result.AddPair('nodes', subFiles);
-      addval(Result, FK_AUTOUPDATED_FILES, getAutoupdatedFiles() );
-      exit;
+      if subFiles <> NIL then
+        commonFields.AddPair('nodes', subFiles);
+      addval(commonFields, FK_AUTOUPDATED_FILES, getAutoupdatedFilesJSON());
+      Result.AddPair('root', commonFields);
+    end
+   else
+    begin
+      addVal(commonFields, FK_NAME, self.name);
+      commonFields.AddPair(IntToStr(FK_ADDEDTIME), self.atime);
+//      addVal(Result, FK_ADDEDTIME, self.atime);
+      if self.icon >= 0 then
+        begin
+          addVal(commonFields, FK_ICON_IDX, self.icon);
+          addIcon(self.icon);
+        end;
+      if self.isFile() then
+        addVal(commonFields, FK_DLCOUNT, self.DLcount);
+      if subFiles <> NIL then
+        commonFields.AddPair('nodes', subFiles);
+      addVal(Result, FK_NODE, commonFields);
     end;
-
-//  addVal(Result, FK_NODE, commonFields);
-  Result.AddPair(IntToStr(FK_NODE), commonFields);
-  addVal(Result, FK_NAME, self.name);
-  addVal(Result, FK_ADDEDTIME, str_(self.atime));
-  addVal(Result, FK_ICON_IDX, IntToStr(self.icon));
-  addIcon(self.icon);
-  if self.isFile() then
-    addVal(Result, FK_DLCOUNT, str_(self.DLcount));
-  Result.AddPair('nodes', subFiles);
 end;
 
-procedure TFile.SyncNode(pNode: Ttreenode);
+procedure TFile.SyncNode(pNode: TFileNode);
 begin
 //  fNode := pNode;
 //  if Assigned(pNode) then
@@ -752,21 +747,30 @@ begin
 //      pNode.Text := name;
 end;
 
-function TFile.findNode: TTreeNode;
+function TFile.findNode: TFileNode;
 var
-  n: TTreeNode;
+  n: TFileNode;
 begin
 //  if Assigned(fGetFileNode) then
 //    Result := fGetFileNode(self)
 //   else
 //    Result := NIL;
+ {$IFDEF FMX}
+  for var i := 0 to mainTree.Count-1 do
+   begin
+    n := mainTree.Items[i];
+    if n.Data.AsObject = Self then
+      Exit(n);
+   end;
+ {$ELSE ~FMX}
   for n in mainTree.Items do
     if n.Data = Self then
       Exit(n);
+ {$ENDIF FMX}
   Result := NIL;
 end;
 
-function TFile.getNode: TTreeNode;
+function TFile.getNode: TFileNode;
 begin
   if isTemp then
     begin
@@ -777,6 +781,15 @@ begin
     end
    else
     Result := findNode;
+end;
+
+procedure Tfile.DeleteChildren;
+var
+  n: TFileNode;
+begin
+  n := getNode;
+  if Assigned(n) then
+    n.DeleteChildren;
 end;
 
 function Tfile.same(f:Tfile):boolean;
@@ -813,7 +826,7 @@ begin result:=(FA_FOLDER in flags) and not (FA_VIRTUAL in flags) end;
 function Tfile.isVirtualFolder():boolean;
 begin result:=(FA_FOLDER in flags) and (FA_VIRTUAL in flags) end;
 
-function Tfile.isEmptyFolder(loadPrefs: TLoadPrefs; cd:TconnDataMain=NIL):boolean;
+function Tfile.isEmptyFolder(loadPrefs: TLoadPrefs; cd: TconnDataMain=NIL): Boolean;
 var
   listing: TfileListing;
 begin
@@ -827,7 +840,7 @@ listing.free;
 end; // isEmptyFolder
 
 // uses comments file
-function Tfile.getDynamicComment(loadPrefs: TLoadPrefs; skipParent:boolean=FALSE):string;
+function Tfile.getDynamicComment(loadPrefs: TLoadPrefs; skipParent: boolean=FALSE): String;
 var
   comments: THashedStringList;
 begin
@@ -860,10 +873,10 @@ try
 finally result:=macroQuote(result) end;
 end; // getDynamicComment
 
-function findNameInDescriptionFile(const txt, name:string):integer;
+function findNameInDescriptionFile(const txt, name: String): Integer;
 begin result:=reMatch(txt, '^'+quoteRegExprMetaChars(quoteIfAnyChar(' ',name)), 'mi') end;
 
-procedure Tfile.setDynamicComment(loadPrefs: TLoadPrefs; cmt:string);
+procedure Tfile.setDynamicComment(loadPrefs: TLoadPrefs; cmt: String);
 var
   s, path, name: string;
   i: integer;
@@ -920,7 +933,7 @@ end; // setDynamicComment
 
 function Tfile.getParent():Tfile;
 var
-  p: TTreeNode;
+  p: TFileNode;
 begin
   if node = NIL then
     result := NIL
@@ -929,11 +942,19 @@ begin
       result := getMainFile
      else
       try
+ {$IFDEF FMX}
+        p := node.ParentItem;
+        if p = NIL then
+          result := NIL
+         else
+          result := Tfile(p.data.AsObject);
+ {$ELSE ~FMX}
         p := node.parent;
         if p = NIL then
           result := NIL
          else
           result := p.data
+ {$ENDIF FMX}
        except
          Result := NIL;
       end;
@@ -954,7 +975,7 @@ end;
 
 function Tfile.getFirstChild: TFile;
 var
-  n: TTreeNode;
+  n: TFileNode;
 begin
   if isTemp or not isFolder then
     Result := NIL
@@ -962,7 +983,14 @@ begin
     begin
       n := node;
       if Assigned(n) then
+ {$IFDEF FMX}
+        begin
+          if n.Count > 0 then
+            Result := nodeToFile(n.Items[0])
+        end
+ {$ELSE ~FMX}
         Result := nodeToFile(n.getFirstChild)
+ {$ENDIF FMX}
        else
         Result := NIL
         ;
@@ -971,7 +999,7 @@ end;
 
 function Tfile.getNextSibling: TFile;
 var
-  n: TTreeNode;
+  n: TFileNode;
 begin
   n := node;
    if Assigned(n) then
@@ -982,9 +1010,12 @@ end;
 
 function Tfile.getDLcount():integer;
 begin
-if isFolder() then result:=getDLcountRecursive()
-else if isTemp() then result:=autoupdatedFiles.getInt(resource)
-else result:=FDLcount;
+  if isFolder() then
+    result := getDLcountRecursive()
+   else if isTemp() then
+    result := autoupdatedFiles.getInt(resource)
+   else
+    result := FDLcount;
 end; // getDLcount
 
 procedure Tfile.setDLcount(i:integer);
@@ -1027,13 +1058,13 @@ if FA_VIRTUAL in flags then result:=0
 else result:=diskSpaceAt(resource);
 end; // diskfree
 
-procedure Tfile.setupImage(sysIcons: Boolean; newIcon:integer);
+procedure Tfile.setupImage(sysIcons: Boolean; newIcon: Integer);
 begin
-icon:=newIcon;
-setupImage(sysIcons);
+  icon := newIcon;
+  setupImage(sysIcons);
 end; // setupImage
 
-procedure Tfile.setupImage(sysIcons: Boolean; pNode: TTreeNode);
+procedure Tfile.setupImage(sysIcons: Boolean; pNode: TFileNode);
 begin
   if pNode = NIL then
     pNode := node;
@@ -1052,54 +1083,92 @@ var
   i: integer;
 begin
   result := icon;
-  if result >= 0 then exit;
+  if result >= 0 then
+    exit;
   if isFile() then
     for i:=0 to length(iconMasks)-1 do
       if fileMatch(iconMasks[i].str, name) then
         begin
-        result:=iconMasks[i].int;
-        exit;
+          result := iconMasks[i].int;
+          exit;
         end;
-  ic:=iconsCache.get(resource);
+  ic := iconsCache.get(resource);
   if ic = NIL then
     begin
-    result := getImageIndexForFile(resource);
-    iconsCache.put(resource, result, mtime);
-    exit;
+      result := IconsDM.getImageIndexForFile(resource);
+      iconsCache.put(resource, result, mtime);
+      exit;
     end;
-  if mtime <= ic.time then result:=ic.idx
-  else
+  if mtime <= ic.time then
+    result := ic.idx
+   else
     begin
-    result:=getImageIndexForFile(resource);
-    ic.time:=mtime;
-    ic.idx:=result;
+      result := IconsDM.getImageIndexForFile(resource);
+      ic.time := mtime;
+      ic.idx := result;
     end;
 end; // getSystemIcon
 
-function Tfile.getIconForTreeview(sysIcons: Boolean):integer;
+function Tfile.gotSystemIcon(): boolean;
+var
+  ic: PcachedIcon;
+  i: integer;
 begin
-if FA_UNIT in flags then result:=ICON_UNIT
-else if FA_ROOT in flags then result:=ICON_ROOT
-else if FA_LINK in flags then result:=ICON_LINK
-else
-  if FA_FOLDER in flags then
-    if FA_VIRTUAL in flags then result:=ICON_FOLDER
-    else result:=ICON_REAL_FOLDER
-  else
-    if sysIcons and (resource > '') then
-      result:=getImageIndexForFile(resource) // skip iconsCache
-    else
-      result:=ICON_FILE;
-end; // getIconForTreeview
-
-function Tfile.relativeURL(fullEncode:boolean=FALSE):string;
-begin
-if isLink() then result:=xtpl(resource, ['%ip%', defaultIP])
-else if isRoot() then result:=''
-else result:=encodeURL(name, fullEncode)+if_(isFolder(),'/')
+  result := icon >= 0;
+  if result then
+    exit;
+  if isFile() then
+    for i:=0 to length(iconMasks)-1 do
+      if fileMatch(iconMasks[i].str, name) then
+        begin
+          result := True;
+          exit;
+        end;
+  ic := iconsCache.get(resource);
+  if ic = NIL then
+    begin
+      result := False;
+      exit;
+    end;
+  if mtime <= ic.time then
+    result := True
+   else
+    begin
+      result := False
+    end;
 end;
 
-function Tfile.getFolder():string;
+function Tfile.getIconForTreeview(sysIcons: Boolean): Integer;
+begin
+  if FA_UNIT in flags then
+    result := ICON_UNIT
+   else if FA_ROOT in flags then
+    result := ICON_ROOT
+   else if FA_LINK in flags then
+    result := ICON_LINK
+   else if FA_FOLDER in flags then
+    if FA_VIRTUAL in flags then
+      result := ICON_FOLDER
+     else
+      result := ICON_REAL_FOLDER
+   else
+    if sysIcons and (resource > '') then
+      result := IconsDM.getImageIndexForFile(resource) // skip iconsCache
+     else
+      result := ICON_FILE;
+end; // getIconForTreeview
+
+function Tfile.relativeURL(fullEncode:boolean=FALSE): String;
+begin
+  if isLink() then
+    result := xtpl(resource, ['%ip%', defaultIP])
+   else if isRoot() then
+     result := ''
+    else
+     result := encodeURL(name, fullEncode)+if_(isFolder(),'/')
+end;
+
+function Tfile.getFolder(): String;
 var
   f: Tfile;
   s: string;
@@ -1118,7 +1187,7 @@ s:=copy( s, length(f.resource)+2, length(s) );
 result:=result+xtpl(s, ['\','/']);
 end; // getFolder
 
-function Tfile.isDLforbidden():boolean;
+function Tfile.isDLforbidden(): Boolean;
 var
   f: Tfile;
 begin
@@ -1129,17 +1198,19 @@ f:=nodeToFile(node);
 result:=assigned(f) and (FA_DL_FORBIDDEN in f.flags);
 end; // isDLforbidden
 
-function Tfile.isNew():boolean;
+function Tfile.isNew(): Boolean;
 var
   t: Tdatetime;
 begin
-if FA_TEMP in flags then t:=mtime
-else t:=atime;
-result:=(filesStayFlaggedForMinutes > 0)
-  and (trunc(abs(now()-t)*24*60) <= filesStayFlaggedForMinutes)
+  if FA_TEMP in flags then
+    t := mtime
+   else
+    t := atime;
+  result := (filesStayFlaggedForMinutes > 0)
+    and (trunc(abs(now()-t)*24*60) <= filesStayFlaggedForMinutes)
 end; // isNew
 
-function Tfile.getRecursiveDiffTplAsStr(outInherited:Pboolean=NIL; outFromDisk:Pboolean=NIL):string;
+function Tfile.getRecursiveDiffTplAsStr(outInherited: Pboolean=NIL; outFromDisk: Pboolean=NIL): String;
 var
   basePath, runPath, s, fn, diff: string;
   f: Tfile;
@@ -1210,15 +1281,16 @@ for s in sortArrayF(getFiles(exePath+'*.diff.tpl')) do
 result:=diff;
 end; // getRecursiveDiffTplAsStr
 
-function Tfile.getDefaultFile():Tfile;
+function Tfile.getDefaultFile(): Tfile;
 var
   f: Tfile;
   mask, s: string;
   sr: TsearchRec;
 begin
-result:=NIL;
-mask:=getRecursiveFileMask();
-if mask = '' then exit;
+  result := NIL;
+  mask := getRecursiveFileMask();
+  if mask = '' then
+    exit;
 
   f := getFirstChild();
 { if this folder has been dinamically generated, the treenode is not actually
@@ -1250,19 +1322,21 @@ while mask > '' do
   end;
 end; // getDefaultFile
 
-function Tfile.shouldCountAsDownload():boolean;
+function Tfile.shouldCountAsDownload(): Boolean;
 var
   f: Tfile;
   mask: string;
 begin
-result:=not (FA_DONT_COUNT_AS_DL in flags);
-if not result then exit;
-f:=self;
+  result := not (FA_DONT_COUNT_AS_DL in flags);
+  if not result then
+    exit;
+  f := self;
   repeat
-  mask:=f.dontCountAsDownloadMask;
-  f:=f.parent;
+    mask := f.dontCountAsDownloadMask;
+    f := f.parent;
   until (f = NIL) or (mask > '');
-if mask > '' then result:=not fileMatch(mask, name)
+  if mask > '' then
+    result := not fileMatch(mask, name)
 end; // shouldCountAsDownload
 
 procedure Tfile.lock();
@@ -1298,67 +1372,75 @@ var
   f, fNext: TFile;
   r: TfileCallbackReturn;
 begin
-r:=callback(self, FALSE, par, par2);
-if FCB_DELETE in r then
-  begin
-    if Assigned(node) then
-      node.delete();
-    exit;
-  end;
-if FCB_NO_DEEPER in r then exit;
-f := getFirstChild();
-while assigned(f) do
-  begin
-  fNext:=f.getNextSibling(); // "next" must be saved this point because the callback may delete the current node
-  f.recursiveApply(callback, par, par2);
-  f := fNext;
-  end;
-if FCB_RECALL_AFTER_CHILDREN in r then
-  begin
-  r:=callback(self, TRUE, par, par2);
+  r := callback(self, FALSE, par, par2);
   if FCB_DELETE in r then
-    if Assigned(node) then
-      node.delete();
-  end;
+    begin
+      if Assigned(node) then
+        node.delete();
+      exit;
+    end;
+  if FCB_NO_DEEPER in r then
+    exit;
+  f := getFirstChild();
+  while assigned(f) do
+    begin
+      fNext := f.getNextSibling(); // "next" must be saved this point because the callback may delete the current node
+      f.recursiveApply(callback, par, par2);
+      f := fNext;
+    end;
+  if FCB_RECALL_AFTER_CHILDREN in r then
+    begin
+      r := callback(self, TRUE, par, par2);
+      if FCB_DELETE in r then
+        if Assigned(node) then
+          node.delete();
+    end;
 end; // recursiveApply
 
-function Tfile.hasRecursive(attributes: TfileAttributes; orInsteadOfAnd:boolean=FALSE; outInherited:Pboolean=NIL):boolean;
+function Tfile.hasRecursive(attributes: TfileAttributes; orInsteadOfAnd: Boolean=FALSE; outInherited: Pboolean=NIL): Boolean;
 var
   f: Tfile;
 begin
-result:=FALSE;
-f:=self;
-if assigned(outInherited) then outInherited^:=FALSE;
-while assigned(f) do
-  begin
-  result:=orInsteadOfAnd and (attributes*f.flags <> [])
-    or (attributes*f.flags = attributes);
-  if result or f.isRoot then exit;
-  f:=f.parent;
-  if assigned(outInherited) then outInherited^:=TRUE;
-  end;
-if assigned(outInherited) then outInherited^:=FALSE; // grant it is set only if result=TRUE
+  result := FALSE;
+  f := self;
+  if assigned(outInherited) then
+    outInherited^ := FALSE;
+  while assigned(f) do
+    begin
+      result := orInsteadOfAnd and (attributes*f.flags <> [])
+        or (attributes*f.flags = attributes);
+      if result or f.isRoot then
+        exit;
+      f := f.parent;
+      if assigned(outInherited) then
+        outInherited^:=TRUE;
+    end;
+  if assigned(outInherited) then
+    outInherited^:=FALSE; // grant it is set only if result=TRUE
 end; // hasRecursive
 
-function Tfile.hasRecursive(attribute: TfileAttribute; outInherited:Pboolean=NIL):boolean;
+function Tfile.hasRecursive(attribute: TfileAttribute; outInherited: Pboolean=NIL): Boolean;
 begin result:=hasRecursive([attribute], FALSE, outInherited) end;
 
-function Tfile.accessFor(cd:TconnDataMain):boolean;
+function Tfile.accessFor(cd: TconnDataMain): Boolean;
 begin
-if cd = NIL then result:=accessFor('', '')
-else result:=accessFor(cd.usr, cd.pwd)
+  if cd = NIL then
+    result := accessFor('', '')
+   else
+    result := accessFor(cd.usr, cd.pwd)
 end; // accessFor
 
-function Tfile.accessFor(username, password:string):boolean;
+function Tfile.accessFor(const username, password: String): Boolean;
 var
   a: Paccount;
   f: Tfile;
   list: TStringDynArray;
 begin
-result:=FALSE;
-if isFile() and isDLforbidden() then exit;
-result:=FALSE;
-f:=self;
+  result := FALSE;
+  if isFile() and isDLforbidden() then
+    exit;
+  result := FALSE;
+  f := self;
 while assigned(f) do
   begin
   list:=f.accounts[FA_ACCESS]; // shortcut
@@ -1395,19 +1477,20 @@ if (username > '') and (f = NIL) then
   end;
 end; // accessFor
 
-function Tfile.getRecursiveFileMask():string;
+function Tfile.getRecursiveFileMask(): String;
 var
   f: Tfile;
 begin
-f:=self;
+  f := self;
   repeat
-  result:=f.defaultFileMask;
-  if result > '' then exit;
-  f:=f.parent;
+    result := f.defaultFileMask;
+    if result > '' then
+      exit;
+    f := f.parent;
   until f = NIL;
 end; // getRecursiveFileMask
 
-function Tfile.getAccountsFor(action:TfileAction; specialUsernames:boolean=FALSE; outInherited:Pboolean=NIL):TstringDynArray;
+function Tfile.getAccountsFor(action: TfileAction; specialUsernames: boolean=FALSE; outInherited: Pboolean=NIL): TstringDynArray;
 var
   f: Tfile;
 begin
@@ -1436,7 +1519,7 @@ while assigned(f) do
   end;
 end; // getAccountsFor
 
-procedure Tfile.getFiltersRecursively(var files,folders:string);
+procedure Tfile.getFiltersRecursively(var files, folders: String);
 var
   f: Tfile;
 begin
@@ -1452,9 +1535,42 @@ while assigned(f) do
   end;
 end; // getFiltersRecursively
 
+function Tfile.setBrowsable(childrenDone: Boolean; par, par2: IntPtr): TfileCallbackReturn;
+begin
+  if not Self.isFolder() then
+    exit;
+  if (FA_BROWSABLE in Self.flags) = boolean(par) then
+    VFSmodified := TRUE
+   else
+    exit;
+  if boolean(par) then
+    exclude(Self.flags, FA_BROWSABLE)
+   else
+    include(Self.flags, FA_BROWSABLE);
+end; // setBrowsable
 
-function nodeToFile(n:TtreeNode):Tfile; inline;
-begin if n = NIL then result:=NIL else result:=Tfile(n.data) end;
+function setBrowsable(f: Tfile; childrenDone: Boolean; par, par2: IntPtr): TfileCallbackReturn;
+begin
+  Result := f.setBrowsable(childrenDone, par, par2);
+end;
+
+function nodeToFile(n: TFileNode): Tfile; inline;
+begin
+  if n = NIL then
+   result := NIL
+  else
+   result := Tfile(n.data)
+end;
+
+function nodeIsLocked(n: TFileNode): boolean;
+begin
+  result := FALSE;
+  if (n = NIL) or (n.data = NIL) then
+    exit;
+  result := nodeToFile(n).isLocked();
+end; // nodeIsLocked
+
+
 
 function loadMD5for(const fn: String): String;
 begin
@@ -1464,5 +1580,18 @@ begin
     result := trim(getTill(' ', UnUTF(loadfile(fn+'.md5'))))
 end; // loadMD5for
 
+function loadFingerprint(const fn:string):string;
+var
+  hasher: Thasher;
+begin
+  result := loadMD5for(fn);
+  if result > '' then
+    exit;
+
+  hasher := Thasher.create();
+  hasher.loadFrom(ExtractFilePath(fn));
+  result := hasher.getHashFor(fn);
+  hasher.Free;
+end; // loadFingerprint
 
 end.

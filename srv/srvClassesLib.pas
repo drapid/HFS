@@ -24,18 +24,33 @@ unit srvClassesLib;
 interface
 
 uses
-  iniFiles, types, strUtils, sysUtils, classes,
-  system.Generics.Collections,
+ {$IFDEF FMX}
+  System.UITypes, FMX.Types,
+ {$ELSE ~FMX}
+  windows,
+  Forms,
+ {$ENDIF FMX}
+  Graphics, iniFiles, types, strUtils, sysUtils, classes,
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  Generics.Collections,
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  mormot.core.collections,
+  {$ENDIF USE_MORMOT_COLLECTIONS}
   OverbyteIcsWSocket, OverbyteIcshttpProt,
   hslib, srvConst;
 
 type
-  Tip2av = Tdictionary<string,Tdatetime>;
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  Tip2av = Tdictionary<string, Tdatetime>;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  Tip2av = IKeyValue<string, Tdatetime>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+
   TantiDos = class
     const MAX_CONCURRENTS = 3;
   class var
     folderConcurrents: integer;
-    ip2availability: Tip2av;
+    ip2availability2: Tip2av;
     class constructor Create;
   protected
     accepted: boolean;
@@ -44,8 +59,11 @@ type
     constructor create;
     destructor Destroy; override;
     function accept(conn:ThttpConn; address:string=''):boolean;
-    end;
-
+  {$IFDEF USE_MORMOT_COLLECTIONS}
+    function RemoveOld(const aKey; var aValue;
+        aIndex, aCount: integer; aOpaque: pointer): boolean;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+   end;
   PcachedIcon = ^TcachedIcon;
   TcachedIcon = record
     data: string;
@@ -80,16 +98,18 @@ type
     function getHashFor(fn:string):string;
     end;
 
-  Tint2int = Tdictionary<integer,integer>;
-  Tstr2str = Tdictionary<string,string>;
-  Tstr2pointer = Tdictionary<string,pointer>;
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  Tstr2str = Tdictionary<string, String>;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  Tstr2str = IKeyValue<string, String>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
 
   TstringToIntHash = class(ThashedStringList)
     constructor create;
-    function getInt(const s:string):integer;
-    function getIntByIdx(idx:integer):integer;
-    function incInt(const s:string):integer;
-    procedure setInt(const s:string; int:integer);
+    function  getInt(const s: String): integer;
+    function  getIntByIdx(idx: integer): integer;
+    function  incInt(const s: String): integer;
+    procedure setInt(const s: String; int: integer);
     end;
 
   PtplSection = ^TtplSection;
@@ -99,7 +119,11 @@ type
     ts: Tdatetime;
     end;
 
-  Tstr2section = Tdictionary<string,PtplSection>;
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  Tstr2section = Tdictionary<string, PtplSection>;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  Tstr2section = IKeyValue<String, PtplSection>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
 
   Ttpl = class
   protected
@@ -111,21 +135,25 @@ type
     strTable: THashedStringList;
 //    fUTF8: boolean;
     fOver: Ttpl;
-    sections: Tstr2section;
-    function  getTxt(section:string):string;
-    function  newSection(section:string):PtplSection;
+    sections2: Tstr2section;
+    function  getTxt(const section: String): String;
+    function  newSection(const section: String): PtplSection;
     procedure fromString(const txt: String);
     function  toS: String;
     procedure fromRaw(const txt: RawByteString);
     function  toRaw: RawByteString;
     procedure setOver(v:Ttpl);
     procedure clear();
+  {$IFDEF USE_MORMOT_COLLECTIONS}
+    function  DisposeSections(const aKey; var aValue;
+      aIndex, aCount: integer; aOpaque: pointer): Boolean;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
   public
     onChange: TNotifyEvent;
     constructor create(const txt: RawByteString=''; over:Ttpl=NIL); OverLoad;
     constructor create(const txt: String; over:Ttpl=NIL); OverLoad;
     destructor Destroy; override;
-    property txt[section:string]:string read getTxt; default;
+    property txt[const section: String]:string read getTxt; default;
     property fullText: RawByteString read toRaw write fromRaw;
     property fullTextS: String read toS write fromString;
 //    property utf8:boolean read fUTF8;
@@ -146,7 +174,7 @@ type
 
   TcachedTpls = class(THashedStringList)
   public
-    function getTplFor(fn:string):Ttpl;
+    function getTplFor(fn: String):Ttpl;
     destructor Destroy; override;
     end; // TcachedTpls
 
@@ -158,6 +186,7 @@ type
     stack: array of integer;
     stackTop: integer;
   public
+    constructor create(const data: RawByteString);
     procedure parse(const data: RawByteString);
 //    function pop(var value:string): integer; OverLoad
     function pop(var value: RawByteString): integer;
@@ -167,17 +196,18 @@ type
     function getCursor():integer;
     function getPerc():real;
     function isOver():boolean;
-    function getTheRest():RawByteString;
+    function getTheRest(): RawByteString;
     end;
 
   TSessionId = String;
+
   Tsession = class
     vars: THashedStringList;
     ttl: Double;
     created, expires: Tdatetime;
     user, ip, redirect: String;
-    procedure setVar(k, v:string);
-    function getVar(k: String):string;
+    procedure setVar(k: TSessionId; const v: String);
+    function getVar(k: TSessionId): String;
     class function sanitizeSID(s:TSessionId):TSessionId;
     class function getNewSID(): TSessionId;
   public
@@ -190,30 +220,47 @@ type
     property v[k: TSessionId]: String read getVar write setVar; default;
    end;
 
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  TSessId2Sess = TDictionary<TSessionId,Tsession>;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  TSessId2Sess = IKeyValue<TSessionId, Tsession>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+
   Tsessions = class
-   fS: TDictionary<TSessionId,Tsession>;
+   fS2: TSessId2Sess;
+  private
+  {$IFDEF USE_MORMOT_COLLECTIONS}
+    function onCheckExpired(const aKey; var aValue;
+               aIndex, aCount: integer; aOpaque: pointer): boolean;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
   public
     constructor create;
     destructor Destroy; override;
-    procedure clearSession(sId: TSessionId);
-    procedure destroySession(sId: TSessionId);
-    function  createSession(sId: TSessionId = ''): Tsession;
-    function  initNewSession(peerIp: String = ''; sid: TSessionId = ''): TSessionId;
-    function  getSession(sId: TSessionId): Tsession; OverLoad;
-    function  noSession(sId: TSessionId): Boolean;
-    procedure keepAlive(sId: TSessionId);
-    procedure checkExpired;
-    property  ss[sId: TSessionId]: Tsession read getSession; default;
+    procedure  clearSession(sId: TSessionId);
+    procedure  destroySession(sId: TSessionId);
+    function   createSession(sId: TSessionId = ''): Tsession;
+    function   initNewSession(peerIp: String = ''; sid: TSessionId = ''): TSessionId;
+    function   getSession(sId: TSessionId): Tsession; OverLoad;
+    function   noSession(sId: TSessionId): Boolean;
+    procedure  keepAlive(sId: TSessionId);
+    procedure  checkExpired;
+    property   ss[sId: TSessionId]: Tsession read getSession; default;
   end;
 
 
-  ThashFunc = function(s:string):string;
+  TuploadResult = record
+    fn, reason: String;
+    speed: Integer;
+    size: Int64;
+   end;
 
-  TconnDataMain = class   // data associated to a client connection
+  ThashFunc = function(const s: String): String;
+
+  TconnDataMain = class abstract   // data associated to a client connection
   public
-    class function getSafeHost(cd:TconnDataMain):string;
+    class function getSafeHost(cd: TconnDataMain): String;
   public
-    address: string;   // this is address shown in the log, and it is not necessarily the same as the socket address
+    address: String;   // this is address shown in the log, and it is not necessarily the same as the socket address
     time: Tdatetime;  // connection start time
     requestTime: Tdatetime; // last request start time
     { cache User-Agent because often retrieved by connBox.
@@ -222,6 +269,14 @@ type
     agent: string;
     conn: ThttpConn;
     limiter: TspeedLimiter;
+    averageSpeed: real;   { calculated on disconnection as bytesSent/totalTime. it is calculated also while
+                            sending and it is different from conn.speed because conn.speed is average speed
+                            in the last second, while averageSpeed is calculated on ETA_FRAME seconds }
+    eta: record
+      idx: integer;   // estimation time (seconds)
+      data: array [0..ETA_FRAME-1] of real;  // accumulates speed data
+      result: Tdatetime;
+      end;
     acceptedCredentials: boolean;
     usr, pwd: string;
     account: Paccount;
@@ -232,95 +287,141 @@ type
       : THashedStringList;
     tpl: Ttpl;
     tplCounters: TstringToIntHash;
+    workaroundForIEutf8: (WI_toDetect, WI_yes, WI_no);
     downloadingWhat: TdownloadingWhat;
-    disconnectReason: string;
-    uploadFailed: string; // reason (empty on success)
+    countAsDownload: Boolean; // cache the value for the Tfile method
+    disconnectAfterReply, logLaterInApache, dontLog, fullDLlogged: boolean;
+    banReason: String;
+    disconnectReason: String;
+    error: String;         // error details
+    uploadFailed: String; // reason (empty on success)
+    uploadSrc, uploadDest: String;
+    uploadResults: array of TuploadResult;
     lastActivityTime: Tdatetime;
-    function goodPassword(const pwd: String; s:string; func:ThashFunc):boolean;
-    function passwordValidation(const pwd: String):boolean;
-    procedure setSessionVar(k, v: String);
+    lastFN: String;
+    function goodPassword(const pwd: String; s: String; func: ThashFunc): Boolean;
+    function passwordValidation(const pwd: String): Boolean;
+    procedure setSessionVar(const k, v: String);
     procedure logout();
+    procedure disconnect(const reason: string);
     function allowRecur: Boolean;
     function getFilesSelection(): TStringDynArray;
 
   end;
 
+  function conn2dataMain(p: Tobject): TconnDataMain; inline; overload;
+  function conn2dataMain(i: integer): TconnDataMain; inline; overload;
+  function isDownloading(data: TconnDataMain): Boolean;
+  function isSendingFile(data: TconnDataMain): Boolean;
+  function isReceivingFile(data: TconnDataMain): Boolean;
+  function getETA(data: TconnDataMain): String;
+  function countIPs(onlyDownloading: boolean=FALSE; usersInsteadOfIps: boolean=FALSE): integer;
+  function countConnectionsByIP(const ip: String): Integer;
+  function getGraphPic(cd: TconnDataMain; w, h: Integer): RawByteString;
+
+
 implementation
 
 uses
-  windows, dateUtils, forms, ansiStrings,
+  Math,
+  dateUtils, ansiStrings,
   RDFileUtil, RDUtils,
-//  utilLib, hfsGlobal, hfsVars,
+  IconsLib,
   srvUtils, srvVars;
 
 
 class constructor TantiDos.Create;
-begin
-  ip2availability := NIL;
+
+begin
+
+  ip2availability2 := NIL;
   folderConcurrents := 0;
 end;
 
-constructor TantiDos.create();
+
+constructor TantiDos.create();
 begin
-accepted:=FALSE;
+  accepted := FALSE;
 end;
 
-function TantiDos.accept(conn:ThttpConn; address:string=''):boolean;
-
+function TantiDos.accept(conn: ThttpConn; address: String=''): Boolean;
   procedure reject();
-  resourcestring
+   resourcestring
     MSG_ANTIDOS_REPLY = 'Please wait, server busy';
   begin
-  conn.reply.mode:=HRM_OVERLOAD;
-  conn.addHeader(ansistring('Refresh: '+intToStr(1+random(2)))); // random for less collisions
-  conn.reply.body:=UTF8Encode(MSG_ANTIDOS_REPLY);
+    conn.reply.mode:=HRM_OVERLOAD;
+    conn.addHeader(ansistring('Refresh: '+intToStr(1+random(2)))); // random for less collisions
+    conn.reply.body:=UTF8Encode(MSG_ANTIDOS_REPLY);
   end;
-
 begin
-if address= '' then
-  address:=conn.address;
-if ip2availability = NIL then
-  ip2availability:=Tip2av.create();
-try
-  if ip2availability.ContainsKey(address) then
-   if ip2availability[address] > now() then // this specific address has to wait?
+  if address= '' then
+    address := conn.address;
+  if ip2availability2 = NIL then
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+    ip2availability2 := Tip2av.create();
+  {$ELSE USE_MORMOT_COLLECTIONS}
+    ip2availability2 := Collections.NewKeyValue<String, TDateTime>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+  try
+    if ip2availability2.ContainsKey(address) then
+     if ip2availability2[address] > now() then // this specific address has to wait?
+      begin
+        reject();
+        exit(FALSE);
+      end;
+   except
+  end;
+  if folderConcurrents >= MAX_CONCURRENTS then   // max number of concurrent folder loading, others are postponed
     begin
-    reject();
-    exit(FALSE);
+      reject();
+      exit(FALSE);
     end;
-except
-  end;
-if folderConcurrents >= MAX_CONCURRENTS then   // max number of concurrent folder loading, others are postponed
-  begin
-  reject();
-  exit(FALSE);
-  end;
-inc(folderConcurrents);
-Paddress:=address;
-ip2availability.AddOrSetValue(address, now()+1/HOURS);
-accepted:=TRUE;
-Result:=TRUE;
+  inc(folderConcurrents);
+  Paddress := address;
+  ip2availability2[address] := now()+1/HOURS;
+  accepted := TRUE;
+  Result := TRUE;
 end;
+
+{$IFDEF USE_MORMOT_COLLECTIONS}
+function TantiDos.RemoveOld(const aKey; var aValue;
+    aIndex, aCount: integer; aOpaque: pointer): boolean;
+var
+  t: TDateTime;
+begin
+  t := PDateTime(aOpaque)^;
+  if TDateTime(aValue) < t then
+    ip2availability2.Data.DeleteAt(aIndex);
+  Result := True;
+end;
+{$ENDIF USE_MORMOT_COLLECTIONS}
 
 destructor TantiDos.Destroy;
 var
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
   pair: Tpair<string,Tdatetime>;
+  {$ENDIF ~USE_MORMOT_COLLECTIONS}
   t: Tdatetime;
 begin
-if not accepted then
-  exit;
-t:=now();
-if folderConcurrents = MAX_CONCURRENTS then // serving multiple addresses at max capacity, let's give a grace period for others
-  ip2availability[Paddress]:=t + 1/SECONDS
-else
-  ip2availability.Remove(Paddress);
-dec(folderConcurrents);
+  if not accepted then
+    exit;
+  t := now();
+  if folderConcurrents = MAX_CONCURRENTS then // serving multiple addresses at max capacity, let's give a grace period for others
+    ip2availability2[Paddress] := t + 1/SECONDS
+   else
+    ip2availability2.Remove(Paddress);
+  dec(folderConcurrents);
 // purge leftovers
- for pair in ip2availability do
-  if pair.Value < t then
-    ip2availability.Remove(pair.Key);
-end;
+  if ip2availability2.Count > 0 then
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+   for pair in ip2availability2 do
+    if pair.Value < t then
+      ip2availability2.Remove(pair.Key);
+  {$ELSE USE_MORMOT_COLLECTIONS}
+    ip2availability2.Data.ForEach(RemoveOld, @t);
+  {$ENDIF USE_MORMOT_COLLECTIONS}
 
+end;
 //////////// TcachedTpls
 
 destructor TcachedTpls.Destroy;
@@ -553,22 +654,30 @@ end; // autoupdatedFiles_getCounter
 
 constructor Ttpl.create(const txt: RawByteString=''; over:Ttpl=NIL);
 begin
-sections:=Tstr2section.Create();
-fullText:=txt;
-self.over:=over;
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  sections2 := Tstr2section.Create();
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  sections2 := Collections.NewKeyValue<String, PtplSection>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+  fullText:=txt;
+  self.over:=over;
 end;
 
 constructor Ttpl.create(const txt: String; over:Ttpl=NIL);
 begin
-sections:=Tstr2section.Create();
-fullTextS:=txt;
-self.over:=over;
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  sections2 := Tstr2section.Create();
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  sections2 := Collections.NewKeyValue<String, PtplSection>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+  fullTextS:=txt;
+  self.over:=over;
 end;
 
 destructor Ttpl.destroy;
 begin
-fullText:=''; // this will cause the disposing
-inherited;
+  fullText := ''; // this will cause the disposing
+  inherited;
 end; // destroy
 
 function Ttpl.getStrByID(const id:string):string;
@@ -583,11 +692,11 @@ if (result = '') and assigned(over) then
   result:=over.getStrByID(id)
 end; // getStrByID
 
-function Ttpl.newSection(section:string):PtplSection;
+function Ttpl.newSection(const section: String):PtplSection;
 begin
-new(result);
-sections.Add(section, result);
-result.name:=section;
+  new(result);
+  sections2.Add(section, result);
+  result.name := section;
 end; // newSection
 
 function Ttpl.sectionExist(section:string):boolean;
@@ -600,33 +709,52 @@ end;
 function Ttpl.getSection(section:string; inherit:boolean=TRUE):PtplSection;
 begin
   result:=NIL;
-  if sections.containsKey(section) then
-   if not sections.TryGetValue(section, result) then
-     result:=NIL;
+  if sections2.containsKey(section) then
+   if not sections2.TryGetValue(section, result) then
+     result := NIL;
 if inherit and assigned(over) and (result = NIL) then
   result:=over.getSection(section);
 end; // getSection
 
-function Ttpl.getTxt(section:string):string;
+function Ttpl.getTxt(const section: String): String;
 var
   p: PTplSection;
 begin
   p := getSection(section);
-if p <> NIL then
-  result:=p.txt
-else
-  result:=''
+  if p <> NIL then
+    result := p.txt
+  else
+    result := ''
 end; // getTxt
 
 function Ttpl.getTxtByExt(fileExt:string):string;
-begin result:=getTxt('file'+fileExt) end;
+begin
+  result := getTxt('file'+fileExt)
+end;
+
+{$IFDEF USE_MORMOT_COLLECTIONS}
+function Ttpl.DisposeSections(const aKey; var aValue;
+    aIndex, aCount: integer; aOpaque: pointer): Boolean;
+var
+  p: PtplSection;
+begin
+  p := PtplSection(aValue);
+  dispose(p);
+  PtplSection(aValue) := NIL;
+  Result := True;
+end;
+{$ENDIF USE_MORMOT_COLLECTIONS}
 
 procedure Ttpl.clear();
 begin
   srcU := '';
-  for var p in sections.values do
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  for var p in sections2.values do
     dispose(p);
-  sections.clear();
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  sections2.Data.ForEach(DisposeSections);
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+  sections2.clear();
   freeAndNIL(strTable);  // mod by mars
 end;
 
@@ -731,7 +859,6 @@ var
       end;
     result:=TRUE;
     end;
-
   var
     ss: TStringDynArray;
     s: string;
@@ -826,34 +953,50 @@ end; // appendString
 
 procedure Ttpl.setOver(v: Ttpl);
 begin
-fOver:=v;
+  fOver := v;
 end; // setOver
 
-function Ttpl.getSections():TStringDynArray;
-begin result:=sections.Keys.ToArray() end;
+function Ttpl.getSections(): TStringDynArray;
+begin
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  result := sections2.Keys.ToArray();
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  SetLength(Result, sections2.Data.Keys.Count);
+  if Length(Result) > 0 then
+    for var I := Low(Result) to High(Result) do
+      Result[i] := PString(sections2.Data.Keys.ItemPtr(i))^;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+end;
 
 function Ttpl.me():Ttpl;
-begin result:=self end;
+begin
+  result := self
+end;
 
 
+constructor Ttlv.create(const data: RawByteString);
+begin
+  Inherited create;
+  parse(data);
+end;
 
 procedure Ttlv.parse(const data: RawByteString);
 begin
-  whole:=data;
-  cur:=1;
-  bound:=length(data);
-  stackTop:=0;
+  whole := data;
+  cur := 1;
+  bound := length(data);
+  stackTop := 0;
 end; // parse
 
-function Ttlv.pop(var value: RawByteString):integer;
+function Ttlv.pop(var value: RawByteString): integer;
 var
   n: integer;
 begin
   result := -1;
   if isOver() then
     exit; // finished
-  result:=integer((@whole[cur])^);
-  n:=Pinteger(@whole[cur+4])^;
+  result := integer((@whole[cur])^);
+  n := Pinteger(@whole[cur+4])^;
   value :=  copy(whole, cur+8, n);
   lastValue := value;
   inc(cur, 8+n);
@@ -909,7 +1052,7 @@ begin result:=(cur+8 > bound) end;
 function Ttlv.getTheRest(): RawByteString;
 begin result:=substr(whole, cur, bound) end;
 
-function TconnDataMain.goodPassword(const pwd: String; s:string; func:ThashFunc):boolean;
+function TconnDataMain.goodPassword(const pwd: String; s: string; func: ThashFunc): boolean;
 var
   a: String;
 begin
@@ -934,7 +1077,7 @@ begin
   Result := (urlvars.indexOf('recursive') >= 0) or (urlvars.values['search'] > '');
 end;
 
-procedure TconnDataMain.setSessionVar(k, v: String);
+procedure TconnDataMain.setSessionVar(const k, v: String);
 var
   s: TSession;
 begin
@@ -959,15 +1102,22 @@ begin
   conn.delCookie(SESSION_COOKIE);
 end; // logout
 
+procedure TconnDataMain.disconnect(const reason: string);
+begin
+  disconnectReason := reason;
+  conn.disconnect();
+end; // disconnect
+
 class function TconnDataMain.getSafeHost(cd:TconnDataMain):string;
 begin
-result:='';
-if cd = NIL then exit;
-if addressmatch(forwardedMask, cd.conn.address) then
-  result:=cd.conn.getHeader('x-forwarded-host');
-if result = '' then
-  result:=cd.conn.getHeader('host');
-result:=stripChars(result, ['0'..'9','a'..'z','A'..'Z',':','.','-','_'], TRUE);
+  result := '';
+  if cd = NIL then
+    exit;
+  if addressmatch(forwardedMask, cd.conn.address) then
+    result := cd.conn.getHeader('x-forwarded-host');
+  if result = '' then
+    result := cd.conn.getHeader('host');
+  result := stripChars(result, ['0'..'9','a'..'z','A'..'Z',':','.','-','_'], TRUE);
 end; // getSafeHost
 
 class function Tsession.getNewSID():TSessionId;
@@ -985,7 +1135,6 @@ if Length(id) < 10 then
 //sessions.Add(id, self);
 init;
 end;
-
 procedure Tsession.init;
 begin
 created:=now();
@@ -995,7 +1144,6 @@ ip := '';
 redirect := '';
 keepAlive();
 end;
-
 destructor Tsession.Destroy;
 var
   cd: TconnDataMain;
@@ -1011,25 +1159,29 @@ freeAndNIL(vars);
 end;
 
 procedure Tsession.keepAlive();
-begin expires:=now() + ttl end;
+begin
+  expires := now() + ttl
+end;
 
-function Tsession.getVar(k:string):string;
+function Tsession.getVar(k: TSessionId): String;
 begin
   Result := '';
   if vars = NIL then
     Exit
    else
      if vars.IndexOfName(k) >= 0 then
-try result:=vars.values[k];
-except result:=''
-  end;
+      try
+        result:=vars.values[k];
+       except
+        result:=''
+      end;
 end; // sessionGet
 
-procedure Tsession.setVar(k, v:string);
+procedure Tsession.setVar(k: TSessionId; const v: String);
 begin
-if vars= NIL then
-  vars:=THashedStringList.create;
-vars.addPair(k,v);
+  if vars= NIL then
+    vars := THashedStringList.create;
+  vars.addPair(k,v);
 end;
 
 procedure Tsession.setTTL(t:Tdatetime);
@@ -1040,24 +1192,32 @@ end;
 
 constructor Tsessions.create;
 begin
-  fS := Tdictionary<TSessionId,Tsession>.Create();
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  fS2 := TSessId2Sess.Create();
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  fS2 := Collections.NewKeyValue<TSessionId, Tsession>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
 end;
 
 destructor Tsessions.Destroy;
 begin
-  FreeAndNil(fS);
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  FreeAndNil(fS2);
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  fS2 := NIL;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
 end;
 
 function Tsessions.getSession(sId: TSessionId): Tsession;
 begin
-  if not fS.TryGetValue(sId, Result) then
+  if not fS2.TryGetValue(sId, Result) then
     Result := NIL;
 end;
 
 function Tsessions.createSession(sId: TSessionId = ''): Tsession;
 begin
   result := Tsession.create(sid);
-  fS.Add(result.id, result);
+  fS2.Add(result.id, result);
 end;
 
 function Tsessions.initNewSession(peerIp: String = ''; sid: TSessionId = ''): TSessionId;
@@ -1074,7 +1234,7 @@ end;
 
 procedure Tsessions.clearSession(sId: TSessionId);
 begin
-  fS.Remove(sId);
+  fS2.Remove(sId);
 end;
 
 procedure Tsessions.destroySession(sId: TSessionId);
@@ -1084,7 +1244,7 @@ begin
   s := getSession(sId);
   if Assigned(s) then
     begin
-      fS.Remove(sId);
+      fS2.Remove(sId);
       s.free;
     end;
 end;
@@ -1093,11 +1253,11 @@ function Tsessions.noSession(sId: TSessionId): Boolean;
 var
   s: TSession;
 begin
-  Result := (sID = '') or not fS.ContainsKey(sId);
+  Result := (sID = '') or not fS2.ContainsKey(sId);
   if not Result then
    // Check if session was expired
     begin
-      s := fS.Items[sId];
+      s := fS2.Items[sId];
       Result := s.expires < now;
     end;
 end;
@@ -1111,21 +1271,181 @@ begin
     s.keepAlive;
 end;
 
+{$IFDEF USE_MORMOT_COLLECTIONS}
+function Tsessions.onCheckExpired(const aKey; var aValue;
+    aIndex, aCount: integer; aOpaque: pointer): boolean;
+var
+  sId: TSessionId;
+begin
+  if PDateTime(aOpaque)^ > Tsession(aValue).expires then
+   begin
+    sId := Tsession(aValue).id;
+    Tsession(aValue).free;
+    Tsession(aValue) := NIL;
+//    fS2.Items[sId] := NIL;
+    fS2.Data.DeleteAt(aIndex);
+   end;
+end;
+{$ENDIF USE_MORMOT_COLLECTIONS}
+
 procedure Tsessions.checkExpired;
 var
   now_: TDateTime;
   sId: TSessionId;
 begin
   now_ := now();
-  for var sess in self.fS.Values do
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  for var sess in self.fS2.Values do
    if now_ > sess.expires then
    begin
     sId := sess.id;
     sess.free;
-    self.fS.Items[sId] := NIL;
-    self.fS.Remove(sId);
+    self.fS2.Items[sId] := NIL;
+    self.fS2.Remove(sId);
    end;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  self.fS2.Data.ForEach(onCheckExpired, @now_);
+  {$ENDIF USE_MORMOT_COLLECTIONS}
 end;
+
+function conn2dataMain(p: Tobject): TconnDataMain; inline; overload;
+begin
+  if p = NIL then
+    result := NIL
+   else
+    result := TconnDataMain((p as ThttpConn).data)
+end; // conn2dataMain
+
+function conn2dataMain(i: integer): TconnDataMain; inline; overload;
+begin
+  try
+    if i < srv.conns.count then
+      result := conn2dataMain(srv.conns[i])
+    else
+      result := conn2dataMain(srv.offlines[i-srv.conns.count])
+   except
+    result := NIL
+  end
+end; // conn2dataMain
+
+function isDownloading(data: TconnDataMain): boolean;
+begin
+  result := assigned(data) and data.countAsDownload
+     and (data.conn.state in [HCS_REPLYING_BODY, HCS_REPLYING_HEADER, HCS_REPLYING])
+end; // isDownloading
+
+function isSendingFile(data: TconnDataMain): Boolean;
+begin
+  result := Assigned(data)
+    and (data.conn.state = HCS_REPLYING_BODY)
+    and (data.conn.reply.bodyMode in [RBM_FILE, RBM_STREAM])
+    and (data.downloadingWhat in [DW_FILE, DW_ARCHIVE])
+end; // isSendingFile
+
+function isReceivingFile(data: TconnDataMain): Boolean;
+begin
+  result := assigned(data) and (data.conn.state = HCS_POSTING) and (data.uploadSrc > '')
+end;
+
+function getETA(data: TconnDataMain): String;
+begin
+  if (data.conn.state in [HCS_REPLYING_BODY, HCS_POSTING])
+   and (data.eta.idx > ETA_FRAME) then
+    result := elapsedToStr(data.eta.result)
+   else
+    result := '-'
+end; // getETA
+
+function countIPs(onlyDownloading: boolean=FALSE; usersInsteadOfIps: boolean=FALSE): integer;
+var
+  i: integer;
+  d: TconnDataMain;
+  ips: TStringDynArray;
+begin
+  i := 0;
+  ips := NIL;
+  while i < srv.conns.count do
+    begin
+    d := conn2dataMain(i);
+    if not onlyDownloading or isDownloading(d) then
+      addUniqueString(if_(usersInsteadOfIps, d.usr, d.address), ips);
+    inc(i);
+    end;
+  result:=length(ips);
+end; // countIPs
+
+function countConnectionsByIP(const ip: String): Integer;
+var
+  i: integer;
+begin
+result:=0;
+i:=0;
+while i < srv.conns.count do
+  begin
+  if conn2dataMain(i).address = ip then
+  	inc(result);
+  inc(i);
+  end;
+end; // countConnectionsByIP
+
+function getGraphPic(cd: TconnDataMain; w, h: Integer): RawByteString;
+var
+  bmp: Tbitmap;
+  refresh: string;
+  i: integer;
+  colors: TIntegerDynArray;
+  options: string;
+
+  procedure addColor(c: Tcolor);
+  var
+    n: integer;
+  begin
+    n := length(colors);
+    setLength(colors, n+1);
+    colors[n] := c;
+  end; // addColor
+
+begin
+  options := copy(decodeURL(cd.conn.request.url), 12, MAXINT);
+  delete(options, pos('?',options), MAXINT);
+  bmp := Tbitmap.create(w, h);
+//  bmp.SetSize(graphBox.Width, graphBox.Height);
+  colors := NIL;
+  if options = '' then
+    begin
+      // here is an initial support for ?parameters. colors not supported yet.
+      try
+        bmp.width := strToInt(cd.urlvars.Values['w'])
+       except
+      end;
+      try
+        bmp.height := min(strToInt(cd.urlvars.Values['h']), 300000 div max(1,bmp.width))
+       except
+      end;
+      refresh := cd.urlvars.Values['refresh'];
+    end
+   else
+    try
+      i := strToInt(chop('x',options));
+      if (i > 0) and (i <= length(graph.samplesIn)) then
+        bmp.Width:=i;
+      i := strToInt(chop('x',options));
+      if (i > 0) and (i <= length(graph.samplesIn)) then
+        bmp.height := min(i, 300000 div max(1,bmp.width));
+      refresh := chop('x',options);
+      for i:=1 to 5 do
+        addColor(stringToColorEx(chop('x',options), graphics.clDefault));
+     except
+    end;
+  drawGraphOn(bmp.canvas, colors);
+  result:=bmp2str(bmp);
+  bmp.free;
+  if cd = NIL then
+    exit;
+  cd.conn.addHeader('Cache-Control', 'no-cache');
+  if refresh > '' then
+    cd.conn.addHeader('Refresh', refresh);
+end; // getGraphPic
 
 
 
