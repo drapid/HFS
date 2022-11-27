@@ -14,10 +14,10 @@ Icons are generated at http://fontello.com/ . Use fontello.json for further modi
 
 For the default template we are targeting compatibility with Chrome 49 as it's the latest version running on Windows XP.
 
-Modification:
-Uses for.rnq from R&Q
-All images are PNG with alpha-channel
-New format for VFS saving (ZIP file with JSON and images as separate files)
+## Modification:
+- Uses for.rnq from R&Q
+- All images are PNG with alpha-channel
+- New format for VFS saving (ZIP file with JSON and images as separate files)
 
 Now it can be build with full unicode support and in X64.
 <img src="https://rnq.ru/forum/attachment/1977" alt="Unicode">
