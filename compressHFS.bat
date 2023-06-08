@@ -1,2 +1,10 @@
-@copy hfs.exe "HFS320_RD.exe"
-upx.exe -9 --lzma "HFS320_RD.exe"
+@IF "%1" EQU "x64" goto x64
+ECHO Processing x86
+@copy binWin32\hfs.exe "binWin32\HFS321_RD.exe"
+upx.exe -9 --lzma "binWin32\HFS321_RD.exe"
+exit
+:x64
+ECHO Processing x64
+@copy binWin64\hfs.exe "binWin64\HFS321_RDx64.exe"
+upx.exe -9 --lzma "binWin64\HFS321_RDx64.exe"
+

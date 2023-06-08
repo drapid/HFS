@@ -32,12 +32,21 @@ var
   upTime: Tdatetime;           // the server is up since...
   inTotalOfs, outTotalOfs: int64; // used to cumulate in/out totals
   hitsLogged, downloadsLogged, uploadsLogged: integer;
+  dontLogAddressMask: string;
   ipsEverConnected: THashedStringList;
   customIPservice: string;
   mimeTypes, address2name, IPservices: TstringDynArray;
   IPservicesTime: TdateTime;
   uploadPaths: TstringDynArray;
   minDiskSpace: int64; // in MB. an int32 would suffice, but an int64 will save us
+
+  maxConnections: integer;     // max number of connections (total)
+  maxConnectionsIP: integer;   // ...from a single address
+  maxContempDLs: integer;      // max number of contemporaneous downloads
+  maxContempDLsIP: integer;    // ...from a single address
+  maxContempDLsUser: integer;  // ...from a single user
+  maxIPs: integer;             // max number of different addresses connected
+  maxIPsDLing: integer;        // max number of different addresses downloading
 
   defaultTpl, dmBrowserTpl, filelistTpl: Ttpl;
   accounts: Taccounts;
@@ -50,9 +59,9 @@ var
   graph: record
   	rate: integer;    // update speed
     lastOut, lastIn: int64; // save bytesSent and bytesReceived last values
-    maxV: integer;    // max value in scale
+    maxV: int64;    // max value in scale
     size: integer;    // height of the box
-    samplesIn, samplesOut: array [0..3000] of integer; // 1 sample, 1 pixel
+    samplesIn, samplesOut: array [0..3000] of int64; // 1 sample, 1 pixel
     beforeRecalcMax: integer;  // countdown
    end;
 

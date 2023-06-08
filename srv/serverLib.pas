@@ -18,12 +18,18 @@ uses
  {$ENDIF FMX}
   math, Types, SysUtils,
   iniFiles,
+  srvConst,
   HSLib, srvClassesLib, fileLib;
 
 type
 
   TShowPrefs = set of (spUseSysIcons, spHttpsUrls, spFoldersBefore, spLinksBefore,
                        spNoPortInUrl, spEncodeNonascii, spEncodeSpaces, spCompressed, spNoWaitSysIcons);
+
+
+  TLogPrefs = set of (logBanned, logIcons, logBrowsing, logProgress,
+                      logServerstart, logServerstop, logconnections,
+                      logDisconnections, logUploads);
 
   TfileListing = class
     actualCount: integer;
@@ -110,12 +116,42 @@ type
     function  getRootNode: TTreeNode;
     procedure getPage(const sectionName: String; data: TconnDataMain; f: Tfile=NIL; tpl2use: Ttpl=NIL);
     procedure compressReply(cd: TconnDataMain);
+    function  countDownloads(const ip: String=''; const user: String=''; f:Tfile=NIL): Integer;
+//    procedure httpEventNG(event: ThttpEvent; conn: ThttpConn; preventLeeching: Boolean);
     function  getSP: TShowPrefs;
     function  getLP: TLoadPrefs;
     property  onGetSP: TOnGetSP read fOnGetSP; // write fOnGetSP;
     property  onGetLP: TOnGetLP read fOnGetLP; // write fOnGetLP;
     property  onAddingItems: TProc read fOnAddingItems write fOnAddingItems;
    end;
+
+  TconnData = class(TconnDataMain)  // data associated to a client connection
+  private
+    fLastFile: Tfile;
+    procedure setLastFile(f: Tfile);
+  public
+    guiData: TObject;
+//    countAsDownload: boolean; // cache the value for the Tfile method
+    { cache User-Agent because often retrieved by connBox.
+    { this value is filled after the http request is complete (HE_REQUESTED),
+    { or before, during the request as we get a file (HE_POST_FILE). }
+    deleting: boolean;      // don't use, this item is about to be discarded
+    nextDloadScreenUpdate: Tdatetime; // avoid too fast updating during download
+    preReply: TpreReply;
+    lastBytesSent, lastBytesGot: int64; // used for print to log only the recent amount of bytes
+    bytesGotGrouping, bytesSentGrouping: record
+      bytes: integer;
+      since: Tdatetime;
+     end;
+    { here we put just a pointer because the file type would triplicate
+    { the size of this record, while it is NIL for most connections }
+    f: ^file; // uploading file handle
+
+    property lastFile: Tfile read fLastFile write setLastFile;
+    constructor create(conn: ThttpConn; pGuiData: TObject);
+    destructor Destroy; override;
+    function accessFor(f: TFile): Boolean;
+   end; // Tconndata
 
 type
   TstringIntPairs = array of record
@@ -125,6 +161,9 @@ type
 
 var
   iconMasks: TstringIntPairs;
+  eventScripts: Ttpl;
+  currentCFG: string;
+  currentCFGhashed: THashedStringList;
 
   procedure kickByIP(const ip: String);
   function  getAcceptOptions(): TstringDynArray;
@@ -133,6 +172,9 @@ var
   procedure stopServer();
   function  restartServer(): boolean;
   function  changePort(const newVal: String): Boolean;
+  function noLimitsFor(account: Paccount): Boolean;
+  function conn2data(p: Tobject): TconnData; inline; overload;
+  function conn2data(i: integer): TconnData; inline; overload;
 
 implementation
 
@@ -150,7 +192,7 @@ uses
   RDUtils, RDFileUtil, RDGlobal, //AnsiClasses,
   RnQCrypt, RnQzip, RnQLangs, RnQDialogs, RnQJSON,
   IconsLib,
-  srvConst, srvUtils, parserLib, srvVars;
+  srvUtils, parserLib, srvVars;
 
 constructor TfileListing.create();
 begin
@@ -2278,6 +2320,46 @@ if (cd.workaroundForIEutf8  = wi_toDetect) and (cd.agent > '') then
     end;
 end; // compressReply
 
+function conn2data(p: Tobject): TconnData; inline; overload;
+begin
+  if p = NIL then
+    result:=NIL
+   else
+    result:=TconnData((p as ThttpConn).data)
+end; // conn2data
+
+function conn2data(i: integer): TconnData; inline; overload;
+begin
+  try
+    if i < srv.conns.count then
+      result := conn2data(srv.conns[i])
+    else
+      result := conn2data(srv.offlines[i-srv.conns.count])
+   except
+    result := NIL
+  end
+end; // conn2data
+
+function TFileServer.countDownloads(const ip: String=''; const user: String=''; f:Tfile=NIL): Integer;
+var
+  i: integer;
+  d: TconnData;
+begin
+  result := 0;
+  i := 0;
+  while i < srv.conns.count do
+  begin
+  d := conn2data(i);
+  if isDownloading(d)
+  and ((f = NIL) or (assigned(d.lastFile) and d.lastFile.same(f)))
+  and ((ip = '') or addressMatch(ip, d.address))
+  and ((user = '') or sameText(user, d.usr))
+  then
+    inc(result);
+  inc(i);
+  end;
+end;
+
 function TFileServer.getSP: TShowPrefs;
 begin
   if Assigned(fOnGetSP) then
@@ -2293,6 +2375,64 @@ begin
    else
     Result := [];
 end;
+
+constructor TconnData.create(conn: ThttpConn; pGuiData: TObject);
+begin
+  conn.data := self;
+  self.conn := conn;
+  time := now();
+  lastActivityTime := time;
+  downloadingWhat := DW_UNK;
+  urlvars := THashedStringList.create();
+  urlvars.lineBreak := '&';
+  tplCounters := TstringToIntHash.create();
+  vars := THashedStringList.create();
+  postVars := THashedStringList.create();
+  guiData := pGuiData;
+end; // constructor
+
+destructor TconnData.destroy;
+begin
+  if vars.Count > 0 then
+  for var i: integer :=0 to vars.Count-1 do
+  if assigned(vars.Objects[i]) and (vars.Objects[i] <> currentCFGhashed) then
+    begin
+    vars.Objects[i].free;
+    vars.Objects[i]:=NIL;
+    end;
+  freeAndNIL(vars);
+  freeAndNIL(postVars);
+  freeAndNIL(urlvars);
+  freeAndNIL(tplCounters);
+  freeAndNIL(limiter);
+  if guiData <> NIL then
+    FreeAndNil(guiData);
+
+// do NOT free "tpl". It is just a reference to cached tpl. It will be freed only at quit time.
+if assigned(f) then
+  begin
+  closeFile(f^);
+//  f.free;
+  f := nil;
+  end;
+inherited destroy;
+end; // destructor
+
+// we'll automatically free and previous temporary object
+procedure TconnData.setLastFile(f: Tfile);
+begin
+  freeIfTemp(FlastFile);
+  FlastFile := f;
+end;
+
+function TconnData.accessFor(f: TFile): Boolean;
+begin
+  Result := Self <> NIL;
+  if Result then
+    Result := f.accessFor(usr, pwd);
+end;
+
+
 
 function uptimestr(): string;
 var
@@ -2403,5 +2543,12 @@ begin
   if act then
     startServer();
 end; // changePort
+
+function noLimitsFor(account: Paccount): boolean;
+begin
+  account := accountRecursion(account, ARSC_NOLIMITS);
+  result := assigned(account) and account.noLimits;
+end; // noLimitsFor
+
 
 end.

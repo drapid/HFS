@@ -269,6 +269,7 @@ type
     agent: string;
     conn: ThttpConn;
     limiter: TspeedLimiter;
+    fileXferStart: Tdatetime;
     averageSpeed: real;   { calculated on disconnection as bytesSent/totalTime. it is calculated also while
                             sending and it is different from conn.speed because conn.speed is average speed
                             in the last second, while averageSpeed is calculated on ETA_FRAME seconds }

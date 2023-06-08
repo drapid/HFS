@@ -35,13 +35,6 @@ var
   addFolderDefault: string;    // how to default adding a folder (real/virtual)
   toDelete: Tlist;             // connections pending for deletion
   speedLimitIP: real;
-  maxConnections: integer;     // max number of connections (total)
-  maxConnectionsIP: integer;   // ...from a single address
-  maxContempDLs: integer;      // max number of contemporaneous downloads
-  maxContempDLsIP: integer;    // ...from a single address
-  maxContempDLsUser: integer;  // ...from a single user
-  maxIPs: integer;             // max number of different addresses connected
-  maxIPsDLing: integer;        // max number of different addresses downloading
 //  autoFingerprint: integer;    // create fingerprint on file addition
   renamePartialUploads: string;
   allowedReferer: string;      // check over the Refer header field
@@ -57,6 +50,7 @@ var
   queryingClose: boolean;
 //  tpl_help: string;
   lastWindowRect: Trect;
+  lastEverySec: TDateTime;
   tplEditor: string;
   tplLast: Tdatetime;
   tplImport: boolean;
@@ -65,7 +59,6 @@ var
   cfgPath, tmpPath: string;
   logMaxLines: integer;     // number of lines
   windowsShuttingDown: boolean = FALSE;
-  dontLogAddressMask: string;
   openInBrowser: string; // to not send the "attachment" suggestion in header
   quitASAP: boolean;  // deferred quit
   quitting: boolean; // ladies, we're quitting

@@ -30,8 +30,7 @@ uses
 
 var
   defaultAlias: THashedStringList;
-  staticVars : THashedStringList; // these scripting variables are held for the whole run-time
-  eventScripts: Ttpl;
+  staticVars: THashedStringList; // these scripting variables are held for the whole run-time
 
 function tryApplyMacrosAndSymbols(fs: TFileServer; var txt: String; var md: TmacroData; removeQuotings: Boolean=true): Boolean;
 function runScript(fs: TFileServer; const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL): String;

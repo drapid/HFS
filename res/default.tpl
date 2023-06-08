@@ -910,7 +910,7 @@ function getItemName(el) {
 } // getItemName
 
 function submit(data, url) {
-    var f = $create('form', { app:'body', a:{method:'post', action:url||undefined }, s:'display:none' })
+    var f = $create('form', { app:'body', a:{method:'post', action:url||'' }, s:'display:none' })
     for (var k in data)
 		wantArray(data[k]).forEach(v2=>
 			$create('input', { app:f, a:{type:'hidden', name:k, value:v2 } }))

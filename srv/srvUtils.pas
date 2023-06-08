@@ -179,6 +179,8 @@ uses
 
   function getAgentID(conn: ThttpConn): String; overload;
   procedure drawGraphOn(cnv: Tcanvas; colors: TIntegerDynArray=NIL);
+  function recalculateGraph(s: ThttpSrv): Boolean;
+  procedure resetGraph(s: ThttpSrv);
 
 type
   TfastStringAppend = class
@@ -1892,35 +1894,40 @@ begin
   result := getAgentID(conn.getHeader('User-Agent'))
 end;
 
-procedure drawGraphOn(cnv:Tcanvas; colors:TIntegerDynArray=NIL);
+procedure drawGraphOn(cnv: Tcanvas; colors: TIntegerDynArray=NIL);
 var
-  i, h, maxV: integer;
+  i, h, maxV, sI: integer;
   r: Trect;
   top: double;
   s: string;
 
-  procedure drawSample(sample:integer);
+  procedure drawSample(sample: int64);
+  var
+    a: Integer;
   begin
-	cnv.moveTo(r.left+i, r.bottom);
-  cnv.lineTo(r.Left+i, r.Bottom-1-sample*h div maxV);
+    cnv.moveTo(r.left+i, r.bottom);
+    a := (sample*h div maxV);
+    cnv.lineTo(r.Left+i, r.Bottom - 1 - a);
   end; // drawSample
 
-  function getColor(idx:integer; def:Tcolor):Tcolor;
+  function getColor(idx: integer; def:Tcolor):Tcolor;
   begin
-  if (length(colors) <= idx) or (colors[idx] = Graphics.clDefault) then result:=def
-  else result:=colors[idx]
+    if (length(colors) <= idx) or (colors[idx] = Graphics.clDefault) then
+      result := def
+     else
+      result := colors[idx]
   end; // getColor
 
-resourcestring
+ resourcestring
   LIMIT = 'Limit';
   TOP_SPEED = 'Top speed';
 begin
-  r:=cnv.cliprect;
+  r := cnv.cliprect;
   // clear
-  cnv.brush.color:=getColor(0, clBlack);
+  cnv.brush.color := getColor(0, clBlack);
   cnv.fillrect(r);
   // draw grid
-  cnv.Pen.color:=getColor(1, rgb(0,0,120));
+  cnv.Pen.color := getColor(1, rgb(0,0,120));
   i:=r.left;
   while i < r.right do
     begin
@@ -1939,10 +1946,17 @@ begin
   maxV:=max(graph.maxV, 1);
   h:=r.bottom-r.top-1;
   // draw graph
-  cnv.Pen.color:=getColor(2, clFuchsia);
-  for i:=0 to (r.Right-r.left)-1 do	drawSample(graph.samplesOut[i]);
-  cnv.Pen.color:=getColor(3, clYellow);
-  for i:=0 to (r.Right-r.left)-1 do	drawSample(graph.samplesIn[i]);
+  if r.Right > r.left then
+    begin
+      sI := Min((r.Right-r.left)-1, Length(graph.samplesOut)-1);
+
+      cnv.Pen.color := getColor(2, clFuchsia);
+      for i:=0 to sI do
+        drawSample(graph.samplesOut[i]);
+      cnv.Pen.color := getColor(3, clYellow);
+      for i:=0 to sI do
+        drawSample(graph.samplesIn[i]);
+    end;
   // text
   cnv.Font.Color:=getColor(4, clLtGray);
   cnv.Font.Name:='Small Fonts';
@@ -1954,6 +1968,53 @@ begin
   if assigned(globalLimiter) and (globalLimiter.maxSpeed < MAXINT) then
     cnv.TextOut(r.right-180+25, 15, format(LIMIT+': '+MSG_SPEED_KBS, [globalLimiter.maxSpeed/1000]));
 end; // drawGraphOn
+
+function recalculateGraph(s: ThttpSrv): Boolean;
+var
+  i: integer;
+begin
+  Result := False;
+  if (s = NIL) then // or quitting then
+    exit;
+// shift samples
+  i := sizeOf(graph.samplesOut)-sizeOf(graph.samplesOut[0]);
+  move(graph.samplesOut[0], graph.samplesOut[1], i);
+  move(graph.samplesIn[0], graph.samplesIn[1], i);
+ // insert new "out" sample
+  graph.samplesOut[0] := s.bytesSent-graph.lastOut;
+  graph.lastOut := s.bytesSent;
+// insert new "in" sample
+  graph.samplesIn[0] := s.bytesReceived-graph.lastIn;
+  graph.lastIn := s.bytesReceived;
+// increase the max value
+  i := max(graph.samplesOut[0], graph.samplesIn[0]);
+  if i > graph.maxV then
+    begin
+      graph.maxV := i;
+      graph.beforeRecalcMax := 100;
+    end;
+  Result := graph.maxV <> 0;
+  dec(graph.beforeRecalcMax);
+  if graph.beforeRecalcMax > 0 then
+    exit;
+// recalculate max value
+  graph.maxV := 0;
+  with graph do
+    for i:=0 to length(samplesOut)-1 do
+      maxV := max(maxV, max(samplesOut[i], samplesIn[i]) );
+  graph.beforeRecalcMax:=100;
+  Result := True;
+end; // recalculateGraph
+
+procedure resetGraph(s: ThttpSrv);
+begin
+  zeroMemory(@graph.samplesIn, sizeOf(graph.samplesIn));
+  zeroMemory(@graph.samplesOut, sizeOf(graph.samplesOut));
+  graph.maxV:=0;
+  graph.beforeRecalcMax:=1;
+  recalculateGraph(s);
+end;
+
 
 INITIALIZATION
 

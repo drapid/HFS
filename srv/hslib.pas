@@ -259,25 +259,25 @@ type
     function  initInputStream(): boolean;
     property address: String read P_address;      // other peer ip address
     property port: String read P_port;            // other peer port
-    property v6:boolean read P_v6;
-    property requestCount:integer read P_requestCount;
-    property bytesToSend:int64 read getBytesToSend;
-    property bytesToPost:int64 read getBytesToPost;
-    property bytesSent:int64 read bsent_bodies;
-    property bytesSentLastItem:int64 read bsent_body;
-    property bytesPartial:int64 read partialBodySize;
-    property bytesFullBody:int64 read fullBodySize;
-    property bytesGot:int64 read getBytesGot;
-    property bytesPosted:int64 read postDataReceived;
-    property bytesPostedLastItem:int64 read FbytesPostedLastItem;
-    property speedIn:real read P_speedIn;  // (bytes_recvd/s)
-    property speedOut:real read P_speedOut;  // (bytes_sent/s)
-    property disconnectedByServer:boolean read disconnecting;
-    property destroying:boolean read P_destroying;
-    property dontFree:boolean read getDontFree;
-    property getLockCount:integer read lockCount;
-    property sndBuf:integer read P_sndBuf write setSndBuf;
-    end;
+    property v6: Boolean read P_v6;
+    property requestCount: integer read P_requestCount;
+    property bytesToSend: int64 read getBytesToSend;
+    property bytesToPost: int64 read getBytesToPost;
+    property bytesSent: int64 read bsent_bodies;
+    property bytesSentLastItem: int64 read bsent_body;
+    property bytesPartial: int64 read partialBodySize;
+    property bytesFullBody: int64 read fullBodySize;
+    property bytesGot: int64 read getBytesGot;
+    property bytesPosted: int64 read postDataReceived;
+    property bytesPostedLastItem: int64 read FbytesPostedLastItem;
+    property speedIn: real read P_speedIn;  // (bytes_recvd/s)
+    property speedOut: real read P_speedOut;  // (bytes_sent/s)
+    property disconnectedByServer: boolean read disconnecting;
+    property destroying: boolean read P_destroying;
+    property dontFree: boolean read getDontFree;
+    property getLockCount: integer read lockCount;
+    property sndBuf: integer read P_sndBuf write setSndBuf;
+   end;
 
   ThttpSrv = class
   protected
@@ -759,44 +759,45 @@ end;
 
 function ThttpSrv.start(onAddress:string='*'):boolean;
 begin
-result:=FALSE;
-if active or not assigned(sock) then exit;
-try
-  if onAddress = '[*]' then
-    begin
-      sock.addr := '[0::0]'
-    end
-   else
-    begin
-      if onAddress = '' then onAddress:='*';
-      if (onAddress = '') or (onAddress = '*') then
-        sock.addr := '0.0.0.0'
-       else
-        sock.addr := onAddress;
-    end;
-  sock.port:=port;
-//  sock.proto:='6';
-  sock.proto := 'tcp';
-  sock.SocketFamily := sfAny;
-  sock.listen();
-  if port = '0' then
-    P_port := sock.getxport();
-  result := TRUE;
+  result := FALSE;
+  if active or not assigned(sock) then
+    exit;
+  try
+    if onAddress = '[*]' then
+      begin
+        sock.addr := '[0::0]'
+      end
+     else
+      begin
+        if onAddress = '' then onAddress:='*';
+        if (onAddress = '') or (onAddress = '*') then
+          sock.addr := '0.0.0.0'
+         else
+          sock.addr := onAddress;
+      end;
+    sock.port := port;
+  //  sock.proto:='6';
+    sock.proto := 'tcp';
+    sock.SocketFamily := sfAny;
+    sock.listen();
+    if port = '0' then
+      P_port := sock.getxport();
+    result := TRUE;
 
-{
-  if onAddress = '*' then
-    try
-      sock.MultiListenSockets.Clear();
-      with sock.MultiListenSockets.Add do
-        begin
-        addr := '::';
-        Port := sock.port
-        end;
-      sock.MultiListen();
-    except end;
-}
-  notify(HE_OPEN, NIL);
-except
+  {
+    if onAddress = '*' then
+      try
+        sock.MultiListenSockets.Clear();
+        with sock.MultiListenSockets.Add do
+          begin
+          addr := '::';
+          Port := sock.port
+          end;
+        sock.MultiListen();
+      except end;
+  }
+    notify(HE_OPEN, NIL);
+   except
   end;
 end; // start
 
@@ -821,10 +822,11 @@ begin notify(HE_CLOSE, NIL) end;
 constructor ThttpSrv.create();
 begin
 //sock:=TWSocketServer.create(NIL);
-sock:=TWSocket.create(NIL);
-sock.OnSessionAvailable:=connected;
-sock.OnSessionClosed:=disconnected;
-sock.OnBgException:=bgexception;
+  sock := TWSocket.create(NIL);
+  sock.OnSessionAvailable := connected;
+  sock.OnSessionClosed := disconnected;
+  sock.OnBgException := bgexception;
+//  sock.MultiThreaded := True;
 
 conns:=TobjectList.create;
 conns.OwnsObjects:=FALSE;
@@ -1055,45 +1057,47 @@ begin canClose:=FALSE end;
 
 ////////// CLIENT
 
-constructor ThttpConn.create(server:ThttpSrv; acceptingSock:Twsocket);
+constructor ThttpConn.create(server: ThttpSrv; acceptingSock: Twsocket);
 var
   i: integer;
 begin
 // init socket
-sock:=Twsocket.create(NIL);
-if acceptingSock <> NIL then
-  sock.Dup(acceptingSock.accept())
- else
-  sock.Dup(server.sock.accept());
-sock.OnDataAvailable:=dataavailable;
-sock.OnSessionClosed:=disconnected;
-sock.onSendData:=senddata;
-sock.onDataSent:=datasent;
-sock.LineMode:=FALSE;
+  sock := Twsocket.create(NIL);
+//  sock.MultiThreaded := True;
+  if acceptingSock <> NIL then
+    sock.Dup(acceptingSock.accept())
+   else
+    sock.Dup(server.sock.accept());
+  sock.OnDataAvailable := dataavailable;
+  sock.OnSessionClosed := disconnected;
+  sock.onSendData := senddata;
+  sock.onDataSent := datasent;
+  sock.LineMode := FALSE;
 
-srv:=server;
+  srv := server;
 
-request.headers:=ThashedStringList.create;
-request.headers.nameValueSeparator:=':';
-limiters:=TObjectList.create;
-limiters.ownsObjects:=FALSE;
-P_address:=sock.GetPeerAddr();
-P_port:=sock.GetPeerPort();
-P_v6 := sock.SocketFamily = sfIPv6;
-state:=HCS_IDLE;
-srv.conns.add(self);
-clearRequest();
-clearReply();
-QueryPerformanceCounter(lastSpeedTime);
+  request.headers := ThashedStringList.create;
+  request.headers.nameValueSeparator := ':';
+  limiters := TObjectList.create;
+  limiters.ownsObjects:=FALSE;
+  P_address := sock.GetPeerAddr();
+  P_port := sock.GetPeerPort();
+  P_v6 := sock.SocketFamily = sfIPv6;
+  state := HCS_IDLE;
+  srv.conns.add(self);
+  clearRequest();
+  clearReply();
+  QueryPerformanceCounter(lastSpeedTime);
 
-i:=sizeOf(P_sndBuf);
-if WSocket_getsockopt(sock.HSocket, SOL_SOCKET, SO_SNDBUF, @P_sndBuf, i) <> NO_ERROR then
-  P_sndBuf:=0;
+  i := sizeOf(P_sndBuf);
+  if WSocket_getsockopt(sock.HSocket, SOL_SOCKET, SO_SNDBUF, @P_sndBuf, i) <> NO_ERROR then
+    P_sndBuf:=0;
 
-server.notify(HE_CONNECTED, self);
-if reply.mode <> HRM_CLOSE then exit;
-dontFulFil:=TRUE;
-disconnect();
+  server.notify(HE_CONNECTED, self);
+  if reply.mode <> HRM_CLOSE then
+    exit;
+  dontFulFil := TRUE;
+  disconnect();
 end;
 
 destructor ThttpConn.destroy;

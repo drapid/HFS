@@ -17,7 +17,6 @@ const
   CRLFA = RawByteString(#13#10);
   TAB = #9;
   BAK_EXT = '.bak';
-  VFS_FILE_IDENTIFIER = 'HFS.VFS';
   CFG_KEY = 'Software\rejetto\HFS';
   CFG_FILE = 'hfs.ini';
   TPL_FILE = 'hfs.tpl';
@@ -35,7 +34,6 @@ const
   STATUSBAR_REFRESH = 10; // tenth of second
   MAX_RECENT_FILES = 5;
   MANY_ITEMS_THRESHOLD = 1000;
-  COMPRESSION_THRESHOLD = 10*KILO; // if more than X bytes, VFS files are compressed
   STARTING_SNDBUF = 32000;
   YESNO :array [boolean] of string=('no','yes');
   DEFAULT_MIME = 'application/octet-stream';
@@ -101,11 +99,9 @@ type
 
 //  Pboolean = ^boolean;
 
-  TfilterMethod = function(self:Tobject):boolean;
+  TfilterMethod = function(self: Tobject): Boolean;
 
   Thelp = ( HLP_NONE, HLP_TPL );
-
-  TpreReply =  (PR_NONE, PR_BAN, PR_OVERLOAD);
 
 type
   TTrayShows = (TS_downloads, TS_connections, TS_uploads, TS_hits, TS_ips, TS_ips_ever, TS_none);

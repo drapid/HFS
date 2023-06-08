@@ -29,6 +29,8 @@ const
   DIFF_TPL_FILE = 'hfs.diff.tpl';
   FILELIST_TPL_FILE = 'hfs.filelist.tpl';
   SESSION_COOKIE = 'HFS_SID_';
+  VFS_FILE_IDENTIFIER = 'HFS.VFS';
+  COMPRESSION_THRESHOLD = 10*KILO; // if more than X bytes, VFS files are compressed
 
   ETA_FRAME = 5; // time frame for ETA (in seconds)
 
@@ -75,11 +77,21 @@ type
 
   TdownloadingWhat = ( DW_UNK, DW_FILE, DW_FOLDERPAGE, DW_ICON, DW_ERROR, DW_ARCHIVE );
 
+  TpreReply =  (PR_NONE, PR_BAN, PR_OVERLOAD);
+
 type
   TaccountRecursionStopCase = (ARSC_REDIR, ARSC_NOLIMITS, ARSC_IN_SET);
 
 const // Messages
   MSG_SPEED_KBS = '%.1f kB/s';
+
+resourcestring
+  MSG_MAX_CON = 'Max connections';
+  MSG_MAX_CON_SING = 'Max connections from single address';
+  MSG_MAX_SIM_ADDR = 'Max simultaneous addresses';
+  MSG_MAX_SIM_ADDR_DL = 'Max simultaneous addresses downloading';
+  MSG_MAX_SIM_DL_SING = 'Max simultaneous downloads from single address';
+  MSG_MAX_SIM_DL = 'Max simultaneous downloads';
 
 implementation
 

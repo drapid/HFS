@@ -41,35 +41,12 @@ uses
 type
   TmyTrayicon = TTrayicon;
 
-  TconnData = class(TconnDataMain)  // data associated to a client connection
-  private
-    fLastFile: Tfile;
-    procedure setLastFile(f: Tfile);
-  public
+  TConnDataGui = class(TObject)
     tray: TmyTrayicon;
     tray_ico: Ticon;
-//    countAsDownload: boolean; // cache the value for the Tfile method
-    { cache User-Agent because often retrieved by connBox.
-    { this value is filled after the http request is complete (HE_REQUESTED),
-    { or before, during the request as we get a file (HE_POST_FILE). }
-    deleting: boolean;      // don't use, this item is about to be discarded
-    nextDloadScreenUpdate: Tdatetime; // avoid too fast updating during download
-    preReply: TpreReply;
-    lastBytesSent, lastBytesGot: int64; // used for print to log only the recent amount of bytes  
-    fileXferStart: Tdatetime;
-    bytesGotGrouping, bytesSentGrouping: record
-      bytes: integer;
-      since: Tdatetime;
-     end;
-    { here we put just a pointer because the file type would triplicate
-    { the size of this record, while it is NIL for most connections }
-    f: ^file; // uploading file handle
-
-    property lastFile: Tfile read fLastFile write setLastFile;
-    constructor create(conn: ThttpConn);
+    constructor Create; OverLoad;
     destructor Destroy; override;
-    function accessFor(f: TFile): Boolean;
-   end; // Tconndata
+  end;
 
   Tautosave = record
     every, minimum: integer; // in seconds
@@ -617,6 +594,7 @@ type
     function appEventsHelp(Command: Word; Data: NativeInt;
       var CallHelp: Boolean): Boolean;
     procedure connBoxData(Sender: TObject; Item: TListItem);
+    function  connBoxDataRefresh(Sender: TObject; Item: TListItem; checkProgress: Boolean = True): Boolean;
     procedure connBoxAdvancedCustomDrawSubItem(Sender: TCustomListView;
       Item: TListItem; SubItem: Integer; State: TCustomDrawState;
       Stage: TCustomDrawStage; var DefaultDraw: Boolean);
@@ -655,7 +633,7 @@ type
 //    procedure setTrayShows(s:string);
     procedure setTrayShows(s: TTrayShows);
     procedure addTray();
-    procedure refreshConn(conn:TconnData);
+    procedure refreshConn(conn: TconnData; checkProgress: Boolean = True);
     function  getVFS(node:Ttreenode=NIL): RawByteString;
     function  getVFSJZ(node: TTreeNode=NIL): RawByteString;
     procedure setnoDownloadTimeout(v:integer);
@@ -716,6 +694,14 @@ type
      function getShownRealm():string;
   end;
 
+  TConnDataHlp = class helper for TConnData
+     function getTray(): TmyTrayicon;
+     function getIcon(): TIcon;
+     procedure initGUIData(hndl: THandle; onEvent: TTrayEventHandle);
+     procedure clearGuiData;
+     constructor createWithGui(conn: ThttpConn);
+  end;
+
 var
   mainFrm: TmainFrm;
 //  tpl: Ttpl; // template for generated pages
@@ -739,8 +725,6 @@ var
 //  hitsLogged, downloadsLogged, uploadsLogged: integer;
   lastFileOpen: string;
   speedLimit: real;            // overall limit, Kb/s --- it virtualizes the value of globalLimiter.maxSpeed, that's actually set to zero when streaming is paused
-  currentCFG: string;
-  currentCFGhashed: THashedStringList;
   saveMode: ( SM_USER, SM_SYSTEM, SM_FILE );
   tray: TmyTrayicon;
   dyndns: record
@@ -755,7 +739,6 @@ procedure repaintTray();
 function  paramsAsArray(): TStringDynArray;
 procedure processParams_before(var params: TStringDynArray; const allowed: String='');
 function  loadCfg(var ini, tpl: String): Boolean;
-function conn2data(i: integer): TconnData; inline; overload;
 function countDownloads(const ip: String=''; const user: String=''; f:Tfile=NIL): Integer;
 function protoColon(): String;
 procedure setSpeedLimitIP(v: real);
@@ -773,7 +756,8 @@ uses
   {$ENDIF UNICODE}
   MMsystem, UITypes, Threading,
   clipbrd, dateutils, shlobj, shellapi, winsock,
-  OverbyteIcsWSocket, OverbyteIcsHttpProt, OverbyteIcsZLibHigh, OverbyteIcsUtils,
+  OverbyteIcsWSocket, OverbyteIcsHttpProt,
+  OverbyteIcsUtils,
   {$IFDEF UNICODE}
 //   AnsiClasses,
   {$ENDIF UNICODE}
@@ -818,30 +802,6 @@ for var i:=0 to n-1 do
     end;
 result:=FALSE;
 end; // deleteAccount
-
-function noLimitsFor(account:Paccount):boolean;
-begin
-account:=accountRecursion(account, ARSC_NOLIMITS);
-result:=assigned(account) and account.noLimits;
-end; // noLimitsFor
-
-function conn2data(p: Tobject): TconnData; inline; overload;
-begin
-if p = NIL then result:=NIL
-else result:=TconnData((p as ThttpConn).data)
-end; // conn2data
-
-function conn2data(i: integer): TconnData; inline; overload;
-begin
-  try
-    if i < srv.conns.count then
-      result := conn2data(srv.conns[i])
-    else
-      result := conn2data(srv.offlines[i-srv.conns.count])
-   except
-    result := NIL
-  end
-end; // conn2data
 
 function conn2data(li: TlistItem): TconnData; inline; overload;
 begin
@@ -1036,57 +996,6 @@ if assigned(mainFrm) then
   mainfrm.visible:=userInteraction.bakVisible;
 end; // reenableUserInteraction
 
-constructor TconnData.create(conn:ThttpConn);
-begin
-conn.data:=self;
-self.conn:=conn;
-time:=now();
-lastActivityTime:=time;
-downloadingWhat:=DW_UNK;
-urlvars:=THashedStringList.create();
-urlvars.lineBreak:='&';
-tplCounters:=TstringToIntHash.create();
-vars:=THashedStringList.create();
-postVars:=THashedStringList.create();
-end; // constructor
-
-destructor TconnData.destroy;
-begin
-for var i: integer :=0 to vars.Count-1 do
-  if assigned(vars.Objects[i]) and (vars.Objects[i] <> currentCFGhashed) then
-    begin
-    vars.Objects[i].free;
-    vars.Objects[i]:=NIL;
-    end;
-freeAndNIL(vars);
-freeAndNIL(postVars);
-freeAndNIL(urlvars);
-freeAndNIL(tplCounters);
-freeAndNIL(limiter);
-// do NOT free "tpl". It is just a reference to cached tpl. It will be freed only at quit time.
-if assigned(f) then
-  begin
-  closeFile(f^);
-//  f.free;
-  f := nil;
-  end;
-inherited destroy;
-end; // destructor
-
-// we'll automatically free and previous temporary object
-procedure TconnData.setLastFile(f:Tfile);
-begin
-freeIfTemp(FlastFile);
-FlastFile:=f;
-end;
-
-function TconnData.accessFor(f: TFile): Boolean;
-begin
-  Result := Self <> NIL;
-  if Result then
-    Result := f.accessFor(usr, pwd);
-end;
-
 function encodeURLA(const s: String; fullEncode: Boolean=FALSE): RawByteString;
 var
   r: RawByteString;
@@ -1156,9 +1065,9 @@ begin
    Result := not progFrm.cancelRequested;
 end;
 
-function shouldRecur(data:TconnData):boolean;
+function shouldRecur(data: TconnData): boolean;
 begin
-result:=mainFrm.recursiveListingChk.checked
+  result := mainFrm.recursiveListingChk.checked
         and data.allowRecur
 end; // shouldRecur
 
@@ -1337,56 +1246,65 @@ cd.lastFN:=copy(url,2,1000);
 end; // sendPic
 
 procedure setupDownloadIcon(data: TconnData);
-
+var
+  tr: TmyTrayicon;
+  ti: TIcon;
   procedure painticon();
   var
     bmp: Tbitmap;
     s: string;
     perc: real;
   begin
-  perc:=safeDiv(0.0+data.conn.bytesSentLastItem, data.conn.bytesPartial);
-  s:=intToStr( trunc(perc*100) )+'%';
-  bmp:=getBaseTrayIcon(perc, TRAY_ICON_SIZE);
-  drawTrayIconNumber(bmp.canvas, s, TRAY_ICON_SIZE);
-//  data.tray_ico.Handle:=bmpToHico(bmp);
-  data.tray_ico.Handle := bmp2ico32(bmp);
-  bmp.free;
-  data.tray.setIcon(data.tray_ico);
-  data.tray.setTip(
-    if_( (data.conn.reply.bodyMode=RBM_RAW)or(data.conn.reply.bodyMode=RBM_TEXT),
-         decodeURL(data.conn.request.url), data.lastFN )
-    +trayNL+format('%.1f KB/s', [data.averageSpeed/1000])
-    +trayNL+dotted(data.conn.bytesSentLastItem)+' bytes sent'
-    +trayNL+data.address
-  );
-  data.tray.show();
+    perc := safeDiv(0.0+data.conn.bytesSentLastItem, data.conn.bytesPartial);
+    s := intToStr( trunc(perc*100) )+'%';
+    bmp := getBaseTrayIcon(perc, TRAY_ICON_SIZE);
+    drawTrayIconNumber(bmp.canvas, s, TRAY_ICON_SIZE);
+  //  data.tray_ico.Handle:=bmpToHico(bmp);
+    ti.Handle := bmp2ico32(bmp);
+    bmp.free;
+    tr.setIcon(ti);
+    tr.setTip(
+      if_( (data.conn.reply.bodyMode=RBM_RAW)or(data.conn.reply.bodyMode=RBM_TEXT),
+           decodeURL(data.conn.request.url), data.lastFN )
+      +trayNL+format('%.1f KB/s', [data.averageSpeed/1000])
+      +trayNL+dotted(data.conn.bytesSentLastItem)+' bytes sent'
+      +trayNL+data.address
+    );
+    tr.show();
   end; // paintIcon
 
 begin
-if (data = NIL) or (data.conn = NIL) then exit;
-if assigned(data.tray)
-and ((data.conn.state <> HCS_REPLYING_BODY) or
+  if (data = NIL) or (data.conn = NIL) then
+    exit;
+  tr := data.getTray;
+  ti := data.getIcon;
+
+  if assigned(tr)
+   and ((data.conn.state <> HCS_REPLYING_BODY) or
   (data.conn.bytesSentLastItem = data.conn.bytesPartial)) then
   begin
-  data.tray.hide();
-  freeAndNIL(data.tray);
-  data.tray_ico.free;
-  exit;
+    data.clearGuiData;
+    tr.hide();
+    freeAndNIL(tr);
+    ti.free;
+    exit;
   end;
-if not isSendingFile(data) then exit;
+  if not isSendingFile(data) then
+    exit;
 
-if not data.countAsDownload then exit;
+  if not data.countAsDownload then
+    exit;
 
-if data.tray = NIL then
-  begin
-  data.tray:= TmyTrayicon.create(mainfrm.handle);
-  data.tray.UsrData := data;
-  data.tray_ico := Ticon.create();
-  data.tray.onEvent := mainfrm.downloadTrayEvent;
-  end;
-if mainfrm.trayfordownloadChk.checked and isSendingFile(data) then
-  paintIcon()
-else data.tray.hide();
+  if tr = NIL then
+    begin
+      data.initGUIData(mainfrm.handle, mainfrm.downloadTrayEvent);
+      tr := data.getTray;
+      ti := data.getIcon;
+    end;
+  if mainfrm.trayfordownloadChk.checked and isSendingFile(data) then
+    paintIcon()
+   else
+    tr.hide();
 end; // setupDownloadIcon
 
 function getDynLogFilename(cd:TconnDataMain):string; overload;
@@ -2008,27 +1926,31 @@ var
 
   procedure closeUploadingFile();
   begin
-  if data.f = NIL then exit;
-  closeFile(data.f^);
-  dispose(data.f);
-  data.f:=NIL;
+    if data.f = NIL then
+      exit;
+    closeFile(data.f^);
+    dispose(data.f);
+    data.f := NIL;
   end; // closeUploadingFile
 
   // close and eventually delete/rename
   procedure closeUploadingFile_partial();
   begin
-  if (data = NIL) or (data.f = NIL) then exit;
-  closeUploadingFile();
-  if deletePartialUploadsChk.checked then deleteFile(data.uploadDest)
-  else if renamePartialUploads = '' then exit;
-  if ipos('%name%', renamePartialUploads) = 0 then
-    renameFile(data.uploadDest, data.uploadDest+renamePartialUploads)
-  else
-    renameFile(data.uploadDest,
-      extractFilePath(data.uploadDest) + xtpl(renamePartialUploads,['%name%',extractFileName(data.uploadDest)]) );
+    if (data = NIL) or (data.f = NIL) then
+      exit;
+    closeUploadingFile();
+    if deletePartialUploadsChk.checked then
+      deleteFile(data.uploadDest)
+     else if renamePartialUploads = '' then
+      exit;
+    if ipos('%name%', renamePartialUploads) = 0 then
+      renameFile(data.uploadDest, data.uploadDest+renamePartialUploads)
+     else
+      renameFile(data.uploadDest,
+        extractFilePath(data.uploadDest) + xtpl(renamePartialUploads,['%name%',extractFileName(data.uploadDest)]) );
   end; // closeUploadingFile_partial
 
-  function isDownloadManagerBrowser():boolean;
+  function isDownloadManagerBrowser(): boolean;
   begin
   result:=(pos('GetRight',data.agent)>0)
     or (pos('FDM',data.agent)>0)
@@ -2321,46 +2243,46 @@ var
     resourcestring
       MSG_LOGIN_FAILED = 'Login failed';
     begin
-    result:=FALSE;
-    if assigned(forceFile) then
-      f:=forceFile;
-    if f = NIL then
-      exit;
-    if f.isFile() and (dlForbiddenForWholeFolder or f.isDLforbidden()) then
-      begin
-      fileSrv.getPage('deny', data);
-      exit;
-      end;
-    result:=f.accessFor(data);
-    // sections are accessible. You can implement protection in place, if needed.
-    if not result  and (f = fileSrv.rootFile)
-    and ((mode='section') or startsStr('~', urlCmd) and fileSrv.tpl.sectionExist(copy(urlCmd,2,MAXINT))) then
-      begin
-      result:=TRUE;
-      specialGrant:=TRUE;
-      end;
-    if result then
-      exit;
-    if f.isFolder() and sessionRedirect() then // forbidden folder, but we were asked to go elsewhere
-      exit;
-    conn.reply.realm:=f.getShownRealm();
-    runEventScript('unauthorized');
-    fileSrv.getPage('login', data, f);
-    // log anyone trying to guess the password
-    if (forceFile = NIL) and stringExists(data.usr, getAccountList(TRUE, FALSE))
-    and logOtherEventsChk.checked then
-      add2log(MSG_LOGIN_FAILED, data);
+      result := FALSE;
+      if assigned(forceFile) then
+        f := forceFile;
+      if f = NIL then
+        exit;
+      if f.isFile() and (dlForbiddenForWholeFolder or f.isDLforbidden()) then
+        begin
+          fileSrv.getPage('deny', data);
+          exit;
+        end;
+      result := f.accessFor(data);
+      // sections are accessible. You can implement protection in place, if needed.
+      if not result  and (f = fileSrv.rootFile)
+      and ((mode='section') or startsStr('~', urlCmd) and fileSrv.tpl.sectionExist(copy(urlCmd,2,MAXINT))) then
+        begin
+        result := TRUE;
+        specialGrant := TRUE;
+        end;
+      if result then
+        exit;
+      if f.isFolder() and sessionRedirect() then // forbidden folder, but we were asked to go elsewhere
+        exit;
+      conn.reply.realm := f.getShownRealm();
+      runEventScript('unauthorized');
+      fileSrv.getPage('login', data, f);
+      // log anyone trying to guess the password
+      if (forceFile = NIL) and stringExists(data.usr, getAccountList(TRUE, FALSE))
+      and logOtherEventsChk.checked then
+        add2log(MSG_LOGIN_FAILED, data);
     end; // accessGranted
 
     function isAllowedReferer():boolean;
     var
       r: string;
     begin
-    result:=TRUE;
-    if allowedReferer = '' then exit;
-    r:=hostFromURL(conn.getHeader('Referer'));
-    if (r = '') or (r = data.getSafeHost(data)) then exit;
-    result:=fileMatch(allowedReferer, r);
+      result := TRUE;
+      if allowedReferer = '' then exit;
+      r:=hostFromURL(conn.getHeader('Referer'));
+      if (r = '') or (r = data.getSafeHost(data)) then exit;
+      result:=fileMatch(allowedReferer, r);
     end; // isAllowedReferer
 
     procedure replyWithString(s:string);
@@ -2372,7 +2294,7 @@ var
       fileSrv.getPage('deny', data);
       exit;
       end;
-    
+
     if conn.reply.contentType = '' then
       conn.reply.contentType:=if_(trim(getTill('<', s))='', RawByteString('text/html'), RawByteString('text/plain'));
     a := conn.getHeader('Accept-Charset');
@@ -3159,7 +3081,7 @@ case event of
     i:=-1;
     WSocket_setsockopt(conn.sock.HSocket, IPPROTO_TCP, TCP_NODELAY, @i, sizeOf(i));
 
-    data:=TconnData.create(conn);
+    data := TconnData.createWithGUI(conn);
     conn.limiters.add(globalLimiter); // every connection is bound to the globalLimiter
     conn.sndBuf:=STARTING_SNDBUF;
     data.address:=conn.address;
@@ -3177,16 +3099,19 @@ case event of
     runEventScript('disconnected');
     connBox.invalidate();
     end;
-  HE_GOT: lastActivityTime:=now();
+  HE_GOT: lastActivityTime := now();
   HE_SENT:
     begin
-    if data.nextDloadScreenUpdate <= now() then
-      begin
-      data.nextDloadScreenUpdate:= now()+DOWNLOAD_MIN_REFRESH_TIME;
-      refreshConn(data);
-      setupDownloadIcon(data);
-      end;
-    lastActivityTime:=now();
+      lastActivityTime := now();
+      if data.nextDloadScreenUpdate <= lastActivityTime then
+        begin
+        data.nextDloadScreenUpdate := lastActivityTime + DOWNLOAD_MIN_REFRESH_TIME;
+  //      refreshConn(data, false);
+        refreshConn(data);
+        setupDownloadIcon(data);
+        end;
+      if (lastActivityTime - lastEverySec) > OneSecond then
+        Application.ProcessMessages;
     end;
   HE_POST_FILE:
     begin
@@ -3729,8 +3654,8 @@ type
   function encodeW(const s: string; encoding: Tencoding): String;
   begin
   case encoding of
-    E_PLAIN: result:=s;
-    E_B64: result:=b64utf8W(s);
+    E_PLAIN: result := s;
+    E_B64: result := b64utf8W(s);
     E_ZIP:
       begin
       result := b64U(zCompressStr(StrToUTF8(s)));
@@ -4798,42 +4723,15 @@ toDelete.clear();
 end; // purgeConnections
 
 function Tmainfrm.recalculateGraph(): Boolean;
-var
-  i: integer;
 begin
   Result := False;
-if (srv = NIL) or quitting then exit;
-// shift samples
-i:=sizeOf(graph.samplesOut)-sizeOf(graph.samplesOut[0]);
-move(graph.samplesOut[0], graph.samplesOut[1], i);
-move(graph.samplesIn[0], graph.samplesIn[1], i);
-// insert new "out" sample
-graph.samplesOut[0]:=srv.bytesSent-graph.lastOut;
-graph.lastOut:=srv.bytesSent;
-// insert new "in" sample
-graph.samplesIn[0]:=srv.bytesReceived-graph.lastIn;
-graph.lastIn:=srv.bytesReceived;
-// increase the max value
-i:=max(graph.samplesOut[0], graph.samplesIn[0]);
-if i > graph.maxV then
-  begin
-  graph.maxV:=i;
-  graph.beforeRecalcMax:=100;
-  end;
-Result := graph.maxV <> 0;
-dec(graph.beforeRecalcMax);
-if graph.beforeRecalcMax > 0 then exit;
-// recalculate max value
-graph.maxV:=0;
-with graph do
-  for i:=0 to length(samplesOut)-1 do
-    maxV:=max(maxV, max(samplesOut[i], samplesIn[i]) );
-graph.beforeRecalcMax:=100;
-  Result := True;
+  if (srv = NIL) or quitting then
+    exit;
+  Result := srvUtils.recalculateGraph(srv);
 end; // recalculateGraph
 
 // parse the version-dependant notice
-procedure parseVersionNotice(s:string);
+procedure parseVersionNotice(s: String);
 var
   l, msg: string;
 begin
@@ -5188,7 +5086,8 @@ var
       for i:=0 to srv.conns.count-1 do
         begin
         data:=conn2data(i);
-        if data = NIL then continue;
+        if data = NIL then
+          continue;
 
         if isReceivingFile(data) then
           begin
@@ -5256,6 +5155,7 @@ var
       end;
 
     runTimedEvents(fileSrv);
+    lastEverySec := now;
   end; // everySec
 
   procedure everyTenth();
@@ -5305,8 +5205,10 @@ var
 
   end; // everyTenth
 
-  function every(tenths:integer):boolean;
-  begin result:=not quitting and (clock mod tenths = 0) end;
+  function every(tenths: integer): boolean;
+  begin
+    result := not quitting and (clock mod tenths = 0)
+  end;
 
 var
   bak: boolean;
@@ -5586,14 +5488,17 @@ procedure TmainFrm.filesBoxCompare(Sender: TObject; Node1, Node2: TTreeNode; Dat
 var
   f1, f2: Tfile;
 begin
-f1:=Tfile(node1.data);
-f2:=Tfile(node2.data);
-if (f1 = NIL) or (f2 = NIL) then exit;
-if not foldersbeforeChk.checked or (f1.isFolder() = f2.isFolder()) then
-  compare:=ansiCompareText(f1.name, f2.name)
-else
-  if f1.isFolder() then compare:=-1
-  else compare:=+1;
+  f1 := Tfile(node1.data);
+  f2 := Tfile(node2.data);
+  if (f1 = NIL) or (f2 = NIL) then
+    exit;
+  if not foldersbeforeChk.checked or (f1.isFolder() = f2.isFolder()) then
+    compare := ansiCompareText(f1.name, f2.name)
+   else
+    if f1.isFolder() then
+      compare := -1
+     else
+      compare := +1;
 end;
 
 procedure TmainFrm.foldersbeforeChkClick(Sender: TObject);
@@ -5634,23 +5539,28 @@ var
   s: TfastStringAppend;
   i: integer;
 begin
-mask:=logSearchBox.text;
-s:=TfastStringAppend.create;
-try
-  if sender = openLogBtn then s.append(logBox.text)
-  else
-    for i:=0 to logBox.Lines.Count-1 do
-      if filematch('*'+mask+'*', logbox.lines[i]) then
-        s.append(logBox.lines[i]+CRLF);
-  if s.length() = 0 then
-    begin
-    msgDlg('It''s empty', MB_ICONWARNING);
-    exit;
-    end;
-  fn:=saveTempFile(s.get());
-finally s.free end;
-if renameFile(fn, fn+'.txt') then exec(fn+'.txt')
-else msgDlg(MSG_NO_TEMP, MB_ICONERROR);
+  mask := logSearchBox.text;
+  s := TfastStringAppend.create;
+  try
+    if sender = openLogBtn then
+      s.append(logBox.text)
+     else
+      for i:=0 to logBox.Lines.Count-1 do
+        if filematch('*'+mask+'*', logbox.lines[i]) then
+          s.append(logBox.lines[i]+CRLF);
+    if s.length() = 0 then
+     begin
+      msgDlg('It''s empty', MB_ICONWARNING);
+      exit;
+     end;
+    fn := saveTempFile(s.get());
+   finally
+    s.free
+  end;
+  if renameFile(fn, fn+'.txt') then
+    exec(fn+'.txt')
+   else
+    msgDlg(MSG_NO_TEMP, MB_ICONERROR);
 end;
 
 procedure Tmainfrm.ipmenuclick(sender:Tobject);
@@ -5782,29 +5692,30 @@ if assigned(f) and autocopyURLonadditionChk.checked then
 result:=f;
 end; // addFilesFromString
 
-procedure Tmainfrm.addDropFiles(hnd:Thandle; under:Ttreenode);
+procedure Tmainfrm.addDropFiles(hnd: Thandle; under: Ttreenode);
 var
   i, n: integer;
   buffer: array [0..2000] of char;
   files: string;
 begin
-if hnd = 0 then exit;
-GlobalLock(hnd);
-n:=DragQueryFile(hnd,cardinal(-1),NIL,0);
-files:='';
-buffer:='';
-for i:=0 to n-1 do
-  begin
-  DragQueryFile(hnd,i,@buffer,sizeof(buffer));
-  files:=files+buffer+CRLF;
-  end;
-//DragFinish(hnd);  // this call seems to cause instability, don't know why
-GlobalUnlock(hnd);
+  if hnd = 0 then
+    exit;
+  GlobalLock(hnd);
+  n := DragQueryFile(hnd,cardinal(-1),NIL,0);
+  files := '';
+  buffer := '';
+  for i:=0 to n-1 do
+    begin
+      DragQueryFile(hnd, i, @buffer, sizeof(buffer));
+      files := files+buffer+CRLF;
+    end;
+  //DragFinish(hnd);  // this call seems to cause instability, don't know why
+  GlobalUnlock(hnd);
 
-addFilesFromString(files, under);
+  addFilesFromString(files, under);
 end; // addDropFiles
 
-procedure Tmainfrm.WMDropFiles(var msg:TWMDropFiles);
+procedure Tmainfrm.WMDropFiles(var msg: TWMDropFiles);
 begin
 with filesbox.screenToClient(mouse.cursorPos) do
   addDropFiles(msg.Drop, filesbox.getNodeAt(x,y));
@@ -6272,102 +6183,147 @@ begin
     drawProgress( cd.conn.bytesPosted, cd.conn.post.length, 0, cd.conn.post.length);
 end;
 
-procedure TmainFrm.connBoxData(Sender: TObject; Item: TListItem);
-resourcestring
-  MSG_CON_STATE_IDLE = 'idle';
-  MSG_CON_STATE_REQ = 'requesting';
-  MSG_CON_STATE_RCV = 'receiving';
+function TmainFrm.connBoxDataRefresh(Sender: TObject; Item: TListItem; checkProgress: Boolean = True): Boolean;
+ resourcestring
+  MSG_CON_STATE_IDLE  = 'idle';
+  MSG_CON_STATE_REQ   = 'requesting';
+  MSG_CON_STATE_RCV   = 'receiving';
   MSG_CON_STATE_THINK = 'thinking';
-  MSG_CON_STATE_REP = 'replying';
-  MSG_CON_STATE_SEND = 'sending';
-  MSG_CON_STATE_DISC = 'disconnected';
-const
-  HCS2STR :array [ThttpConnState] of string = (MSG_CON_STATE_IDLE, MSG_CON_STATE_REQ, MSG_CON_STATE_RCV,
+  MSG_CON_STATE_REP   = 'replying';
+  MSG_CON_STATE_SEND  = 'sending';
+  MSG_CON_STATE_DISC  = 'disconnected';
+ const
+  HCS2STR: array [ThttpConnState] of string = (MSG_CON_STATE_IDLE, MSG_CON_STATE_REQ, MSG_CON_STATE_RCV,
     MSG_CON_STATE_THINK, MSG_CON_STATE_REP, MSG_CON_STATE_SEND, MSG_CON_STATE_DISC);
-var
+ var
   data: TconnData;
+  changed: Boolean;
 
-  function getFname():string;
+  function getFname(): String;
   begin
-  if isSendingFile(data) then result:=data.lastFN
-  else if isReceivingFile(data) then result:=data.uploadSrc
-  else result:='-'
+    if isSendingFile(data) then
+      result := data.lastFN
+     else if isReceivingFile(data) then
+      result := data.uploadSrc
+     else result:='-'
   end;
 
-  function getStatus():string;
+  function getStatus(): String;
   begin
-  if isSendingFile(data) then
-    begin
-    if data.conn.paused then
-      result:=MSG_CON_PAUSED
-    else
-      result:=format(MSG_CON_SENT, [
-        smartsize(data.conn.bytesSentLastItem),
-        smartsize(data.conn.bytesPartial)
+    if isSendingFile(data) then
+     begin
+      if data.conn.paused then
+        result := MSG_CON_PAUSED
+      else
+        result := format(MSG_CON_SENT, [
+          smartsize(data.conn.bytesSentLastItem),
+          smartsize(data.conn.bytesPartial)
+        ]);
+      exit;
+     end;
+    if isReceivingFile(data) then
+     begin
+      result := format(MSG_CON_received, [
+        smartsize(data.conn.bytesPosted),
+        smartsize(data.conn.post.length)
       ]);
-    exit;
-    end;
-  if isReceivingFile(data) then
-    begin
-    result:=format(MSG_CON_received, [
-      smartsize(data.conn.bytesPosted),
-      smartsize(data.conn.post.length)
-    ]);
-    exit;
-    end;
-  result:=HCS2STR[data.conn.state]
-    +if_(data.conn.state = HCS_IDLE, ' '+intToStr(data.conn.requestCount))
+      exit;
+     end;
+    result := HCS2STR[data.conn.state]
+      +if_(data.conn.state = HCS_IDLE, ' '+intToStr(data.conn.requestCount))
   end; // getStatus
 
-  function getSpeed():string;
+  function getSpeed(): string;
   var
     d: real;
   begin
-  case data.conn.state of
-    HCS_REPLYING_BODY: d:=data.conn.speedOut;
-    HCS_POSTING: d:=data.conn.speedIn;
-    else d:=data.averageSpeed;
-    end;
-  if d < 1 then result:='-'
-  else result:=format(MSG_SPEED_KBS,[d/1000])
+    case data.conn.state of
+      HCS_REPLYING_BODY: d := data.conn.speedOut;
+      HCS_POSTING: d := data.conn.speedIn;
+      else d := data.averageSpeed;
+      end;
+    if d < 1 then
+      result := '-'
+     else
+      result := format(MSG_SPEED_KBS,[d/1000])
   end; // getSpeed
+
+  procedure changeSubItem(itemIndex: Integer; val: String);
+  begin
+    if item.subItems[itemIndex] <> val then
+      begin
+        changed := True;
+        item.subItems[itemIndex] := val;
+      end;
+  end;
 
 var
   progress: real;
   s: String;
+  img: Integer;
 begin
-if quitting then exit;
-if item = NIL then exit;
-data:=conn2data(item);
-if data = NIL then exit;
-item.caption:=nonEmptyConcat('', data.usr, '@')+data.address+':'+data.conn.port;
-while item.subitems.count < 5 do
-  item.subitems.add('');
+  Result := True;
+  if quitting then
+    exit;
+  if item = NIL then
+    exit;
+  data := conn2data(item);
+  if data = NIL then
+    exit;
+  Result := False;
+  s := nonEmptyConcat('', data.usr, '@')+data.address+':'+data.conn.port;
+  if item.caption <> s then
+    item.caption := s;
+  while item.subitems.count < 5 do
+    begin
+      item.subitems.add('');
+      Result := True;
+    end;
 
-item.imageIndex:=-1;
-progress:=-1;
-if data.conn.state = HCS_DISCONNECTED then
-  item.imageIndex:=21
-else if isSendingFile(data) then
-  begin
-  item.imageIndex:=32;
-  progress:= data.conn.bytesSentLastItem / data.conn.bytesPartial;
-  end
-else if isReceivingFile(data) then
-  begin
-  item.imageIndex:=33;
-  progress:= data.conn.bytesPosted / data.conn.post.length;
-  end;
 
-item.subItems[0]:=getFname();
-item.subItems[1]:=getStatus();
-item.subItems[2]:=getSpeed();
-item.subItems[3]:=getETA(data);
+  img := -1;
+  progress := -1;
+  if data.conn.state = HCS_DISCONNECTED then
+    img := 21
+   else if isSendingFile(data) then
+    begin
+      img := 32;
+      progress := data.conn.bytesSentLastItem / data.conn.bytesPartial;
+    end
+   else if isReceivingFile(data) then
+    begin
+      img := 33;
+      progress := data.conn.bytesPosted / data.conn.post.length;
+    end;
+  if img <> item.imageIndex then
+    begin
+      item.imageIndex := img;
+      Result := True;
+    end;
+
+  Changed := false;
+  changeSubItem(0, getFname());
+  changeSubItem(1, getStatus());
+  changeSubItem(2, getSpeed());
+  changeSubItem(3, getETA(data));
   if progress<0 then
     s := ''
    else
     s := format('%d%%', [trunc(progress*100)]);
-item.subItems[4]:=s;
+  if checkProgress then
+    changeSubItem(4, s)
+   else
+    item.subItems[4] := s;
+  Result := Result or Changed;
+end;
+
+procedure TmainFrm.connBoxData(Sender: TObject; Item: TListItem);
+begin
+  if quitting then
+    exit;
+  if item = NIL then
+    exit;
+  connBoxDataRefresh(Sender, Item, false);
 end;
 
 function TmainFrm.appEventsHelp(Command: Word; Data: NativeInt;
@@ -6379,8 +6335,9 @@ end;
 
 procedure TmainFrm.appEventsMinimize(Sender: TObject);
 begin
-if not MinimizetotrayChk.Checked then exit;
-minimizeToTray();
+  if not MinimizetotrayChk.Checked then
+    exit;
+  minimizeToTray();
 end;
 
 procedure TmainFrm.appEventsRestore(Sender: TObject);
@@ -6425,13 +6382,14 @@ begin
       forwardedMask := forwardedMask + ';' + cd.conn.address;
 end;
 
-procedure Tmainfrm.downloadtrayEvent(sender:Tobject; ev:TtrayEvent);
+procedure Tmainfrm.downloadtrayEvent(sender: Tobject; ev: TtrayEvent);
 var
   i: integer;
 begin
-if userInteraction.disabled then exit;
+  if userInteraction.disabled then
+    exit;
 
-for i:=connBox.items.count-1 downto 0 do
+  for i:=connBox.items.count-1 downto 0 do
     if conn2data(i) = (sender as TmyTrayicon).usrData then
       connBox.itemIndex:=i;
 
@@ -6590,9 +6548,10 @@ end;
 
 procedure TmainFrm.FormShow(Sender: TObject);
 begin
-if trayed then showWindow(application.handle, SW_HIDE);
-updateTrayTip();
-connBox.DoubleBuffered:=true;
+  if trayed then
+    showWindow(application.handle, SW_HIDE);
+  updateTrayTip();
+  connBox.DoubleBuffered := true;
 
   logBox.Font.PixelsPerInch := Self.CurrentPPI;
   IconsDM.images.SetSize(MulDiv(16, Self.CurrentPPI, 96), MulDiv(16, Self.CurrentPPI, 96));
@@ -6661,29 +6620,35 @@ filesBox.refresh();
 dst.alphaSort(FALSE);
 end;
 
-procedure TmainFrm.refreshConn(conn:TconnData);
+procedure TmainFrm.refreshConn(conn: TconnData; checkProgress: Boolean = True);
 var
   r: Trect;
   i: integer;
 begin
-if quitting then exit;
+  if quitting then
+    exit;
 
-for i:=0 to connBox.items.count-1 do
-  if conn2data(i) = conn then
-    begin
-    connBoxData(connBox, connBox.items[i]);
-    r:=connBox.items[i].displayRect(drBounds);
-    invalidateRect(connBox.handle, @r, TRUE);
-    break;
-    end;
-//updateSbar();   // this was causing too many refreshes on fast connections
+  for i:=0 to connBox.items.count-1 do
+    if conn2data(i) = conn then
+      begin
+        //ToDo - To add check if we need to repaint (something changed)
+        // Refresh is not working, because it's refreshes 2 times at once
+//        if connBoxDataRefresh(connBox, connBox.items[i], checkProgress) then
+          begin
+            r := connBox.items[i].displayRect(drBounds);
+            invalidateRect(connBox.handle, @r, TRUE);
+          end;
+        break;
+      end;
+  //updateSbar();   // this was causing too many refreshes on fast connections
 end; // refreshConn
 
 
-function Tmainfrm.getVFS(node:Ttreenode=NIL): RawByteString;
+function Tmainfrm.getVFS(node: Ttreenode=NIL): RawByteString;
 var
   f: Tfile;
 begin
+  Result := '';
   if node = NIL then
     f := fileSrv.rootFile
    else
@@ -6697,6 +6662,7 @@ function Tmainfrm.getVFSJZ(node: TTreeNode=NIL): RawByteString;
 var
   f: Tfile;
 begin
+  Result := '';
   if node = NIL then
     f := fileSrv.rootFile
    else
@@ -6705,20 +6671,6 @@ begin
     exit('');
   Result := f.getVFSZ;
 end; // getVFSJZ
-
-function addVFSheader(vfsdata: RawByteString): RawByteString;
-begin
-  if length(vfsdata) > COMPRESSION_THRESHOLD then
-    vfsdata := TLV(FK_COMPRESSED_ZLIB,
-//    ZcompressStr2(vfsdata, zcFastest, 31,8, zsDefault) );
-      ZcompressStr(vfsdata, clFastest, zsGZip) );
-  result := TLV(FK_HEAD, VFS_FILE_IDENTIFIER)
-    +TLV(FK_FORMAT_VER, str_(CURRENT_VFS_FORMAT))
-    +TLV(FK_HFS_VER, srvConst.VERSION)
-    +TLV(FK_HFS_BUILD, VERSION_BUILD)
-    +TLV(FK_CRC, str_(getCRC(vfsdata)));  // CRC must always be right before data
-  result := result+vfsdata
-end; // addVFSheader
 
 procedure TmainFrm.Savefilesystem1Click(Sender: TObject);
 begin saveVFS() end;
@@ -6757,13 +6709,14 @@ var
   bmp: Tbitmap;
   r: Trect;
 begin
-if not graphBox.visible then exit;
-bmp:=Tbitmap.create();
-bmp.SetSize(graphBox.Width, graphBox.Height);
-r:=bmp.canvas.ClipRect;
-drawGraphOn(bmp.canvas);
-graphBox.canvas.CopyRect(r,bmp.canvas,r);
-bmp.free;
+  if not graphBox.visible then
+    exit;
+  bmp := Tbitmap.create();
+  bmp.SetSize(graphBox.Width, graphBox.Height);
+  r := bmp.canvas.ClipRect;
+  drawGraphOn(bmp.canvas);
+  graphBox.canvas.CopyRect(r, bmp.canvas, r);
+  bmp.free;
 end;
 
 procedure resendShortcut(mi:Tmenuitem; sc:Tshortcut);
@@ -7658,12 +7611,12 @@ if fn = '' then
       deleteFile(fn+BAK_EXT);
       renameFile(fn, fn+BAK_EXT);
       if not savefileA(fn, addVFSheader(getVFS())) then
-        begin
+       begin
         deleteFile(fn);
         renameFile(fn+BAK_EXT, fn);
         msgDlg('Error saving', MB_ICONERROR);
         exit;
-        end;
+       end;
       if not backupSavingChk.checked then
         deleteFile(fn+BAK_EXT);
       VFSmodified:=FALSE;
@@ -7874,11 +7827,7 @@ begin openURL('http://www.rejetto.com/hfs/guide/intro.html') end;
 
 procedure TmainFrm.Reset1Click(Sender: TObject);
 begin
-zeroMemory(@graph.samplesIn, sizeOf(graph.samplesIn));
-zeroMemory(@graph.samplesOut, sizeOf(graph.samplesOut));
-graph.maxV:=0;
-graph.beforeRecalcMax:=1;
-recalculateGraph();
+  srvUtils.resetGraph(srv);
 end;
 
 procedure TmainFrm.Resetfileshits1Click(Sender: TObject);
@@ -9754,8 +9703,51 @@ if mainfrm.useCommentAsRealmChk.checked then
   result:= getDynamicComment(mainfrm.getLP);
 end; // getShownRealm
 
+constructor TConnDataGui.Create;
+begin
+  tray := NIL;
+  tray_ico := NIL;
+end;
 
+destructor TConnDataGui.Destroy;
+begin
+  if Assigned(tray) then
+    FreeAndNil(tray);
+  if Assigned(tray_ico) then
+    FreeAndNil(tray_ico);
+end;
 
+constructor TConnDataHlp.createWithGui(conn: ThttpConn);
+begin
+  Self.create(conn, TConnDataGui.Create);
+end;
+
+function TConnDataHlp.getTray(): TmyTrayicon;
+begin
+  Result := TConnDataGui(Self.guiData).tray;
+end;
+
+function TConnDataHlp.getIcon(): TIcon;
+begin
+  Result := TConnDataGui(Self.guiData).tray_ico;
+end;
+
+procedure TConnDataHlp.clearGuiData;
+begin
+  TConnDataGui(Self.guiData).tray := NIL;
+  TConnDataGui(Self.guiData).tray_ico := NIL;
+end;
+
+procedure TConnDataHlp.initGUIData;
+begin
+  with TConnDataGui(Self.guiData) do
+    begin
+      tray := TmyTrayicon.create(mainfrm.handle);
+      tray.UsrData := self;
+      tray_ico := Ticon.create();
+      tray.onEvent := mainfrm.downloadTrayEvent;
+    end;
+end;
 
 var
   dll: HMODULE;

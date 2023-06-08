@@ -172,6 +172,8 @@ function loadMD5for(const fn: String): String;
 function loadFingerprint(const fn: String): String;
 function setBrowsable(f: Tfile; childrenDone: Boolean; par, par2: IntPtr): TfileCallbackReturn;
 
+function addVFSheader(const vfsdata: RawByteString): RawByteString;
+
 const
   FILEACTION2STR: array [TfileAction] of string = ('Access', 'Delete', 'Upload');
 
@@ -1580,7 +1582,7 @@ begin
     result := trim(getTill(' ', UnUTF(loadfile(fn+'.md5'))))
 end; // loadMD5for
 
-function loadFingerprint(const fn:string):string;
+function loadFingerprint(const fn: String): String;
 var
   hasher: Thasher;
 begin
@@ -1593,5 +1595,23 @@ begin
   result := hasher.getHashFor(fn);
   hasher.Free;
 end; // loadFingerprint
+
+function addVFSheader(const vfsdata: RawByteString): RawByteString;
+var
+  data: RawByteString;
+begin
+  if length(vfsdata) > COMPRESSION_THRESHOLD then
+    data := TLV(FK_COMPRESSED_ZLIB,
+//    ZcompressStr2(vfsdata, zcFastest, 31,8, zsDefault) );
+      ZcompressStr(vfsdata, TCompressionLevel.clFastest, TZStreamType.zsGZip) )
+   else
+    data := vfsdata;
+  result := TLV(FK_HEAD, VFS_FILE_IDENTIFIER)
+    +TLV(FK_FORMAT_VER, str_(CURRENT_VFS_FORMAT))
+    +TLV(FK_HFS_VER, srvConst.VERSION)
+    +TLV(FK_HFS_BUILD, VERSION_BUILD)
+    +TLV(FK_CRC, str_(getCRC(data)));  // CRC must always be right before data
+  result := result + data
+end; // addVFSheader
 
 end.
