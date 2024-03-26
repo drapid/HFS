@@ -1,4 +1,5 @@
 unit fileLib;
+{$INCLUDE defs.inc }
 {$I NoRTTI.inc}
 
 interface
@@ -78,10 +79,10 @@ type
     tempParent: TFile;
 //    fGetFileNode: TFindFileNode;
 //    fNode: TFileNode;
-    function  getParent():Tfile;
-    function  getDLcount():integer;
-    procedure setDLcount(i:integer);
-    function  getDLcountRecursive():integer;
+    function  getParent(): Tfile;
+    function  getDLcount(): Integer;
+    procedure setDLcount(i: Integer);
+    function  getDLcountRecursive(): Integer;
   public
     name, comment, user, pwd, lnk: string;
     resource: string;  // link to physical file/folder; URL for links
@@ -97,9 +98,9 @@ type
     constructor createTemp(pTree: TFileTree; const fullpath: String; pParentFile: TFile = NIL);
     constructor createVirtualFolder(pTree: TFileTree; const name:string);
     constructor createLink(pTree: TFileTree; const name: String);
-    function  toggle(att:TfileAttribute):boolean;
-    function  isFolder():boolean; inline;
-    function  isFile():boolean; inline;
+    function  toggle(att: TfileAttribute): Boolean;
+    function  isFolder(): Boolean; inline;
+    function  isFile(): Boolean; inline;
     function  isFileOrFolder():boolean; inline;
     function  isRealFolder():boolean; inline;
     function  isVirtualFolder():boolean; inline;
@@ -195,10 +196,9 @@ const
   FK_ACCOUNTS = 12;
   FK_FILESFILTER = 13;
   FK_FOLDERSFILTER = 14;
+  FK_ICON_GIF = 15;
 {$IFDEF HFS_GIF_IMAGES}
-  FK_ICON_GIF = 15;
 {$ELSE ~HFS_GIF_IMAGES}
-  FK_ICON_GIF = 15;
   FK_ICON_PNG = 115;
   FK_ICON32_PNG = 116;
   FK_ICON_IDX = 117;
@@ -274,7 +274,8 @@ end; // unescapeIon
 
 procedure loadIon(const lp: TLoadPrefs; const path: String; comments: TStringList);
 var
-  s, l, fn: string;
+  s, l: UnicodeString;
+  fn: string;
 begin
 //if not mainfrm.supportDescriptionChk.checked then exit;
 s:=loadDescriptionFile(lp, path);
@@ -312,12 +313,15 @@ function getFiles(const mask: String): TStringDynArray;
 var
   sr: TSearchRec;
 begin
-result:=NIL;
-if findFirst(mask, faAnyFile, sr) = 0 then
+  result:=NIL;
+  if findFirst(mask, faAnyFile, sr) = 0 then
   try
-    repeat addString(sr.name, result)
+    repeat
+      addString(sr.name, result)
     until findNext(sr) <> 0;
-  finally findClose(sr) end;
+   finally
+    findClose(sr)
+  end;
 end; // getFiles
 
 function freeIfTemp(var f:Tfile):boolean; inline;
@@ -438,7 +442,7 @@ begin
       res := resolveLnk(res);
       include(flags, FA_SOLVED_LNK);
     end
-  else
+   else
     exclude(flags, FA_SOLVED_LNK);
   res := ExcludeTrailingPathDelimiter(res);
 
@@ -453,7 +457,7 @@ begin
       if not isRoot() and not (FA_SOLVED_LNK in flags) then
         setName(res);
     end
-  else
+   else
     begin
       exclude(flags, FA_UNIT);
       if not isRoot() and not (FA_SOLVED_LNK in flags) then
@@ -517,7 +521,7 @@ begin
 
   result:='';
   if self.isRoot() then
-    result := result+TLV(FK_ROOT, commonFields );
+    result := result+TLV(FK_ROOT, commonFields);
   for i:=0 to node.Count-1 do
     begin
     var
@@ -880,57 +884,60 @@ begin result:=reMatch(txt, '^'+quoteRegExprMetaChars(quoteIfAnyChar(' ',name)), 
 
 procedure Tfile.setDynamicComment(loadPrefs: TLoadPrefs; cmt: String);
 var
-  s, path, name: string;
+  s: UnicodeString;
+  path, name: string;
   i: integer;
 begin
-if not isTemp() then
+  if not isTemp() then
   begin
-  comment:=cmt; // quite easy
-  exit;
+    comment:=cmt; // quite easy
+    exit;
   end;
-path:=resource+COMMENT_FILE_EXT;
-if fileExists(path) then
+  path := resource+COMMENT_FILE_EXT;
+  if fileExists(path) then
   begin
-  if cmt='' then
-    deleteFile(path)
-  else
-    saveTextFile(path, cmt);
-  exit;
+    if cmt='' then
+      deleteFile(path)
+     else
+      saveTextFile(path, cmt);
+    exit;
   end;
-name:=extractFileName(resource);
+  name := extractFileName(resource);
 
 // we prefer descript.ion, but if its support was disabled,
 // or it doesn't exist while hfs.comments.txt does, then we'll use the latter
-path:=extractFilePath(resource)+COMMENTS_FILE;
-if not (lpION in loadPrefs)
-or fileExists(path) and not fileExists(extractFilePath(resource)+'descript.ion') then
-  saveTextFile(path, setKeyInString(UnUTF(loadFile(path)), name, escapeNL(cmt)));
+  path := extractFilePath(resource)+COMMENTS_FILE;
+  if not (lpION in loadPrefs)
+    or fileExists(path) and not fileExists(extractFilePath(resource)+'descript.ion') then
+   saveTextFile(path, setKeyInString(UnUTF(loadFile(path)), name, escapeNL(cmt)));
 
-if not (lpION in loadPrefs) then exit;
+  if not (lpION in loadPrefs) then
+    exit;
 
-path:=extractFilePath(resource)+'descript.ion';
-try
-  s:=loadDescriptionFile(loadPrefs, path);
-  cmt:=escapeIon(cmt); // that's how multilines are handled in this file
-  i:=findNameInDescriptionFile(s, name);
-  if i = 0 then // not found
-    if cmt='' then // no comment, we are good
-      exit
-    else
-      s:=s+quoteIfAnyChar(' ', name)+' '+cmt+CRLF // append
-  else // found, then replace
-    if cmt='' then
-      replace(s, '', i, findEOL(s, i)) // remove the whole line
-    else
-      begin
-      i:=nonQuotedPos(' ', s, i); // replace just the comment
-      replace(s, cmt, i+1, findEOL(s, i, FALSE));
-      end;
-  if s='' then
-    deleteFile(path)
-  else
-    saveTextFile(path, s);
-except end;
+  path := extractFilePath(resource)+'descript.ion';
+  try
+    s := loadDescriptionFile(loadPrefs, path);
+    cmt:=escapeIon(cmt); // that's how multilines are handled in this file
+    i:=findNameInDescriptionFile(s, name);
+    if i = 0 then // not found
+      if cmt='' then // no comment, we are good
+        exit
+      else
+        s:=s+quoteIfAnyChar(' ', name)+' '+cmt+CRLF // append
+     else // found, then replace
+      if cmt='' then
+        replace(s, '', i, findEOL(s, i)) // remove the whole line
+       else
+        begin
+        i:=nonQuotedPos(' ', s, i); // replace just the comment
+        replace(s, cmt, i+1, findEOL(s, i, FALSE));
+        end;
+    if s='' then
+      deleteFile(path)
+     else
+      saveTextFile(path, s);
+   except
+  end;
 end; // setDynamicComment
 
 function Tfile.getParent():Tfile;
@@ -1194,10 +1201,11 @@ var
   f: Tfile;
 begin
 // the flag can be in this node
-result:=FA_DL_FORBIDDEN in flags;
-if result or not isTemp() then exit;
-f:=nodeToFile(node);
-result:=assigned(f) and (FA_DL_FORBIDDEN in f.flags);
+  result := FA_DL_FORBIDDEN in flags;
+  if result or not isTemp() then
+    exit;
+  f := nodeToFile(node);
+  result := assigned(f) and (FA_DL_FORBIDDEN in f.flags);
 end; // isDLforbidden
 
 function Tfile.isNew(): Boolean;
@@ -1369,7 +1377,7 @@ f:=self;
   end;
 end; // isLocked
 
-procedure Tfile.recursiveApply(callback:TfileCallback; par: IntPtr=0; par2: IntPtr=0);
+procedure Tfile.recursiveApply(callback: TfileCallback; par: IntPtr=0; par2: IntPtr=0);
 var
   f, fNext: TFile;
   r: TfileCallbackReturn;
@@ -1445,28 +1453,29 @@ begin
   f := self;
 while assigned(f) do
   begin
-  list:=f.accounts[FA_ACCESS]; // shortcut
+    list := f.accounts[FA_ACCESS]; // shortcut
 
-  if (username = '') and stringExists(USER_ANONYMOUS, list, TRUE) then break;
-  // first check in user/pass
-  if (f.user > '') and sameText(f.user, username) and (f.pwd = password) then break;
-  // then in accounts
-  if assigned(list) then
-    begin
-    a:=getAccount(username);
+    if (username = '') and stringExists(USER_ANONYMOUS, list, TRUE) then break;
+    // first check in user/pass
+    if (f.user > '') and sameText(f.user, username) and (f.pwd = password) then break;
+    // then in accounts
+    if assigned(list) then
+      begin
+      a:=getAccount(username);
 
-    if stringExists(USER_ANYONE, list, TRUE) then break;
-    // we didn't match the user/pass, but this file is restricted, so we must have an account at least to access it
-    if assigned(a) and (a.pwd = password) and
-      (stringExists(USER_ANY_ACCOUNT, list, TRUE) or (findEnabledLinkedAccount(a, list, TRUE) <> NIL))
-    then break;
+      if stringExists(USER_ANYONE, list, TRUE) then break;
+      // we didn't match the user/pass, but this file is restricted, so we must have an account at least to access it
+      if assigned(a) and (a.pwd = password) and
+        (stringExists(USER_ANY_ACCOUNT, list, TRUE) or (findEnabledLinkedAccount(a, list, TRUE) <> NIL))
+      then break;
 
-    exit;
-    end;
-  // there's a user/pass restriction, but the password didn't match (if we got this far). We didn't exit before to give accounts a chance.
-  if f.user > '' then exit;
+      exit;
+      end;
+    // there's a user/pass restriction, but the password didn't match (if we got this far). We didn't exit before to give accounts a chance.
+    if f.user > '' then
+      exit;
 
-  f:=f.parent;
+    f := f.parent;
   end;
 result:=TRUE;
 

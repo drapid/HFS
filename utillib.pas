@@ -501,7 +501,8 @@ end; // loadFile
 }
 function saveFileA(var f:file; data: RawByteString):boolean; overload;
 begin
-  blockWrite(f, data[1], length(data));
+  if data > '' then
+    blockWrite(f, data[1], length(data));
   result:=IOresult=0;
 end;
 

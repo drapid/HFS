@@ -1,4 +1,5 @@
 unit srvUtils;
+{$I DEFS.inc}
 {$I NoRTTI.inc}
 
 interface

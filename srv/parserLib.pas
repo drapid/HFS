@@ -1,4 +1,5 @@
 unit parserLib;
+{$INCLUDE defs.inc }
 {$I NoRTTI.inc}
 
 interface
@@ -10,7 +11,7 @@ uses
   {$ELSE USE_MORMOT_COLLECTIONS}
   mormot.core.collections,
   {$ENDIF USE_MORMOT_COLLECTIONS}
-  intlist, serverLib;
+  serverLib;
 
 type
 
@@ -20,8 +21,11 @@ type
     full: String;
   end;
 
-//  TParsVal = Tdictionary<string,Tdatetime>;
+ {$IFDEF USE_MORMOT_COLLECTIONS}
   TParsVal = IKeyValue<String, String>;
+ {$ELSE}
+  TParsVal = Tdictionary<String, String>;
+ {$ENDIF ~USE_MORMOT_COLLECTIONS}
 
   TPars2 = class
    private
@@ -55,7 +59,7 @@ type
     pos, row, col: integer;
     code: string;
     constructor Create(const msg, code:string; row,col:integer);
-    end;
+   end;
 const
   MARKER_OPEN = '{.';
   MARKER_CLOSE = '.}';
@@ -99,15 +103,21 @@ end;
 constructor TPars2.create;
 begin
   fCount := 0;
-//  fD := TDictionary<String, String>.Create;
+ {$IFNDEF USE_MORMOT_COLLECTIONS}
+  fD2 := TParsVal.Create;
+ {$ELSE USE_MORMOT_COLLECTIONS}
   fD2 := Collections.NewKeyValue<String, String>;
+ {$ENDIF USE_MORMOT_COLLECTIONS}
   setLength(fA, 0);
 end;
 
 destructor TPars2.destroy;
 begin
-//  fD.Free;
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  fD2.Free;
+  {$ELSE USE_MORMOT_COLLECTIONS}
   fD2 := NIL;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
   SetLength(fA, 0);
   fCount := 0;
 end;
@@ -133,8 +143,11 @@ begin
       fA[idx].v := '';
     end;
   if fA[idx].k > '' then
-//    fD.AddOrSetValue(fA[idx].k, fA[idx].v);
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+    fD2.AddOrSetValue(fA[idx].k, fA[idx].v);
+  {$ELSE USE_MORMOT_COLLECTIONS}
     fD2[fA[idx].k] := fA[idx].v;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
 end;
 
 procedure TPars2.Delete(idx: Integer);
@@ -241,14 +254,16 @@ const
   CLOSE_ID = 3;
   MAX_MARKER_ID = 3;
 
-  function alreadyRecurredOn(s:string):boolean;
+  function alreadyRecurredOn(const s: String): Boolean;
   var
     i: integer;
   begin
-  result:=TRUE;
-  for i:=recurLevel downto 1 do
-    if sameText(s, idsStack[i]) then exit;
-  result:=FALSE;
+    //result := TRUE;
+    if recurLevel > 1 then
+      for i:=recurLevel downto 1 do
+        if sameText(s, idsStack[i]) then
+          exit(True);
+    result:=FALSE;
   end; // alreadyRecurredOn
 
   procedure handleSymbols();

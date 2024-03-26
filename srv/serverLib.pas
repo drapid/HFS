@@ -1,4 +1,6 @@
 unit serverLib;
+{$INCLUDE defs.inc }
+{$I NoRTTI.inc}
 
 interface
 

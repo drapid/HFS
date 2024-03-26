@@ -89,24 +89,24 @@ uses
 
 procedure TfilepropFrm.accountsBoxChange(Sender: TObject; Item: TListItem; Change: TItemChange);
 begin
-if (change = ctState)
-and (item.caption > '')
-and (stringExists(item.caption, users[currAction]) <> item.checked) then
+  if (change = ctState)
+  and (item.caption > '')
+  and (stringExists(item.caption, users[currAction]) <> item.checked) then
   begin
-  savePerm[currAction]:=TRUE;
-  toggleString(item.caption, users[currAction])
+    savePerm[currAction]:=TRUE;
+    toggleString(item.caption, users[currAction])
   end;
 end;
 
 procedure TfilepropFrm.accountsBoxGetImageIndex(Sender: TObject; Item: TListItem);
 begin item.ImageIndex:=accountIcon(item.data) end;
 
-function str2fileaction(s:string):TfileAction;
+function str2fileaction(const s: String): TfileAction;
 begin
-for result:=low(result) to high(result) do
-  if FILEACTION2STR[result] = s then
-    exit;
-result:=TfileAction(-1);
+  for result:=low(result) to high(result) do
+    if FILEACTION2STR[result] = s then
+      exit;
+  result := TfileAction(-1);
 end; // str2fileaction
 
 procedure TfilepropFrm.actionTabsChange(Sender: TObject);
@@ -115,35 +115,39 @@ var
   i: integer;
   ar: TstringDynArray;
 begin
-currAction:=str2fileaction(actionTabs.tabs[actionTabs.tabIndex]);
-if not firstActionChange then
-  begin
-  // we must save current selection before updating the checkmarks
-  ar:=users[prevAction];
-  // now 'ar' is actually an alias, no duplication
-  setLength(ar, 0);
-  if anonChk.checked then addString(USER_ANONYMOUS, ar);
-  if anyAccChk.checked then addString(USER_ANY_ACCOUNT, ar);
-  if anyoneChk.checked then addString(USER_ANYONE, ar);
-  for i:=0 to accountsBox.Items.Count-1 do
-    with accountsBox.Items[i] do
-      if checked then
-        addString(caption, ar);
+  currAction:=str2fileaction(actionTabs.tabs[actionTabs.tabIndex]);
+  if not firstActionChange then
+    begin
+      // we must save current selection before updating the checkmarks
+      ar:=users[prevAction];
+      // now 'ar' is actually an alias, no duplication
+      setLength(ar, 0);
+      if anonChk.checked then
+        addString(USER_ANONYMOUS, ar);
+      if anyAccChk.checked then
+        addString(USER_ANY_ACCOUNT, ar);
+      if anyoneChk.checked then
+        addString(USER_ANYONE, ar);
+      for i:=0 to accountsBox.Items.Count-1 do
+        with accountsBox.Items[i] do
+          if checked then
+            addString(caption, ar);
 
-  prevAction:=currAction;
+      prevAction := currAction;
+    end;
+  firstActionChange:=FALSE;
+
+  l := arrayToList(users[currAction]);
+  try
+    for i:=0 to accountsBox.Items.Count-1 do
+      with accountsBox.Items[i] do
+        checked := l.IndexOf(caption) >= 0;
+    anonChk.checked := l.IndexOf(USER_ANONYMOUS) >= 0;
+    anyAccChk.checked := l.indexOf(USER_ANY_ACCOUNT) >= 0;
+    anyoneChk.checked := l.indexOf(USER_ANYONE) >= 0;
+   finally
+    l.free
   end;
-firstActionChange:=FALSE;
-
-l:=arrayToList(users[currAction]);
-try
-  for i:=0 to accountsBox.Items.Count-1 do
-    with accountsBox.Items[i] do
-      checked:=l.IndexOf(caption) >= 0;
-  anonChk.checked:=l.IndexOf(USER_ANONYMOUS) >= 0;
-  anyAccChk.checked:=l.indexOf(USER_ANY_ACCOUNT) >= 0;
-  anyoneChk.checked:=l.indexOf(USER_ANYONE) >= 0;
-finally l.free end;
-
 end;
 
 procedure TfilepropFrm.addiconBtnClick(Sender: TObject);

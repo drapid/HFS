@@ -31,7 +31,10 @@ unit HSlib;
 interface
 
 uses
-  classes, messages, winprocs,
+  classes, messages,
+ {$IFNDEF FPC}
+  winprocs,
+ {$ENDIF ~FPC}
   mormot.core.base,
  {$IFDEF FMX}
   FMX.Graphics, System.UITypes, FMX.Types,
@@ -42,7 +45,11 @@ uses
  {$ENDIF FMX}
   sysutils,
   contnrs, strUtils, winsock, inifiles, types,
-  OverbyteIcsWSocket //OverbyteIcsWSockets,
+ {$IFDEF FPC}
+  WSocket
+ {$ELSE ~FPC}
+  OverbyteIcsWSocket
+ {$ENDIF FPC}
   ;
 
 const
@@ -219,10 +226,10 @@ type
     procedure notify(ev:ThttpEvent);
     procedure tryNotify(ev:ThttpEvent);
     procedure calculateSpeed();
-	  procedure sendheader(const h: String); OverLoad;
-	  procedure sendheader(const h: RawByteString=''); OverLoad;
-		function  replyHeader_mode(mode: ThttpReplyMode): RawByteString;
-		function  replyHeader_code(code: Integer): RawByteString;
+    procedure sendheader(const h: String); OverLoad;
+    procedure sendheader(const h: RawByteString=''); OverLoad;
+    function  replyHeader_mode(mode: ThttpReplyMode): RawByteString;
+    function  replyHeader_code(code: Integer): RawByteString;
     function  getDontFree(): Boolean;
     procedure processInputBuffer();
     procedure clearRequest();
@@ -369,9 +376,12 @@ function namePos(const name: RawByteString; const headers: RawByteString; from: 
 implementation
 
 uses
-  Windows, AnsiStrings,
+  Windows,
+{$IFDEF UNICODE}
+  AnsiStrings,
 //  AnsiClasses,
-   RDUtils, Base64,
+{$ENDIF UNICODE}
+  RDUtils, Base64,
   srvConst;
 
 const
@@ -420,7 +430,11 @@ var
 begin
   if ip = '::1' then
     exit(TRUE);
+ {$IFDEF FPC}
+  dword(r) := WSocket_ntohl(WSocket_inet_addr(@ip));
+ {$ELSE FPC}
   dword(r) := dword(WSocket_ntohl(WSocket_inet_addr(ansiString(ip))));
+ {$ENDIF FPC}
 result:=(r.a in [0,10,23,127])
   or (r.a = 192) and ((r.b = 168) or (r.b = 0) and (r.c = 2))
   or (r.a = 169) and (r.b = 254)
@@ -882,7 +896,7 @@ var
   c: ThttpConn;
   i: integer;
 begin
-i:=0;
+  i := 0;
 while i < disconnecting.Count do
   begin
   c:=disconnecting[i] as ThttpConn;
@@ -956,36 +970,39 @@ procedure ThttpSrv.timerEvent(sender:Tobject);
   end; // processQ
 
 begin
-hertzEvent();
+  hertzEvent();
 
-lockTimerevent:=TRUE;
-try
-  processDisconnecting();
-  if autoFreeDisconnectedClients then freeConnList(offlines);
-  processPipelines();
-  processQ();
-finally
-  lockTimerevent:=FALSE
+  lockTimerevent := TRUE;
+  try
+    processDisconnecting();
+    if autoFreeDisconnectedClients then
+      freeConnList(offlines);
+    processPipelines();
+    processQ();
+   finally
+    lockTimerevent := FALSE
   end;
 end; // timerEvent
 
-procedure ThttpSrv.notify(ev:ThttpEvent; conn:ThttpConn);
+procedure ThttpSrv.notify(ev: ThttpEvent; conn: ThttpConn);
 begin
-if not assigned(onEvent) then exit;
-if assigned(conn) then
+  if not assigned(onEvent) then
+    exit;
+  if assigned(conn) then
   begin
-  inc(conn.lockCount);
-  conn.sock.pause();
+    inc(conn.lockCount);
+    conn.sock.pause();
   end;
 // event handler shall not break our thing
-try onEvent(ev, conn);
-finally
-  //if assigned(sock) then sock.resume();
-  if assigned(conn) then
-    begin
-    dec(conn.lockCount);
-    conn.sock.resume();
-    end;
+  try
+    onEvent(ev, conn);
+   finally
+    //if assigned(sock) then sock.resume();
+    if assigned(conn) then
+      begin
+      dec(conn.lockCount);
+      conn.sock.resume();
+      end;
   end;
 end;
 
@@ -1003,9 +1020,14 @@ begin
 while l.count > 0 do
   with l.first() as ThttpConn do
     try
-      try l.delete(0)
-      finally free end
-    except end;
+      try
+        l.delete(0)
+       finally
+        free
+      end
+     except
+      Application.ProcessMessages;
+    end;
 end; // freeConnList
 
 procedure ThttpSrv.calculateSpeed();
@@ -1102,23 +1124,23 @@ end;
 
 destructor ThttpConn.destroy;
 begin
-if dontFree then
-  raise exception.Create('still in use');
-P_destroying:=TRUE;
-if assigned(sock) then
-  try
-    sock.Shutdown(SD_BOTH);
-    sock.WaitForClose();
-  except
+  if dontFree then
+    raise exception.Create('still in use');
+  P_destroying:=TRUE;
+  if assigned(sock) then
+    try
+      sock.Shutdown(SD_BOTH);
+      sock.WaitForClose();
+     except
     end;
-if assigned(srv) and assigned(srv.offlines) then
-  srv.offlines.remove(self);
-freeAndNIL(request.headers);
-freeAndNIL(request.cookies);
-freeAndNil(stream);
-freeAndNIL(sock);
-freeAndNIL(limiters);
-inherited;
+  if assigned(srv) and assigned(srv.offlines) then
+    srv.offlines.remove(self);
+  freeAndNIL(request.headers);
+  freeAndNIL(request.cookies);
+  freeAndNil(stream);
+  freeAndNIL(sock);
+  freeAndNIL(limiters);
+  inherited;
 end; // destroy
 
 procedure ThttpConn.calculateSpeed();
@@ -1254,7 +1276,7 @@ procedure ThttpConn.processInputBuffer();
   if ansiStartsText('bytes=', h) then
     begin
     delete(h,1,6);
-    h2:=chop('-',h);
+    h2 := chop('-',h);
     try
       if h2>'' then request.firstByte:=strToInt64(h2);
       if h>'' then request.lastByte:=strToInt64(h);
@@ -1635,13 +1657,15 @@ end; // datasent
 
 procedure ThttpConn.disconnect();
 begin
-if disconnecting then exit;
-disconnecting:=TRUE;
-if sock = NIL then exit;
-try
-  sock.Shutdown(SD_BOTH);
-  sock.CloseDelayed();
-except
+  if disconnecting then
+    exit;
+  disconnecting:=TRUE;
+  if sock = NIL then
+    exit;
+  try
+    sock.Shutdown(SD_BOTH);
+    sock.CloseDelayed();
+   except
   end;
 end; // disconnect
 
@@ -1675,7 +1699,7 @@ try
           exit;
         stream := TFileStream.Create(i);
       end;
-    RBM_STREAM: stream:=reply.bodyStream;
+    RBM_STREAM: stream := reply.bodyStream;
     end;
   with reply do
     if resumeForbidden or (firstByte < 0) and (lastByte < 0) then
@@ -1688,14 +1712,14 @@ try
       else
         if firstbyte < 0 then
           begin
-          firstByte:=bytesFullBody-lastByte;
-          lastByte:=bytesFullBody;
+          firstByte := bytesFullBody-lastByte;
+          lastByte := bytesFullBody;
           end;
 
   if (reply.firstByte > 0) and (reply.mode = HRM_REPLY) then
     stream.Seek(request.firstByte, soBeginning);
 
-  result:=TRUE;
+  result := TRUE;
 except end;
 end; // initInputStream
 

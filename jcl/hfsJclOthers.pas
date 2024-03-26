@@ -2,7 +2,12 @@ unit hfsJclOthers;
 
 interface
 uses
-  Windows, System.SysUtils, System.Classes;
+  Windows,
+ {$IFDEF FPC}
+  SysUtils, Classes;
+ {$ELSE ~FPC}
+  System.SysUtils, System.Classes;
+ {$ENDIF FPC}
 
 {$DEFINE BORLAND}
 
@@ -592,7 +597,12 @@ function StgOpenStorageEx(const pwcsName: PWideChar; grfMode: DWORD;
 
 implementation
 uses
-  strUtils,   System.Character;
+  strUtils,
+ {$IFDEF FPC}
+  Character, JwaWinNT;
+ {$ELSE ~FPC}
+  System.Character;
+ {$ENDIF FPC}
 
 constructor EJclWin32Error.Create(const Msg: string);
 begin
@@ -695,7 +705,11 @@ begin
     not SameText(ExtractFileExt(Path), StrEnsurePrefix('.', Extension)) then
   begin
     if Path[Length(Path)] = '.' then
+     {$IFDEF FPC}
+      Result := Copy(Result, 1, Length(Path)-1);
+     {$ELSE FPC}
       Delete(Result, Length(Path), 1);
+     {$ENDIF FPC}
     if Extension[1] = '.' then
       Result := Result + Extension
     else

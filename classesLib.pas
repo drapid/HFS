@@ -54,6 +54,7 @@ implementation
 
 uses
   windows, dateUtils,
+  OverbyteIcsSslBase,
  {$IFDEF FMX}
   FMX.Forms,
  {$ELSE ~FMX}
