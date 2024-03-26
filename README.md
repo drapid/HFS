@@ -23,6 +23,6 @@ Now it can be build with full unicode support and in X64.
 <img src="https://rnq.ru/forum/attachment/1977" alt="Unicode">
 
 ## Libs used
-- [ICS v8.64](http://www.overbyte.be) by François PIETTE 
+- [ICS v9](http://www.overbyte.be) by François PIETTE 
 - [For.RnQ](https://github.com/drapid/rnq/tree/master/for.RnQ)
 - [Synopse mORMot2](https://github.com/synopse/mORMot2)
