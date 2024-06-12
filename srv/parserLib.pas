@@ -54,7 +54,7 @@ type
 //  TPars = TStringList;
   TPars = TPars2;
 
-  TmacroCB = function(fs: TFileServer; const fullMacro: string; pars: TPars; cbData: pointer): string;
+  TmacroCB = function(fs: TFileServer; const fullMacro: UnicodeString; pars: TPars; cbData: pointer): UnicodeString;
   EtplError = class(Exception)
     pos, row, col: integer;
     code: string;
@@ -77,8 +77,8 @@ const
 
 function isAnyMacroIn(const s: RawByteString): Boolean; inline;
 function anyMacroMarkerIn(const s:string):boolean;
-function findMacroMarker(const s:string; ofs:integer=1):integer;
-procedure applyMacrosAndSymbols(fs: TFileServer; var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
+function findMacroMarker(const s: string; ofs:integer=1): integer;
+procedure applyMacrosAndSymbols(fs: TFileServer; var txt: UnicodeString; cb: TmacroCB; cbData: pointer; removeQuotings: Boolean=TRUE);
 
 function macroQuote(s:string):string;
 function macroDequote(s:string):string;
@@ -245,7 +245,7 @@ begin
 end; // ToArray
 
 
-procedure applyMacrosAndSymbols2(fs: TFileServer; var txt:string; cb:TmacroCB; cbData:pointer; var idsStack:TparserIdsStack; recurLevel:integer=0);
+procedure applyMacrosAndSymbols2(fs: TFileServer; var txt: UnicodeString; cb: TmacroCB; cbData: Pointer; var idsStack: TparserIdsStack; recurLevel: integer=0);
 const
   // we don't track SEPs, they are handled just before the callback
   QUOTE_ID = 0;   // QUOTE must come before OPEN because it is a substring
@@ -269,39 +269,46 @@ const
   procedure handleSymbols();
   var
     b, e, l : integer;
-    s, newS: string;
+    s, newS: UnicodeString;
   begin
-  e:=0;
-  l:=length(txt);
-  while e < l do
+    e := 0;
+    l := length(txt);
+    while e < l do
     begin
     // search for next symbol
-    b:=posEx('%',txt,e+1);
-    if b = 0 then break;
-    e:=b+1;
-    if txt[e] = '%' then
+      b := posEx('%', txt, e+1);
+      if b = 0 then
+        break;
+      e := b+1;
+      if txt[e] = '%' then
       begin    // we don't accept %% as a symbol. so, restart parsing from the second %
-      e:=b;
-      continue;
+        e := b;
+        continue;
       end;
-    if not (txt[e] in ['_','a'..'z','A'..'Z']) then continue; // first valid character
-    while (e < l) and (txt[e] in ['0'..'9','a'..'z','A'..'Z','-','_']) do
-      inc(e);
-    if txt[e] <> '%' then continue;
-    // found!
-    s:=substr(txt,b,e);
-    if alreadyRecurredOn(s) then continue; // the user probably didn't meant to create an infinite loop
+      if not (txt[e] in ['_','a'..'z','A'..'Z']) then
+        continue; // first valid character
+      while (e < l) and (txt[e] in ['0'..'9','a'..'z','A'..'Z','-','_']) do
+        inc(e);
+      if txt[e] <> '%' then
+        continue;
+      // found!
+      s := substr(txt, b, e);
+      if alreadyRecurredOn(s) then
+        continue; // the user probably didn't meant to create an infinite loop
 
-    newS:=cb(fs, s, NIL, cbData);
-    if s = newS then continue;
+      newS := cb(fs, s, NIL, cbData);
+      if s = newS then
+        continue;
 
-    idsStack[recurLevel]:=s; // keep track of what we recur on
-    // apply translation, and eventually recur
-    try applyMacrosAndSymbols2(fs, newS, cb, cbData, idsStack, recurLevel);
-    except end;
-    idsStack[recurLevel]:='';
-    inc(e, replace(txt, newS, b, e));
-    l:=length(txt);
+      idsStack[recurLevel]:=s; // keep track of what we recur on
+      // apply translation, and eventually recur
+      try
+        applyMacrosAndSymbols2(fs, newS, cb, cbData, idsStack, recurLevel);
+       except
+      end;
+      idsStack[recurLevel]:='';
+      inc(e, replace(txt, newS, b, e));
+      l := length(txt);
     end;
   end; // handleSymbols
 
@@ -309,36 +316,40 @@ const
   var
     pars: TPars;
 
-    function expand(from,to_:integer):integer;
+    function expand(from, to_:integer):integer;
     var
-      s, fullMacro: string;
+      s, fullMacro: UnicodeString;
       i, o, q, u: integer;
     begin
-    result:=0;
-    fullMacro:=substr(txt, from+length(MARKER_OPEN), to_-length(MARKER_CLOSE));
-    if alreadyRecurredOn(fullMacro) then exit; // the user probably didn't meant to create an infinite loop
+      result:=0;
+      fullMacro := substr(txt, from+length(MARKER_OPEN), to_-length(MARKER_CLOSE));
+      if alreadyRecurredOn(fullMacro) then
+        exit; // the user probably didn't meant to create an infinite loop
 
     // let's find the SEPs to build 'pars'
-    pars.clear();
-    i:=1; // char pointer from where we shall copy the macro parameter
-    o:=0;
-    q:=posEx(MARKER_QUOTE, fullMacro); // q points to _QUOTE
+      pars.clear();
+      i := 1; // char pointer from where we shall copy the macro parameter
+      o := 0;
+      q := posEx(MARKER_QUOTE, fullMacro); // q points to _QUOTE
       repeat
-      o:=posEx(MARKER_SEP, fullmacro, o+1);
-      if o = 0 then break;
-      if (q > 0) and (q < o) then // this SEP is possibly quoted
+        o := posEx(MARKER_SEP, fullMacro, o+1);
+        if o = 0 then
+          break;
+        if (q > 0) and (q < o) then // this SEP is possibly quoted
         begin
         // update 'q' and 'u'
           repeat
-          u:=posEx(MARKER_UNQUOTE, fullMacro, q);
-          if u = 0 then exit; // macro quoting not properly closed
+          u := posEx(MARKER_UNQUOTE, fullMacro, q);
+          if u = 0 then
+            exit; // macro quoting not properly closed
           q:=posEx(MARKER_QUOTE, fullMacro, q+1); // update q for next cycle
           // if we find other _QUOTEs before _UNQUOTE, then they are stacked, and we must go through the same number of both markers
           while (q > 0) and (q < u) do
             begin
-            u:=posEx(MARKER_UNQUOTE, fullMacro, u+1);
-            if u = 0 then exit; // macro quoting not properly closed
-            q:=posEx(MARKER_QUOTE, fullMacro, q+1);
+              u := posEx(MARKER_UNQUOTE, fullMacro, u+1);
+              if u = 0 then
+                exit; // macro quoting not properly closed
+              q := posEx(MARKER_QUOTE, fullMacro, q+1);
             end;
           until (q = 0) or (o < q);
         // eventually skip this chunk of string
@@ -348,22 +359,26 @@ const
           continue;
           end;
         end;
-      // ok, that's a valid SEP, so we collect this as a parameter
-      pars.add(substr(fullMacro, i, o-1));
-      i:=o+length(MARKER_SEP);
+        // ok, that's a valid SEP, so we collect this as a parameter
+        pars.add(substr(fullMacro, i, o-1));
+        i:=o+length(MARKER_SEP);
       until false;
-    pars.add(substr(fullMacro, i, length(fullMacro))); // last piece
-    // ok, 'pars' has now been built
+      pars.add(substr(fullMacro, i, length(fullMacro))); // last piece
+      // ok, 'pars' has now been built
 
-    // do the call, recur, and replace with the result
-    s:=cb(fs, fullMacro, pars, cbData);
-    idsStack[recurLevel]:=fullmacro; // keep track of what we recur on
-    try
+      // do the call, recur, and replace with the result
+      s := cb(fs, fullMacro, pars, cbData);
+      idsStack[recurLevel] := fullMacro; // keep track of what we recur on
+      if s > '' then
       try
-        applyMacrosAndSymbols2(fs, s, cb, cbData, idsStack, recurLevel)
-      except end;
-    finally idsStack[recurLevel]:='' end;
-    result:=replace(txt, s, from, to_);
+        try
+          applyMacrosAndSymbols2(fs, s, cb, cbData, idsStack, recurLevel)
+         except
+        end;
+       finally
+        idsStack[recurLevel]:=''
+      end;
+      result := replace(txt, s, from, to_);
     end; // expand
 
   const
@@ -425,27 +440,30 @@ const
         end;//for
       inc(i);
       end;
-  finally pars.free end;
+   finally
+    pars.free
+  end;
   if Nstack > 0 then
     with stack[Nstack-1] do
       raise EtplError.create('unmatched marker', copy(txt,pos,30), row, col)
   end; // handleMacros
 
 begin
-if recurLevel > MAX_RECUR_LEVEL then exit;
-inc(recurLevel);
-handleSymbols();
-handleMacros();
+  if recurLevel > MAX_RECUR_LEVEL then
+    exit;
+  inc(recurLevel);
+  handleSymbols();
+  handleMacros();
 end; //applyMacrosAndSymbols2
 
-procedure applyMacrosAndSymbols(fs: TFileServer; var txt:string; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
+procedure applyMacrosAndSymbols(fs: TFileServer; var txt: UnicodeString; cb:TmacroCB; cbData:pointer; removeQuotings:boolean=TRUE);
 var
   idsStack: TparserIdsStack;
 begin
-enforceNUL(txt);
-applyMacrosAndSymbols2(fs, txt, cb, cbData, idsStack);
-if removeQuotings then
-  txt:=xtpl(txt, [MARKER_QUOTE, '', MARKER_UNQUOTE, ''])
+  enforceNUL(txt);
+  applyMacrosAndSymbols2(fs, txt, cb, cbData, idsStack);
+  if removeQuotings then
+    txt := xtpl(txt, [MARKER_QUOTE, '', MARKER_UNQUOTE, ''])
 end;
 
 function findMacroMarker(const s:string; ofs:integer=1):integer;
@@ -466,7 +484,7 @@ function macroQuote(s:string):string;
 var
   t: string;
 begin
-enforceNUL(s);
+  enforceNUL(s);
 if not anyMacroMarkerIn(s) then
   begin
   result:=s;

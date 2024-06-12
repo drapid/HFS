@@ -49,6 +49,7 @@ type
  {$ELSE ~FMX}
     systemimages: Timagelist;    // system icons
  {$ENDIF FMX}
+    function GetBitmap(idx: Integer; Size: Integer): TBitmap;
     function getImageIndexForFile(fn: string): integer;
   end;
 
@@ -73,6 +74,7 @@ type
   function str2pic(const s: RawByteString; imgSize: Integer): integer;
   function strGif2pic(const gs: RawByteString; imgSize: Integer): integer;
   function ico2str(hndl: THandle; icoNdx: Integer; imgSize: Integer): RawByteString;
+  function ico2bmp(hndl: THandle; icoNdx: Integer; imgSize: Integer): TBitmap;
 
   function  stringPNG2BMP(const s: RawByteString): TBitmap;
 
@@ -130,9 +132,11 @@ begin
   result := TImageList.Create(NIL);
  {$ELSE ~FMX}
   result := Timagelist.Create(NIL);
-  Result.ColorDepth := cd32Bit;
   result.ShareImages := TRUE;
+  {$IFNDEF FPC}
+  Result.ColorDepth := cd32Bit;
   result.handle := hs;
+  {$ENDIF FPC}
  {$ENDIF FMX}
 end; // loadSystemimages
 
@@ -332,8 +336,8 @@ var
 begin
   Result := '';
   ss := TRawByteStringStream.create(s);
+  bmp := TBitmap.Create;
   try
-    bmp := TBitmap.Create;
  {$IFDEF FMX}
     bmp.loadFromStream(ss);
  {$ELSE FMX}
@@ -344,6 +348,7 @@ begin
     Result := bmp2str(bmp);
    finally
      ss.free;
+     bmp.Free;
  {$IFNDEF FMX}
      gif.Free;
  {$ENDIF ~FMX}
@@ -376,7 +381,7 @@ type
   PRGBAArray = ^TRGBAArray;
  {$IFNDEF FMX}
 var
-	png: TPNGImage;
+  png: TPNGImage;
   RowInOut: PRGBAArray;
   RowAlpha: PByteArray;
  {$ENDIF FMX}
@@ -387,6 +392,9 @@ begin
   png := TPNGImage.Create();
   try
   //  png.ColorReduction:=rmQuantize;
+   {$IFDEF FPC}
+    png.LoadFromBitmapHandles(bmp.Handle, bmp.MaskHandle);
+   {$ELSE ~FPC}
     png.Assign(bmp);
    {$IFDEF FMX}
     if bmp.PixelFormat in [TPixelFormat.RGBA, TPixelFormat.BGRA, TPixelFormat.RGBA16] then
@@ -403,6 +411,7 @@ begin
             RowAlpha[X] := RowInOut[X].rgbReserved;
         end;
       end;
+   {$ENDIF ~FPC}
     result := png2str(png);
   finally png.free;
   end;
@@ -433,11 +442,7 @@ begin
 
   bmp := nil;
   try
-   {$IFDEF FMX}
-    bmp := IconsDM.Images.Bitmap(TSizeF.Create(imgSize, imgSize), idx);
-   {$ELSE FMX}
-    bmp := IconsDM.ImgCollection.GetBitmap(idx, imgSize, imgSize);
-   {$ENDIF FMX}
+    bmp := IconsDM.GetBitmap(idx, imgSize);
 
     if Assigned(bmp) then
      begin
@@ -469,6 +474,22 @@ begin
      finally
       bmp.Free;
     end;
+end;
+
+function ico2bmp(hndl: THandle; icoNdx: Integer; imgSize: Integer): TBitmap;
+ //var
+   //bmp: TBitmap;
+begin
+  Result := TBitmap.Create;
+  try
+    Result.PixelFormat := pf32bit;
+    Result.SetSize(imgSize, imgSize);
+  {$IFDEF FPC}  Result.BeginUpdate(True); {$ENDIF FPC}
+    ImageList_DrawEx(hndl, icoNdx, Result.Canvas.Handle, 0, 0, imgSize, ImgSize, CLR_NONE, CLR_NONE, ILD_SCALE or ILD_PRESERVEALPHA);
+  {$IFDEF FPC}  Result.EndUpdate; {$ENDIF FPC}
+   finally
+    //bmp.Free;
+  end;
 end;
 
 function str2pic(const s: RawByteString; imgSize: Integer): Integer;
@@ -559,6 +580,25 @@ begin
    {$ENDIF FMX}
 end;
 
+function TIconsDM.GetBitmap(idx: Integer; Size: Integer): TBitmap;
+begin
+ {$IFDEF FMX}
+  result := Images.Bitmap(TSizeF.Create(Size, Size), idx);
+ {$ELSE FMX}
+ {$IFDEF FPC}
+  Result := NIL;
+  if Self.images.Count > idx then
+   begin
+    Result := TBitmap.Create;
+    Result.SetSize(Size, Size);
+    Self.images.GetBitmap(idx, Result);
+   end;
+ {$ELSE ~FPC}
+  Result:= imgCollection.GetBitmap(idx, size, size);
+ {$ENDIF FPC}
+ {$ENDIF FMX}
+end;
+
 function TIconsDM.getImageIndexForFile(fn: String): Integer;
 var
   newIdx, n: integer;
@@ -588,7 +628,8 @@ begin
    {$IFNDEF FMX}
 
   // have we already met this sysidx before?
-  for var i:=0 to length(sysidx2index)-1 do
+  if length(sysidx2index) > 0 then
+   for var i:=0 to length(sysidx2index)-1 do
     if sysidx2index[i].sysidx = shfi.iIcon then
       begin
         result := sysidx2index[i].idx;

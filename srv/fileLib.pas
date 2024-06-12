@@ -1612,7 +1612,7 @@ begin
   if length(vfsdata) > COMPRESSION_THRESHOLD then
     data := TLV(FK_COMPRESSED_ZLIB,
 //    ZcompressStr2(vfsdata, zcFastest, 31,8, zsDefault) );
-      ZcompressStr(vfsdata, TCompressionLevel.clFastest, TZStreamType.zsGZip) )
+      ZcompressStr(vfsdata, TCompressionLevel.clDefault, TZStreamType.zsGZip) )
    else
     data := vfsdata;
   result := TLV(FK_HEAD, VFS_FILE_IDENTIFIER)

@@ -32,8 +32,8 @@ var
   defaultAlias: THashedStringList;
   staticVars: THashedStringList; // these scripting variables are held for the whole run-time
 
-function tryApplyMacrosAndSymbols(fs: TFileServer; var txt: String; var md: TmacroData; removeQuotings: Boolean=true): Boolean;
-function runScript(fs: TFileServer; const script:string; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL): String;
+function tryApplyMacrosAndSymbols(fs: TFileServer; var txt: UnicodeString; var md: TmacroData; removeQuotings: Boolean=true): Boolean;
+function runScript(fs: TFileServer; const script: UnicodeString; table:TstringDynArray=NIL; tpl_:Ttpl=NIL; f:Tfile=NIL; folder:Tfile=NIL; cd:TconnDataMain=NIL): UnicodeString;
 function runEventScript(fs: TFileServer; const event: String; table: TStringDynArray=NIL; cd: TconnDataMain=NIL): String;
 procedure resetLog();
 procedure runTimedEvents(fs: TFileServer);
@@ -115,23 +115,27 @@ for i:=0 to length(MARKERS)-1 do
 result:=s;
 end; // encodeMarkers
 
-function noMacrosAllowed(s:string):string;
+function noMacrosAllowed(s: UnicodeString): UnicodeString;
 // prevent hack attempts
 var
   i: integer;
 begin
+  if s = '' then
+    Exit('');
   i:=1;
   enforceNUL(s);
   repeat
-  i:=findMacroMarker(s, i);
-  if i = 0 then break;
-  replace(s, '&#'+intToStr(charToUnicode(s[i]))+';', i,i);
+    i:=findMacroMarker(s, i);
+    if i = 0 then
+      break;
+    replace(s, '&#'+intToStr(charToUnicode(s[i]))+';', i,i);
   until false;
-s:=reReplace(s,'%([-a-z0-9]+%)','&#37;$1', 'mi');
-result:=s;
+//  s := reReplace(s,'%([-a-z0-9]+%)','&#37;$1', 'mi');
+//  result:=s;
+  Result := ReplaceStr(s, '%','&#37;');
 end; // noMacrosAllowed
 
-function cbMacros(fs: TFileServer; const fullMacro: String; pars: TPars; cbData: Pointer): String;
+function cbMacros(fs: TFileServer; const fullMacro: UnicodeString; pars: TPars; cbData: Pointer): UnicodeString;
 var
   md: ^TmacroData;
   name, p: string;
@@ -306,6 +310,20 @@ var
     result := pars.ContainsKey(name);
   end; // parExist
 
+  function parExistVal(const name: String; var val: String; doTrim: boolean=TRUE): boolean;
+  begin
+    Result := false;
+    val := '';
+    if name > '' then
+      begin
+        Result := pars.TryGetValue(name, val);
+        if Result then
+          if doTrim then
+            val := trim(val)
+      end;
+  end; // parExistVal
+
+
   procedure trueIf(condition:boolean);
   begin if condition then result:='1' else result:='' end;
 
@@ -340,7 +358,7 @@ var
   begin result:=getVarSpace(varname).values[varname] end;
 
   // if par with name exists, then it's a var name, otherwise it's a constant value at specified index
-  function parVar(parname:string; idx:integer):string; overload;
+  function parVar(const parname: String; idx: Integer): String; overload;
   begin
   if parExist(parname) then
     result:=getVar(par(parname))
@@ -348,7 +366,7 @@ var
     result:=pars[idx];
   end; // parVar
 
-  function setVar(varname, value:string; space:THashedStringList=NIL):boolean;
+  function setVar(varname: String; const value: String; space: THashedStringList=NIL): Boolean;
   var
     o: Tobject;
     i: integer;
@@ -612,7 +630,7 @@ var
     result:=macroQuote(result);
   end; // section
 
-  function urlVar(k:string):string;
+  function urlVar(const k: String): String;
   var
     s: string;
   begin
@@ -629,10 +647,12 @@ var
   except end;
   end; // urlVar
 
-  function maybeUrlvar(k:string):string;
+  function maybeUrlvar(const k: String): String;
   begin
-  if (k = '') or (k[1] <> '?') then result:=k
-  else result:=urlvar(copy(k,2,MAXINT));
+    if (k = '') or (k[1] <> '?') then
+      result := k
+     else
+      result := urlvar(copy(k,2,MAXINT));
   end; // maybeUrlvar
 
   function compare(op,p1,p2:string):boolean;
@@ -669,7 +689,7 @@ var
     end;
   end; // infixOperators
 
-  procedure call(code:string; ofs:integer=0);
+  procedure call(const code: String; ofs: Integer=0);
   var
     i: integer;
   begin
@@ -823,9 +843,10 @@ var
 
     if p = 'virtual' then
       begin
-      name:=par(1);
-      if not validateAndExtractParent() then exit;
-      f:=Tfile.createVirtualFolder(fs.rootFile.mainTree, name);
+        name:=par(1);
+        if not validateAndExtractParent() then
+          exit;
+        f := Tfile.createVirtualFolder(fs.rootFile.mainTree, name);
       end
     else
       begin
@@ -882,11 +903,13 @@ var
     uniqueStrings(result);
     end;
 
-    procedure setAttr(a:TfileAttribute; parName:string);
+    procedure setAttr(a: TfileAttribute; const parName: String);
+    var
+      v: String;
     begin
-      if parExist(parname) then
+      if parExistVal(parname, v) then
         try
-          if isTrue(parEx(parname)) then
+          if isTrue(v) then
             include(f.flags, a)
           else
             exclude(f.flags, a);
@@ -903,7 +926,7 @@ var
        f.setDynamicComment(LP, macroDequote(parEx('comment')))
      except end;
     try
-      f.name:=parEx('name');
+      f.name := parEx('name');
       if assigned(f.node) then
         f.node.text:=f.name;
     except end;
@@ -1292,10 +1315,9 @@ var
     i: integer;
     v: string;
   begin
-    if parExist('var') then
+    if parExistVal('var', v) then
       try
-        v := parEx('var');
-        result:=getVar(v);
+        result := getVar(v);
        except
         result := pars[pars.count-1]
       end
@@ -1349,8 +1371,8 @@ var
   if not icon and buttons then
     inc(code, MB_ICONQUESTION);
   case msgDlg(p, code, par(2)) of
-    MRYES, MROK: result:=if_(buttons, '1'); // if only OK button is available, then return nothing
-    MRCANCEL: result:=if_(code and MB_YESNOCANCEL = MB_YESNOCANCEL, 'cancel'); // for the YESNOCANCEL, we return cancel to allow to tell NO from CANCEL
+    MRYES, MROK: result := if_(buttons, '1'); // if only OK button is available, then return nothing
+    MRCANCEL: result := if_(code and MB_YESNOCANCEL = MB_YESNOCANCEL, 'cancel'); // for the YESNOCANCEL, we return cancel to allow to tell NO from CANCEL
     else result:='';
     end;
   end; // dialog
@@ -1658,8 +1680,9 @@ var
     end; // getPairs
 
   begin
-  if not satisfied(md.cd) then exit;
-  result:='';
+    if not satisfied(md.cd) then
+      exit;
+    result:='';
     if parExist('value') then
       try md.cd.conn.setCookie(p, parEx('value'), getPairs());
       except result:=noMacrosAllowed(md.cd.conn.getCookie(p)) end // there was no "value" to set, so just read
@@ -1699,11 +1722,12 @@ var
     setVar(parEx('sub'), s);
   except end;
 
-  try
-    result:=reReplace(subj, p, parEx('replace'), mods);
-    setVar(parEx('var'), result); // we put the output where we got the input
-    result:='';
-  except end;
+    try
+      result:=reReplace(subj, p, parEx('replace'), mods);
+      setVar(parEx('var'), result); // we put the output where we got the input
+      result:='';
+     except
+    end;
   end; // regexp
 
   procedure dir();
@@ -1926,7 +1950,7 @@ var
   end; // handleSymbol
 
 
-  function stringTotrayMessageType(s:string): TBalloonIconType;
+  function stringTotrayMessageType(const s: String): TBalloonIconType;
   begin
   if compareText(s,'warning') = 0 then
     result:= bitWarning
@@ -1938,18 +1962,18 @@ var
     result:= bitNone
   end; // stringTotrayMessageType
 
-  function renameIt(src,dst:string):boolean;
+  function renameIt(const src, dst: String): Boolean;
   var
     srcReal, dstReal: string;
   begin
-  srcReal:=uri2diskMaybe(src,NIL,FALSE);
-  dstReal:=uri2diskMaybeFolder(dst);
-  if isExtension(srcReal, '.lnk')
-  and not isExtension(src, '.lnk') then
-    dstReal:=dstReal+'.lnk';
-  if extractFilePath(dstReal)='' then
-    dstReal:=extractFilePath(srcReal)+dstReal;
-  result:=renameFile(srcReal, dstReal)
+    srcReal:=uri2diskMaybe(src,NIL,FALSE);
+    dstReal:=uri2diskMaybeFolder(dst);
+    if isExtension(srcReal, '.lnk')
+    and not isExtension(src, '.lnk') then
+      dstReal:=dstReal+'.lnk';
+    if extractFilePath(dstReal)='' then
+      dstReal:=extractFilePath(srcReal)+dstReal;
+    result := renameFile(srcReal, dstReal)
   end; // renameIt
 
 var

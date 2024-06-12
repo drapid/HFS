@@ -172,8 +172,8 @@ type
     end;
 
   TspeedLimiter = class
-  { connections can be bound to a limiter. The limiter is a common limited
-  { resource (the bandwidth) that is consumed. }
+  // connections can be bound to a limiter. The limiter is a common limited
+  // resource (the bandwidth) that is consumed.
   protected
     P_maxSpeed: integer;              // this is the limit we set. MAXINT means disabled.
     procedure setMaxSpeed(v:integer);
@@ -246,7 +246,7 @@ type
     eventData: RawByteString;
     ignoreSpeedLimit: boolean;
     limiters: TobjectList;     // every connection can be bound to a number of TspeedLimiter
-    constructor create(server:ThttpSrv; acceptingSock:Twsocket);
+    constructor create(server: ThttpSrv; acceptingSock: TWsocket);
     destructor Destroy; override;
     procedure disconnect();
 //    procedure addHeader(s: String; overwrite: Boolean=TRUE); OverLoad; // append an additional header line
@@ -257,6 +257,7 @@ type
     function  setHeaderIfNone(const s: String): Boolean; OverLoad;// set header if not already existing
     function  setHeaderIfNone(const s: RawByteString): Boolean; OverLoad;// set header if not already existing
     function  setHeaderIfNone(const name: RawByteString; const s: String): Boolean; OverLoad;
+    function  setHeaderIfNone(const name: RawByteString; const s: RawByteString): Boolean; OverLoad;
     procedure removeHeader(name: RawByteString);
     function  getHeader(const h: String): String;  // extract the value associated to the specified header field
     function  getCookie(const k: String): String;
@@ -361,10 +362,12 @@ function getIP(): String;
 procedure includeTrailingString(var s: String; const ss: String); OverLoad;
 procedure includeTrailingString(var s: RawByteString; const ss: RawByteString); OverLoad;
 // gets unicode code for specified character
-function charToUnicode(c: char): dword; OverLoad;
+function charToUnicode(c: WideChar): dword; OverLoad;
 function charToUnicode(c: AnsiChar): dword; OverLoad;
 // this version of pos() is able to skip the pattern if inside quotes
+{$IFDEF UNICODE}
 function nonQuotedPos(const ss, s: String; ofs: Integer=1; const quote: String='"'; const unquote: String='"'): Integer; OverLoad;
+{$ENDIF UNICODE}
 function nonQuotedPos(const ss, s: RawByteString; ofs: integer=1; const quote: RawByteString='"'; const unquote: RawByteString='"'): Integer; OverLoad;
 // case insensitive version
 //function ipos(ss, s:string; ofs:integer=1):integer; overload;
@@ -388,6 +391,8 @@ const
   HEADER_LIMITER: RawByteString = CRLFA+CRLFA;
   MAX_REQUEST_LENGTH = 64*1024;
   MAX_INPUT_BUFFER_LENGTH = 256*1024;
+  HexCharsW :set of Char = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+                            'A', 'B', 'C', 'D', 'E', 'F']; //
   // used as body content when the user did not specify any
   HRM2BODY: array [ThttpReplyMode] of AnsiString = (
   	'200 - OK',
@@ -418,10 +423,10 @@ begin
     s:=s+ss
 end;
 
-function charToUnicode(c:char):dword;
+function charToUnicode(c: WideChar):dword;
 begin stringToWideChar(c,@result,4) end;
 
-function charToUnicode(c:AnsiChar):dword;
+function charToUnicode(c: AnsiChar):dword;
 begin stringToWideChar(c,@result,4) end;
 
 function isLocalIP(const ip:string):boolean;
@@ -446,6 +451,7 @@ begin if a < b then result:=a else result:=b end;
 
 
 
+{$IFDEF UNICODE}
 function nonQuotedPos(const ss, s: String; ofs: Integer=1; const quote: String='"'; const unquote: String='"'): Integer; OverLoad;
 var
   qpos: integer;
@@ -468,6 +474,7 @@ begin
     until ofs > result; // this quoting was short, let's see if we have another
   until false;
 end; // nonQuotedPos
+{$ENDIF UNICODE}
 
 function nonQuotedPos(const ss, s: RawByteString; ofs: integer=1; const quote: RawByteString='"'; const unquote: RawByteString='"'):integer; OverLoad;
 var
@@ -494,39 +501,44 @@ var
   c: char;
   resA: RawByteString;
   ca: AnsiChar;
+  hv: Boolean;
 begin
   setLength(result, length(url));
+  if length(url) = 0 then
+    Exit;
   setLength(resA, length(url));
   l := 0;
   i := 1;
-while i<=length(url) do
-  begin
-  if (url[i] = '%') and (i+2 <= length(url)) then
-    try
-      if utf8 then
-        ca := AnsiChar(strToInt( '$'+url[i+1]+url[i+2] ))
-       else
-        c:=char(strToInt( '$'+url[i+1]+url[i+2] ));
-      inc(i,2); // three chars for one
-    except
-      if utf8 then
-        ca := AnsiChar(url[i])
-       else
-        c := url[i];
-    end
-  else
-      if utf8 then
-        ca := AnsiChar(url[i])
-       else
-        c := url[i];
+  while i<=length(url) do
+    begin
+      hv := False;
+      if (url[i] = '%') and (i+2 <= length(url)) then
+        if (url[i+1] in HexCharsW) and
+           (url[i+2] in HexCharsW) then
+      try
+        if utf8 then
+          ca := AnsiChar(strToInt( '$'+url[i+1]+url[i+2] ))
+         else
+          c := char(strToInt( '$'+url[i+1]+url[i+2] ));
+        inc(i,2); // three chars for one
+        hv := True;
+       except
+        hv := False;
+      end;
 
-  inc(i);
-  inc(l);
-      if utf8 then
-        resA[l] := ca
-       else
-        result[l] := c;
-  end;
+     if not hv then
+       if utf8 then
+         ca := AnsiChar(url[i])
+        else
+         c := url[i];
+
+     inc(i);
+     inc(l);
+        if utf8 then
+          resA[l] := ca
+         else
+          result[l] := c;
+    end;
   if utf8 then
     begin
      setLength(resA, l);
@@ -546,22 +558,22 @@ begin
   setLength(resA, length(url));
   l := 0;
   i := 1;
-while i<=length(url) do
-  begin
-    if (url[i] = '%') and (i+2 <= length(url)) then
-      try
-        c := AnsiChar(strToIntA(RawByteString('$')+url[i+1]+url[i+2] ));
-        inc(i,2); // three chars for one
-      except
-        c := url[i];
-      end
-    else
-     c := url[i];
+  while i<=length(url) do
+    begin
+      if (url[i] = '%') and (i+2 <= length(url)) then
+        try
+          c := AnsiChar(strToIntA(RawByteString('$')+url[i+1]+url[i+2] ));
+          inc(i,2); // three chars for one
+        except
+          c := url[i];
+        end
+      else
+       c := url[i];
 
-    inc(i);
-    inc(l);
-    resA[l] := c;
-  end;
+      inc(i);
+      inc(l);
+      resA[l] := c;
+    end;
   setLength(resA, l);
   Result := UnUTF(resA);
 end; // decodeURL
@@ -639,7 +651,7 @@ begin
     result := result+url[i];
 end; // encodeURL
 
-function getIP():string;
+function getIP(): String;
 var
   i: integer;
   ips: Tstrings;
@@ -771,7 +783,7 @@ end;
 
 /////// SERVER
 
-function ThttpSrv.start(onAddress:string='*'):boolean;
+function ThttpSrv.start(onAddress: String='*'): Boolean;
 begin
   result := FALSE;
   if active or not assigned(sock) then
@@ -896,18 +908,19 @@ var
   c: ThttpConn;
   i: integer;
 begin
-  i := 0;
-while i < disconnecting.Count do
+  i := disconnecting.Count-1;
+  while i >= 0 do
   begin
-  c:=disconnecting[i] as ThttpConn;
-  inc(i);
-  if c.dontFree then continue;
-  c.processInputBuffer(); // serve, till the end.
-  disconnecting.delete(i-1);
-  q.remove(c);
-  conns.remove(c);
-  offlines.add(c);
-  notify(HE_DISCONNECTED, c);
+    c := disconnecting[i] as ThttpConn;
+    dec(i);
+    if c.dontFree then
+      continue;
+    c.processInputBuffer(); // serve, till the end.
+    disconnecting.delete(i+1);
+    q.remove(c);
+    conns.remove(c);
+    offlines.add(c);
+    notify(HE_DISCONNECTED, c);
   end;
 end; // processDisconnecting
 
@@ -917,12 +930,18 @@ procedure ThttpSrv.timerEvent(sender:Tobject);
   var
     i: integer;
   begin
-  for i:=0 to conns.count-1 do
-    try
-      with ThttpConn(conns[i]) do
-        if (state in [HCS_IDLE, HCS_DISCONNECTED]) and (buffer > '') then
-          processInputBuffer();
-    except end;
+    i := 0;
+    if conns.count > 0 then
+      while i < conns.count do
+       begin
+         try
+           with ThttpConn(conns[i]) do
+            if (state in [HCS_IDLE, HCS_DISCONNECTED]) and (buffer > '') then
+              processInputBuffer();
+          except
+         end;
+         Inc(i);
+       end;
   end; // processPipelines
 
   procedure processQ();
@@ -931,17 +950,19 @@ procedure ThttpSrv.timerEvent(sender:Tobject);
     toQ: Tobjectlist;
     i, chunkSize: integer;
   begin
-  toQ:=Tobjectlist.create;
-  try
-    toQ.ownsObjects:=FALSE;
-    while q.count > 0 do
-      begin
-      c:=NIL;
-      try
-        c:=q.first() as ThttpConn; // got an AV here, had no better solution than adding a try statement www.rejetto.com/forum/?topic=6204
-        q.delete(0);
-      except end;
-      if c = NIL then continue;
+    toQ := Tobjectlist.create;
+    try
+      toQ.ownsObjects:=FALSE;
+      while q.count > 0 do
+        begin
+          c := NIL;
+          try
+            c := q.first() as ThttpConn; // got an AV here, had no better solution than adding a try statement www.rejetto.com/forum/?topic=6204
+            q.delete(0);
+           except
+          end;
+          if c = NIL then
+            continue;
 
       try
         chunkSize:= RDUtils.ifThen(c.paused, 0, MAXINT);
@@ -963,10 +984,13 @@ procedure ThttpSrv.timerEvent(sender:Tobject);
         for i:=0 to c.limiters.Count-1 do
           with c.limiters[i] as TspeedLimiter do
             dec(availableBandwidth, chunkSize);
-      except end;
+       except
+       end;
       end;
-    q.assign(toQ, laOR);
-  finally toQ.Free end;
+      q.assign(toQ, laOR);
+     finally
+      toQ.Free
+    end;
   end; // processQ
 
 begin
@@ -1340,7 +1364,7 @@ procedure ThttpConn.processInputBuffer();
   begin
     repeat
     { When the buffer is stuffed with file bytes only, we can avoid calling pos() and chop().
-    { Unexpectedly this did not speed up anything. I report the try so you don't waste your time.
+    // Unexpectedly this did not speed up anything. I report the try so you don't waste your time.
     if (bytesPosted < post.length-length(post.boundary)) and (post.filename > '') then
       begin
       post.data:=buffer;
@@ -1357,8 +1381,8 @@ procedure ThttpConn.processInputBuffer();
       if post.filename = '' then
         post.data:=post.data+chop(length(buffer)-length(post.boundary), 0, buffer)
       else
-        { no boundary, this is a chunk of the file we are receiving. notify the listener
-        { only about the data we are sure it doesn't overlap a possibly coming boundary }
+        // no boundary, this is a chunk of the file we are receiving. notify the listener
+        // only about the data we are sure it doesn't overlap a possibly coming boundary }
         begin
         post.data:=chop(length(buffer)-length(post.boundary), 0, buffer);
         if post.data > '' then
@@ -1637,8 +1661,8 @@ and (bytesToSend = 0) then
 if not persistent or not (reply.mode in [HRM_REPLY, HRM_REPLY_HEADER]) then
   disconnect()
 else
-  { we must check the socket state, because a disconnection could happen while
-  { this method is executing }
+  // we must check the socket state, because a disconnection could happen while
+  // this method is executing }
   if sock.State <> wsClosed then state:=HCS_IDLE;
 if notifyReplied then
   begin
@@ -1887,6 +1911,15 @@ if name = '' then
 result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
 if result then
   addHeader(name, StrToUTF8(s), FALSE); // with FALSE it's faster
+end; // setHeaderIfNone
+
+function ThttpConn.setHeaderIfNone(const name: RawByteString; const s: RawByteString): Boolean;
+begin
+  if name = '' then
+    raise Exception.Create('Missing colon');
+  result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
+  if result then
+    addHeader(name, s, FALSE); // with FALSE it's faster
 end; // setHeaderIfNone
 
 procedure ThttpConn.removeHeader(name: RawByteString);
