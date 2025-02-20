@@ -27,15 +27,20 @@ interface
 uses
   // delphi libs
   Windows, Messages, SysUtils, Forms, Menus, Graphics, Controls, ComCtrls, Dialogs, math,
-  Buttons, StdCtrls, ExtCtrls, ToolWin, ImageList, strutils, AppEvnts, types,
-  iniFiles, Classes, System.Contnrs, Winapi.CommCtrl,
+  Buttons, StdCtrls, ExtCtrls, strutils, types,
+ {$IFDEF FPC}
+  RichMemo,
+ {$ENDIF FPC}
+  ToolWin,
+  iniFiles, Classes,
+  AppEvnts, ImageList, Winapi.CommCtrl, System.Contnrs,
   Vcl.Mask, Vcl.ImgList, Vcl.VirtualImageList,
   // 3rd part libs. ensure you have all of these, the same version reported in dev-notes.txt
-  rnqTraylib,
+  rnqTraylib, hfs.tray,
   // rejetto libs
-  hfsGlobal, fileLib, srvConst, serverLib, srvClassesLib,
-  IconsLib,
-  HSlib, monoLib, progFrmLib, classesLib;
+  hfsGlobal,
+  fileLib, serverLib, srvClassesLib,
+  IconsLib;
 
 
 type
@@ -44,17 +49,18 @@ type
   TConnDataGui = class(TObject)
     tray: TmyTrayicon;
     tray_ico: Ticon;
+    tp: TIconParams;
     constructor Create; OverLoad;
     destructor Destroy; override;
   end;
 
   Tautosave = record
     every, minimum: integer; // in seconds
-    last: Tdatetime;
+    last: TDateTime;
     menu: Tmenuitem;
-    end;
+   end;
 
-  TtreeNodeDynArray = array of TtreeNode;
+  { TmainFrm }
 
   TmainFrm = class(TForm)
     filemenu: TPopupMenu;
@@ -62,7 +68,9 @@ type
     Remove1: TMenuItem;
     topToolbar: TToolBar;
     startBtn: TToolButton;
-    ToolButton1: TToolButton;
+    Sep1TBtn: TToolButton;
+    Sep2TBtn: TToolButton;
+    Sep3TBtn: TToolButton;
     menuBtn: TToolButton;
     menu: TPopupMenu;
     About1: TMenuItem;
@@ -84,7 +92,6 @@ type
     Openit1: TMenuItem;
     appEvents: TApplicationEvents;
     logmenu: TPopupMenu;
-    DumprequestsChk: TMenuItem;
     CopyURL1: TMenuItem;
     Readonly1: TMenuItem;
     Clear1: TMenuItem;
@@ -174,21 +181,28 @@ type
     usecommentasrealmChk: TMenuItem;
     Resetuserpass1: TMenuItem;
     Switchtovirtual1: TMenuItem;
-    LogiconsChk: TMenuItem;
     Loginrealm1: TMenuItem;
     Logwhat1: TMenuItem;
     N9: TMenuItem;
     N16: TMenuItem;
+    DumprequestsChk: TMenuItem;
+    LogiconsChk: TMenuItem;
     logconnectionsChk: TMenuItem;
     logDisconnectionsChk: TMenuItem;
     logRequestsChk: TMenuItem;
     logRepliesChk: TMenuItem;
     logFulldownloadsChk: TMenuItem;
-    logBytesreceivedChk: TMenuItem;
-    logBytessentChk: TMenuItem;
+    logBytesReceivedChk: TMenuItem;
+    logBytesSentChk: TMenuItem;
     logServerstartChk: TMenuItem;
     logServerstopChk: TMenuItem;
     logBrowsingChk: TMenuItem;
+    logProgressChk: TMenuItem;
+    logUploadsChk: TMenuItem;
+    logBannedChk: TMenuItem;
+    logOtherEventsChk: TMenuItem;
+    logOnlyServedChk: TMenuItem;
+    logDeletionsChk: TMenuItem;
     Help1: TMenuItem;
     Introduction1: TMenuItem;
     N18: TMenuItem;
@@ -199,11 +213,9 @@ type
     N19: TMenuItem;
     Clearfilesystem1: TMenuItem;
     HintsfornewcomersChk: TMenuItem;
-    logUploadsChk: TMenuItem;
     only1instanceChk: TMenuItem;
     compressedbrowsingChk: TMenuItem;
     Numberofloggeduploads1: TMenuItem;
-    logProgressChk: TMenuItem;
     Flagfilesaddedrecently1: TMenuItem;
     Flagasnew1: TMenuItem;
     confirmexitChk: TMenuItem;
@@ -233,8 +245,6 @@ type
     Opendirectlyinbrowser1: TMenuItem;
     maxDLs1: TMenuItem;
     Editresource1: TMenuItem;
-    logBannedChk: TMenuItem;
-    ToolButton2: TToolButton;
     modeBtn: TToolButton;
     Addfiles2: TMenuItem;
     Addfolder2: TMenuItem;
@@ -256,7 +266,6 @@ type
     abortBtn: TToolButton;
     Seelastserverresponse1: TMenuItem;
     N5: TMenuItem;
-    logOtherEventsChk: TMenuItem;
     supportDescriptionChk: TMenuItem;
     Showcustomizedoptions1: TMenuItem;
     useISOdateChk: TMenuItem;
@@ -281,7 +290,6 @@ type
     CopyURLwithfingerprint1: TMenuItem;
     recursiveListingChk: TMenuItem;
     Disable1: TMenuItem;
-    logOnlyServedChk: TMenuItem;
     Fingerprints1: TMenuItem;
     saveNewFingerprintsChk: TMenuItem;
     Createfingerprintonaddition1: TMenuItem;
@@ -309,7 +317,6 @@ type
     Addresseseverconnected1: TMenuItem;
     N24: TMenuItem;
     Allowedreferer1: TMenuItem;
-    ToolButton4: TToolButton;
     oemForIonChk: TMenuItem;
     portBtn: TToolButton;
     resetOptions1: TMenuItem;
@@ -369,7 +376,6 @@ type
     N14: TMenuItem;
     Runscript1: TMenuItem;
     Changeport1: TMenuItem;
-    logDeletionsChk: TMenuItem;
     showMemUsageChk: TMenuItem;
     trayiconforeachdownload1: TMenuItem;
     tabOnLogFileChk: TMenuItem;
@@ -385,14 +391,36 @@ type
     AnyAddressV6: TMenuItem;
     AddIPasreverseproxy1: TMenuItem;
     BtnImages: TVirtualImageList;
+    AnyAddressV4: TMenuItem;
+    AddrDelim: TMenuItem;
+    disableMacrosNonLocalIPChk: TMenuItem;
+    RDForumMnu: TMenuItem;
+    addProgramToFirewllExceptionMnu: TMenuItem;
     procedure FormResize(Sender: TObject);
     procedure filesBoxCollapsing(Sender: TObject; Node: TTreeNode; var AllowCollapse: Boolean);
-    procedure newfolder1Click(Sender: TObject);
     procedure filesBoxEditing(Sender: TObject; Node: TTreeNode; var AllowEdit: Boolean);
     procedure filesBoxEdited(Sender: TObject; Node: TTreeNode; var S: String);
+    procedure filesBoxAddition(Sender: TObject; Node: TTreeNode);
+    procedure filesBoxChange(Sender: TObject; Node: TTreeNode);
+    procedure filesBoxDblClick(Sender: TObject);
+    procedure filesBoxMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure filesBoxCompare(Sender: TObject; Node1, Node2: TTreeNode;
+      Data: Integer; var Compare: Integer);
+    procedure filesBoxDragOver(Sender, Source: TObject; X, Y: Integer;
+      State: TDragState; var Accept: Boolean);
+    procedure filesBoxDragDrop(Sender, Source: TObject; X, Y: Integer);
+    procedure filesBoxDeletion(Sender: TObject; Node: TTreeNode);
+    procedure filesBoxCustomDrawItem(Sender: TCustomTreeView;
+      Node: TTreeNode; State: TCustomDrawState; var DefaultDraw: Boolean);
+    procedure filesBoxEndDrag(Sender, Target: TObject; X, Y: Integer);
+    procedure filesBoxEnter(Sender: TObject);
+    procedure filesBoxMouseEnter(Sender: TObject);
+    procedure filesBoxMouseLeave(Sender: TObject);
+    procedure filesBoxExit(Sender: TObject);
+    procedure newfolder1Click(Sender: TObject);
     procedure Remove1Click(Sender: TObject);
     procedure startBtnClick(Sender: TObject);
-    procedure filesBoxChange(Sender: TObject; Node: TTreeNode);
     procedure Kickconnection1Click(Sender: TObject);
     procedure Kickallconnections1Click(Sender: TObject);
     procedure KickIPaddress1Click(Sender: TObject);
@@ -402,11 +430,6 @@ type
     procedure About1Click(Sender: TObject);
     procedure timerEvent(Sender: TObject);
     procedure menuPopup(Sender: TObject);
-    procedure filesBoxDblClick(Sender: TObject);
-    procedure filesBoxMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure filesBoxCompare(Sender: TObject; Node1, Node2: TTreeNode;
-      Data: Integer; var Compare: Integer);
     procedure foldersbeforeChkClick(Sender: TObject);
     procedure Browseit1Click(Sender: TObject);
     procedure Openit1Click(Sender: TObject);
@@ -431,11 +454,7 @@ type
     procedure onconnectionChkClick(Sender: TObject);
     procedure never1Click(Sender: TObject);
     procedure FormShow(Sender: TObject);
-    procedure filesBoxDragOver(Sender, Source: TObject; X, Y: Integer;
-      State: TDragState; var Accept: Boolean);
-    procedure filesBoxDragDrop(Sender, Source: TObject; X, Y: Integer);
     procedure Savefilesystem1Click(Sender: TObject);
-    procedure filesBoxDeletion(Sender: TObject; Node: TTreeNode);
     procedure Loadfilesystem1Click(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure Officialwebsite1Click(Sender: TObject);
@@ -454,8 +473,6 @@ type
     procedure Graphrefreshrate1Click(Sender: TObject);
     procedure Pausestreaming1Click(Sender: TObject);
     procedure Comment1Click(Sender: TObject);
-    procedure filesBoxCustomDrawItem(Sender: TCustomTreeView;
-      Node: TTreeNode; State: TCustomDrawState; var DefaultDraw: Boolean);
     procedure Setuserpass1Click(Sender: TObject);
     procedure browseBtnClick(Sender: TObject);
     procedure BanIPaddress1Click(Sender: TObject);
@@ -472,7 +489,6 @@ type
     procedure Accounts1Click(Sender: TObject);
     procedure traymessage1Click(Sender: TObject);
     procedure Guide1Click(Sender: TObject);
-    procedure filesBoxAddition(Sender: TObject; Node: TTreeNode);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Logfile1Click(Sender: TObject);
     procedure Font1Click(Sender: TObject);
@@ -533,7 +549,6 @@ type
     procedure Addicons1Click(Sender: TObject);
     procedure Iconmasks1Click(Sender: TObject);
     procedure Anyaddress1Click(Sender: TObject);
-    procedure filesBoxEndDrag(Sender, Target: TObject; X, Y: Integer);
     procedure CopyURLwithfingerprint1Click(Sender: TObject);
     procedure Disable1Click(Sender: TObject);
     procedure saveNewFingerprintsChkClick(Sender: TObject);
@@ -551,10 +566,6 @@ type
     procedure NumberofdifferentIPaddresseseverconnected1Click(Sender: TObject);
     procedure Addresseseverconnected1Click(Sender: TObject);
     procedure Allowedreferer1Click(Sender: TObject);
-    procedure filesBoxEnter(Sender: TObject);
-    procedure filesBoxMouseEnter(Sender: TObject);
-    procedure filesBoxMouseLeave(Sender: TObject);
-    procedure filesBoxExit(Sender: TObject);
     procedure sbarMouseDown(Sender: TObject; Button: TMouseButton; shift: TShiftState; X, Y: Integer);
     procedure portBtnClick(Sender: TObject);
     procedure SwitchON1Click(Sender: TObject);
@@ -591,10 +602,10 @@ type
     procedure Changeport1Click(Sender: TObject);
     procedure trayiconforeachdownload1Click(Sender: TObject);
     procedure Defaultpointtoaddfiles1Click(Sender: TObject);
-    function appEventsHelp(Command: Word; Data: NativeInt;
+    function  appEventsHelp(Command: Word; Data: THelpEventData;
       var CallHelp: Boolean): Boolean;
     procedure connBoxData(Sender: TObject; Item: TListItem);
-    function  connBoxDataRefresh(Sender: TObject; Item: TListItem; checkProgress: Boolean = True): Boolean;
+    function  connBoxDataRefresh(Sender: TObject; var Item: TListItem; checkProgress: Boolean = True): Boolean;
     procedure connBoxAdvancedCustomDrawSubItem(Sender: TCustomListView;
       Item: TListItem; SubItem: Integer; State: TCustomDrawState;
       Stage: TCustomDrawStage; var DefaultDraw: Boolean);
@@ -605,8 +616,15 @@ type
     procedure FormAfterMonitorDpiChanged(Sender: TObject; OldDPI,
       NewDPI: Integer);
     procedure AddIPasreverseproxy1Click(Sender: TObject);
+    procedure onLoadPrefsChange(Sender: TObject);
+    procedure onShowPrefsChange(Sender: TObject);
+    procedure onLogPrefsChange(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure AnyAddressV4Click(Sender: TObject);
+    procedure RDForumMnuClick(Sender: TObject);
+    procedure addProgramToFirewllExceptionMnuClick(Sender: TObject);
   private
-    function searchLog(dir:integer):boolean;
+    function  searchLog(dir: Integer): Boolean;
     procedure WMDropFiles(var msg:TWMDropFiles);
       message WM_DROPFILES;
     procedure WMQueryEndSession(var msg:TWMQueryEndSession);
@@ -615,116 +633,110 @@ type
       message WM_ENDSESSION;
     procedure WMNCLButtonDown(var msg:TWMNCLButtonDown);
       message WM_NCLBUTTONDOWN;
-    procedure trayEvent(sender:Tobject; ev:TtrayEvent);
+    procedure trayEvent(sender: Tobject; ev: TtrayEvent);
     procedure downloadtrayEvent(sender: Tobject; ev: TtrayEvent);
-    procedure httpEvent(event: ThttpEvent; conn: ThttpConn);
-    function  pointedFile(strict:boolean=TRUE):Tfile;
-    function  pointedConnection():TconnData;
+    function  pointedFile(strict: boolean=TRUE): Tfile;
+    function  pointedConnection(point: TPoint): TconnData;
     procedure updateSbar();
-    function  getFolderPage(folder:Tfile; cd:TconnData; otpl: TTpl):string;
     function  selectedConnection():TconnData;
-    function  sendPic(cd:TconnData; idx:integer=-1):boolean;
     procedure ipmenuclick(sender:Tobject);
-    procedure acceptOnMenuclick(sender:Tobject);
-    procedure copyURLwithAddressMenuClick(sender:Tobject);
-    procedure copyURLwithPasswordMenuClick(sender:Tobject);
+    procedure acceptOnMenuclick(sender: TObject);
+    procedure copyURLwithAddressMenuClick(sender: TObject);
+    procedure copyURLwithPasswordMenuClick(sender: TObject);
     procedure updateTrayTip();
     procedure updateCopyBtn();
 //    procedure setTrayShows(s:string);
     procedure setTrayShows(s: TTrayShows);
     procedure addTray();
+    procedure onRefreshConn(conn: TconnData);
     procedure refreshConn(conn: TconnData; checkProgress: Boolean = True);
-    function  getVFS(node:Ttreenode=NIL): RawByteString;
-    function  getVFSJZ(node: TTreeNode=NIL): RawByteString;
+//    function  getVFS(node: TFileNode=NIL): RawByteString;
+//    function  getVFSJZ(node: TFileNode=NIL): RawByteString;
+    function  getFullVFS: RawByteString;
+    function  getFullVFSJZ: RawByteString;
     procedure setnoDownloadTimeout(v:integer);
-		procedure addDropFiles(hnd:Thandle; under:Ttreenode);
+    procedure addDropFiles(hnd: Thandle; under: TFileNode);
     procedure pasteFiles();
-		function  addFilesFromString(files:string; under:Ttreenode=NIL):Tfile;
-		procedure setGraphRate(v:integer);
+    function  addFilesFromString(files: String; under: TFileNode=NIL): Tfile;
+    procedure setGraphRate(v:integer);
     procedure updateRecentFilesMenu();
     procedure recentsClick(sender:Tobject);
     procedure popupMainMenu();
     procedure updateAlwaysOnTop();
     procedure initVFS();
-		procedure refreshIPlist();
-		procedure updateUrlBox();
-    procedure loadVFS(fn:string);
+    procedure refreshIPlist();
+    procedure updateUrlBox();
+    procedure loadVFS(fn: String);
     procedure purgeConnections();
     procedure setEasyMode(easy:boolean=TRUE);
     procedure hideGraph();
     procedure showGraph();
     function  fileAttributeInSelection(fa:TfileAttribute):boolean;
-    procedure progFrmHttpGetUpdate(sender:TObject; buffer:pointer; Len:integer);
+    function  progFrmHttpProgress(p: real): Boolean;
     function  recalculateGraph(): Boolean;
-    procedure remove(node:Ttreenode=NIL); OverLoad;
+    procedure remove(node: TFileNode=NIL); OverLoad;
+    procedure onServerStatusChanged(open: Boolean);
  public
     fileSrv: TFileServer;
     easyMode: boolean;
     selectedFile: Tfile;  // last selected file on the tree
-    procedure statusBarHttpGetUpdate(sender:TObject; buffer:pointer; Len:integer);
+    function  statusBarHttpProgress(p: real): Boolean;
     function  getLP: TLoadPrefs;
     function  getSP: TShowPrefs;
     procedure onAddingItemOnServer;
+    procedure onIPsEverChanged;
     procedure remove(f: TFile=NIL); OverLoad;
-    function  setCfg(cfg:string; alreadyStarted:boolean=TRUE):boolean;
-    function  getCfg(exclude:string=''): string;
-    function  saveCFG(): boolean;
-    function  addFile(f: TFile; parent: TTreeNode=NIL; skipComment: Boolean=FALSE): TFile; OverLoad;
-    function  addFile(f: TFile; parent: TTreeNode; skipComment: boolean; var newNode: TTreeNode): TFile; OverLoad;
-    procedure add2log(lines:string; cd:TconnDataMain=NIL; clr:Tcolor= Graphics.clDefault);
+    procedure updateGui;
+    function  setCfg(const cfg: String; alreadyStarted: Boolean=TRUE): Boolean;
+    function  getCfg(exclude: String=''; skipTotals: Boolean = false): String;
+    function  saveCFG(): Boolean;
+//    function  addFile(f: TFile; parent: TFileNode; skipComment: boolean; var newNode: TFileNode): TFile; OverLoad;
+    procedure OnBeforeAddFile(Sender: TObject);
+    procedure OnAfterAddFile(f: Tfile; parentNode, node: TTreeNode; skipComment: Boolean; addingStoped: Boolean);
+    procedure add2log(lines: String; cd: TconnDataMain=NIL; clr: Tcolor= Graphics.clDefault);
     function  ipPointedInLog():string;
     procedure saveVFS(fn:string='');
     function  finalInit(): boolean;
     procedure processParams_after(var params: TStringDynArray);
-    procedure setStatusBarText(s:string; lastFor:integer=5);
+    procedure setStatusBarText(const s: String; lastFor: integer=5);
     procedure minimizeToTray();
     procedure autoCheckUpdates();
     function  SetSelectedFile(f: TFile): Boolean; OverLoad;
-    function  SetSelectedFile(f: TFile; node: TTreeNode): Boolean; OverLoad;
-    function  copySelection():TtreeNodeDynArray;
+    function  SetSelectedFile(f: TFile; node: TFileNode): Boolean; OverLoad;
+    function  copySelection(): TFileNodeDynArray;
     procedure setLogToolbar(v:boolean);
     function  getTrayTipMsg(const tpl: String=''): String;
-    procedure menuDraw(sender:Tobject; cnv: Tcanvas; r:Trect; selected:boolean);
+   {$IFDEF FPC}
+    procedure menuDraw(sender:Tobject; cnv: Tcanvas; r:Trect; ds: TOwnerDrawState);
+   {$ELSE ~FPC}
+    procedure menuDraw(sender:Tobject; cnv: Tcanvas; r:Trect; selected: boolean);
+   {$ENDIF FPC}
     procedure menuMeasure(sender:Tobject; cnv: Tcanvas; var w:integer; var h:integer);
     procedure wrapInputQuery(sender:Tobject);
-    function  fileExistsByURL(const url: string): boolean;
   end; // Tmainfrm
-
-  TFileHlp = class helper for Tfile
-     function getShownRealm():string;
-  end;
 
   TConnDataHlp = class helper for TConnData
      function getTray(): TmyTrayicon;
      function getIcon(): TIcon;
      procedure initGUIData(hndl: THandle; onEvent: TTrayEventHandle);
      procedure clearGuiData;
-     constructor createWithGui(conn: ThttpConn);
+     //constructor createWithGui(conn: ThttpConn);
+     procedure setIcon(p: TIconParams);
+     function  getIcoParams: TIconParams;
+     procedure setIcoParams(p: TIconParams);
+     property  IconParams: TIconParams read getIcoParams write setIcoParams;
   end;
 
 var
   mainFrm: TmainFrm;
-//  tpl: Ttpl; // template for generated pages
   customIPs: TStringDynArray;   // user customized IP addresses
   iconMasks: TstringIntPairs;
-//  ipsEverConnected: THashedStringList;
-//  rootNode: TtreeNode;
-  noReplyBan: boolean;
-  externalIP: string;
-  banlist: array of record ip,comment: String; end;
   trayMsg: string; // template for the tray hint
 //  customIPservice: string;
-  tplFilename: string; // when empty, we are using the default tpl
   trayNL: string = #13;
-//  mimeTypes, address2name, IPservices: TstringDynArray; -> srvVars
-//  IPservicesTime: TdateTime; -> srvVars
-  inBrowserIfMIME: boolean;
 //  VFSmodified: boolean; // TRUE if the VFS changes have not been saved
   tempScriptFilename: string;
-//  inTotalOfs, outTotalOfs: int64; // used to cumulate in/out totals
-//  hitsLogged, downloadsLogged, uploadsLogged: integer;
   lastFileOpen: string;
-  speedLimit: real;            // overall limit, Kb/s --- it virtualizes the value of globalLimiter.maxSpeed, that's actually set to zero when streaming is paused
   saveMode: ( SM_USER, SM_SYSTEM, SM_FILE );
   tray: TmyTrayicon;
   dyndns: record
@@ -734,16 +746,13 @@ var
     lastTime: Tdatetime;
    end;
 
-procedure kickBannedOnes();
-procedure repaintTray();
+procedure kickBannedOnes(fs: TFileServer);
+procedure repaintTray(fs: TFileServer);
 function  paramsAsArray(): TStringDynArray;
 procedure processParams_before(var params: TStringDynArray; const allowed: String='');
 function  loadCfg(var ini, tpl: String): Boolean;
-function countDownloads(const ip: String=''; const user: String=''; f:Tfile=NIL): Integer;
-function protoColon(): String;
 procedure setSpeedLimitIP(v: real);
-function deleteAccount(const name: String): Boolean;
-function createFingerprint(const fn: String; showProgress: Boolean = True): String;
+function  createFingerprint(const fn: String; showProgress: Boolean = True): String;
 
 implementation
 
@@ -754,22 +763,34 @@ uses
   {$IFDEF UNICODE}
    AnsiStrings,
   {$ENDIF UNICODE}
-  MMsystem, UITypes, Threading,
-  clipbrd, dateutils, shlobj, shellapi, winsock,
-  OverbyteIcsWSocket, OverbyteIcsHttpProt,
-  OverbyteIcsUtils,
+  //MMsystem,
+  System.UITypes,
+  clipbrd, dateutils, shellapi,
+ {$IFDEF FPC}
+   //RegularExpressions,
+  regexpr,
+  LCLProc,
+  ZLibHigh,
+  ezthreads,
+ {$ELSE}
+  //shlobj,
+  Threading,
+  Character,
+ {$ENDIF FPC}
   {$IFDEF UNICODE}
 //   AnsiClasses,
   {$ENDIF UNICODE}
   RDFileUtil, RDUtils, RDSysUtils,
   RnQCrypt, RnQzip, RnQLangs, RnQDialogs,
-//  RnQJSON,
-  RnQNet.Uploads.Lib, RnQNet.Uploads.Tar,
+  monoLib,
+  newuserpassDlg, optionsDlg, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg,
+  purgeDlg, progFrmLib, filepropDlg, runscriptDlg,
+  HSUtils,
   langLib,
-  newuserpassDlg, optionsDlg, utilLib, folderKindDlg, shellExtDlg, diffDlg, ipsEverDlg,
-  parserLib, srvUtils, srvVars, netUtils,
-  hfs.tray,
-  purgeDlg, filepropDlg, runscriptDlg, scriptLib, hfsVars;
+//  parserLib,
+  srvUtils, srvVars, netUtils, srvConst,
+  HFS.Macroses,
+  utilLib, scriptLib, hfsVars;
 
 // global variables
 var
@@ -780,101 +801,56 @@ var
 //    ofs: integer;
 //    end;
 
-function deleteAccount(const name: String): Boolean;
-var
-  n: integer;
+function conn2data(fs: TFileServer; li: TlistItem): TconnData; inline; overload;
 begin
-  n := length(accounts);
-// search
-for var i:=0 to n-1 do
-  if sameText(name, accounts[i].user) then // found
-    begin
-    // shift
-    for var j:=i to n-2 do
-      accounts[j]:=accounts[j+1];
-    // shrink
-    setLength(accounts, n-1);
-    // aftermaths
-    purgeVFSaccounts();
-    mainfrm.filesBox.repaint();
-    result:=TRUE;
-    exit;
-    end;
-result:=FALSE;
-end; // deleteAccount
-
-function conn2data(li: TlistItem): TconnData; inline; overload;
-begin
-if li = NIL then
-  result := NIL
-else
-  result := conn2data(li.index)
+  if li = NIL then
+    result := NIL
+   else
+    result := fs.conn2data(li.index)
 end; // conn2data
 
-function countDownloads(const ip: String=''; const user: String=''; f: Tfile=NIL): Integer;
+procedure repaintTray(fs: TFileServer);
 var
-  i: integer;
-  d: TconnData;
-begin
-result:=0;
-i:=0;
-while i < srv.conns.count do
-  begin
-  d:=conn2data(i);
-  if isDownloading(d)
-  and ((f = NIL) or (assigned(d.lastFile) and d.lastFile.same(f)))
-  and ((ip = '') or addressMatch(ip, d.address))
-  and ((user = '') or sameText(user, d.usr))
-  then
-    inc(result);
-  inc(i);
-  end;
-end; // countDownloads
-
-
-procedure repaintTray();
-var
-  bmp: Tbitmap;
   n: Integer;
+  p: TIconParams;
 begin
   if quitting or (mainfrm = NIL) then
     exit;
-  bmp := getBaseTrayIcon(0, TRAY_ICON_SIZE);
-
   case trayShows of
-   TS_connections: n := srv.conns.count;
+   TS_connections: n := fs.getConnectionsCount;
    TS_downloads: n := downloadsLogged;
    TS_uploads: n := uploadsLogged;
    TS_hits: n := hitsLogged;
-   TS_ips: n := countIPs();
+   TS_ips: n := fs.countIPs;
    TS_ips_ever: n := ipsEverConnected.count;
    else
     n := 0;
   end;
   if trayShows <> TTrayShows.TS_none then
-    drawTrayIconNumber(bmp.canvas, n, TRAY_ICON_SIZE);
-  //tray_ico.Handle := bmpToHico(bmp);
-  tray_ico.Handle := bmp2ico32(bmp);
-  //tray_ico.Handle := bmp2ico4M(bmp);
-  //tray_ico.Transparent := FALSE;
-  bmp.free;
-  tray.setIcon(tray_ico);
+    p.str := IntToStr(n)
+   else
+    p.str := '';
+  p.isActive := fs.httpServIsActive;
+  p.perc := 0;
+  p.size := TRAY_ICON_SIZE;
+  if setTrayIcon(tray_ico, main_ico_params, p) then
+   begin
+     main_ico_params := p;
+     tray.setIcon(tray_ico);
+   end;
 end; // repaintTray
 
-procedure resetTotals();
+procedure resetTotals(fs: TFileServer);
 begin
-hitsLogged:=0;
-downloadsLogged:=0;
-uploadsLogged:=0;
-outTotalOfs:=-srv.bytesSent;
-inTotalOfs:=-srv.bytesReceived;
-repainttray();
+  fs.resetTotals;
+  repaintTray(fs);
 end; // resetTotals
 
-procedure flash();
+procedure flash(event: String = '');
 begin
-FlashWindow(application.handle, TRUE);
-if mainFrm.beepChk.checked then MessageBeep(MB_OK);
+  FlashWindow(application.handle, TRUE);
+  if mainFrm.beepChk.checked then
+    MessageBeep(MB_OK);
 end; // flash
 
 procedure onLoadVFSprogress(Sender: TObject; PRC: Real; var Cancel: Boolean);
@@ -967,7 +943,7 @@ begin
   if length(s) > 30 then
     s := format(MSG_DDNS_REPLY_SIZE, [length(s)])
    else
-    s:=interpretResponse(s);
+    s := interpretResponse(s);
   mainfrm.add2log(format(MSG_DDNS_REQ, [dyndns.lastIP,s]));
   if dyndns.active then
     dyndns.lastIP:=externalIP
@@ -996,29 +972,7 @@ if assigned(mainFrm) then
   mainfrm.visible:=userInteraction.bakVisible;
 end; // reenableUserInteraction
 
-function encodeURLA(const s: String; fullEncode: Boolean=FALSE): RawByteString;
-var
-  r: RawByteString;
-begin
-  if fullEncode or mainFrm.encodenonasciiChk.checked then
-    begin
-      r := ansiToUTF8(s);
-      result := HSlib.encodeURL(r, mainFrm.encodeNonasciiChk.checked,
-        fullEncode or mainFrm.encodeSpacesChk.checked)
-    end
-   else
-    result := HSlib.encodeURL(s, mainFrm.encodeNonasciiChk.checked,
-        fullEncode or mainFrm.encodeSpacesChk.checked)
-end; // encodeURL
-
-function protoColon():string;
-const
-  LUT: array [boolean] of string = ('http://','https://');
-begin
-result:=LUT[mainFrm.httpsUrlsChk.checked];
-end; // protoColon
-
-function banAddress(ip:string):boolean;
+function banAddress(fs: TFileServer; ip: String): Boolean;
 resourcestring
   MSG_BAN_MASK = 'Ban IP mask';
   MSG_IP_MASK_LONG = 'You can edit the address.'#13'Masks and ranges are allowed.';
@@ -1030,29 +984,31 @@ var
   comm: string;
   l: Integer;
 begin
-result:=FALSE;
-mainfrm.setFocus();
-if not InputQuery(MSG_BAN_MASK,MSG_IP_MASK_LONG,ip) then exit;
-
-for var i: Integer :=0 to length(banlist)-1 do
-  if banlist[i].ip = ip then
-    begin
-    msgDlg(MSG_BAN_ALREADY, MB_ICONWARNING);
+  result := FALSE;
+  mainfrm.setFocus();
+  if not InputQuery(MSG_BAN_MASK, MSG_IP_MASK_LONG, ip) then
     exit;
-    end;
 
-comm:='';
-if not InputQuery(MSG_BAN_CMT,MSG_BAN_CMT_LONG,comm) then exit;
+  for var i: Integer :=0 to length(banlist)-1 do
+    if banlist[i].ip = ip then
+      begin
+        msgDlg(MSG_BAN_ALREADY, MB_ICONWARNING);
+        exit;
+      end;
 
-l:=length(banlist);
-setlength(banlist, l+1);
-banlist[l].ip:=ip;
-banlist[l].comment:=comm;
+  comm := '';
+  if not InputQuery(MSG_BAN_CMT,MSG_BAN_CMT_LONG,comm) then
+    exit;
 
-l:=countConnectionsByIP(ip);
-if (l > 0) and (msgDlg(format(MSG_KICK_ADDR,[l]), MB_ICONQUESTION+MB_YESNO) = IDYES) then
-  kickByIP(ip);
-result:=TRUE;
+  l := length(banlist);
+  setlength(banlist, l+1);
+  banlist[l].ip := ip;
+  banlist[l].comment := comm;
+
+  l := countConnectionsByIP(fs.htSrv, ip);
+  if (l > 0) and (msgDlg(format(MSG_KICK_ADDR,[l]), MB_ICONQUESTION+MB_YESNO) = IDYES) then
+    fs.kickByIP(ip);
+  result := TRUE;
 end; // banAddress
 
 function prog(p: real): Boolean;
@@ -1070,11 +1026,6 @@ begin
   result := mainFrm.recursiveListingChk.checked
         and data.allowRecur
 end; // shouldRecur
-
-function TMainFrm.fileExistsByURL(const url: string): boolean;
-begin
-  Result := fileSrv.fileExistsByURL(url, getLP);
-end; // fileExistsByURL
 
 function Tmainfrm.getLP: TLoadPrefs;
 begin
@@ -1097,11 +1048,27 @@ begin
 
   if oemForIonChk.checked then
     Include(Result, lpOEMForION);
+  if deletePartialUploadsChk.Checked then
+    Include(Result, lpDeletePartialUploads);
+  if NumberFilesOnUploadChk.Checked then
+    Include(Result, lpNumberFilesOnUpload);
+  if useCommentAsRealmChk.Checked then
+    Include(Result, lpUseCommentAsRealm);
 end;
 
 function Tmainfrm.getSP: TShowPrefs;
 begin
   Result := [];
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// ToDo Move all menus to prefs
 
   if useSystemIconsChk.checked then
     Include(Result, spUseSysIcons);
@@ -1122,6 +1089,34 @@ begin
     Include(Result, spEncodeSpaces);
   if compressedbrowsingChk.checked then
     Include(Result, spCompressed);
+  if sendHFSidentifierChk.Checked then
+    Include(Result, spSendHFSIdentifier);
+  if freeLoginChk.Checked then
+    Include(Result, spFreeLogin);
+  if stopSpidersChk.Checked then
+    Include(Result, spStopSpiders);
+  if preventLeechingChk.Checked then
+    Include(Result, spPreventLeeching);
+  if pwdInPagesChk.Checked then
+    Include(Result, spPwdInPages);
+  if enableNoDefaultChk.Checked then
+    Include(Result, spEnableNoDefault);
+  if DMbrowserTplChk.Checked then
+    Include(Result, spDMbrowserTpl);
+  if not enableMacrosChk.Checked then
+    Include(Result, spDisableMacros);
+  if disableMacrosNonLocalIPChk.Checked then
+    Include(Result, spNonLocalIPDisableMacros);
+
+
+  if recursiveListingChk.Checked then
+    Include(Result, spRecursiveListing);
+  if oemTarChk.Checked then
+    Include(Result, spOemTar);
+  if noContentdispositionChk.Checked then
+    Include(Result, spNoContentDisposition);
+  if preventStandbyChk.Checked then
+    Include(Result, spPreventStandby);
 end;
 
 procedure Tmainfrm.onAddingItemOnServer;
@@ -1139,9 +1134,10 @@ begin
     end;
 end;
 
-function Tmainfrm.getFolderPage(folder:Tfile; cd:TconnData; otpl: TTpl):string;
+procedure Tmainfrm.onIPsEverChanged;
 begin
-  Result := fileSrv.getAFolderPage(folder, cd, otpl, getLP, getSP, pwdInPagesChk.Checked, macrosLogChk.Checked)
+  if ipsEverFrm.visible then
+    ipsEverFrm.refreshData();
 end;
 
 procedure setDefaultIP(v: string);
@@ -1150,18 +1146,18 @@ var
 begin
   old := defaultIP;
   if v > '' then
-    defaultIP:=v
+    defaultIP := v
    else if externalIP > '' then
-    defaultIP:=externalIP
+    defaultIP := externalIP
    else
-    defaultIP:=getIP();
+    defaultIP := getIP();
   if mainfrm = NIL then
     exit;
   mainfrm.updateUrlBox();
   if old = defaultIP then
     exit;
   try
-    v:=clipboard.AsText;
+    v := clipboard.AsText;
     if pos(old, v) = 0 then
       exit;
    except
@@ -1171,79 +1167,13 @@ end; // setDefaultIP
 
 procedure TmainFrm.findExtOnStartupChkClick(Sender: TObject);
 resourcestring
-  MSG = 'This option is NOT compatible with "dynamic dns updater".'
+  MSG_NOT_COMPAT = 'This option is NOT compatible with "dynamic dns updater".'
     +#13'Continue?';
 begin
 with sender as TMenuItem do
   if dyndns.active and (dyndns.url > '') and checked then
-    checked:= msgDlg(MSG, MB_ICONWARNING+MB_YESNO) = MRYES;
+    checked:= msgDlg(MSG_NOT_COMPAT, MB_ICONWARNING+MB_YESNO) = MRYES;
 end;
-
-function notModified(conn: ThttpConn; f: Tfile): boolean; overload;
-begin
-  result := notModified(conn, f.resource)
-end;
-
-function Tmainfrm.sendPic(cd: TconnData; idx: integer=-1): boolean;
-var
-  s, url: string;
-  special: (no, graph);
-begin
-  url := decodeURL(cd.conn.request.url);
-  result := FALSE;
-  special := no;
-  if idx < 0 then
-    begin
-      s := url;
-      if not ansiStartsText('/~img', s) then
-        exit;
-      delete(s,1,5);
-      // converts special symbols
-      if ansiStartsText('_graph', s) then
-        special:=graph else
-      if ansiStartsText('_link', s) then
-        idx:=ICON_LINK else
-      if ansiStartsText('_file', s) then
-        idx := ICON_FILE else
-      if ansiStartsText('_folder', s) then
-        idx := ICON_FOLDER else
-      if ansiStartsText('_lock', s) then
-        idx := ICON_LOCK
-       else
-        try
-          idx := strToInt(s)
-         except
-          exit
-        end;
-    end;
-
-if (special = no) and ((idx < 0) or (idx >= IconsDM.images.count)) then exit;
-
-case special of
-  no: cd.conn.reply.body := pic2str(idx, 16);
-  graph: cd.conn.reply.body := getGraphPic(cd, graphBox.Width, graphBox.Height);
-  end;
-
-result:=TRUE;
-{**
-// browser caching support
-if idx < startingImagesCount then
-  s:=intToStr(idx)+':'+etags.values['exe']
-else
-  s:=etags.values['icon.'+intToStr(idx)];
-if notModified(cd.conn, s, '') then
-  exit;
-}
-cd.conn.reply.mode:=HRM_REPLY;
-{$IFDEF HFS_GIF_IMAGES}
-cd.conn.reply.contentType:='image/gif';
-{$ELSE ~HFS_GIF_IMAGES}
-cd.conn.reply.contentType:='image/png';
-{$ENDIF HFS_GIF_IMAGES}
-cd.conn.reply.bodyMode := RBM_RAW;
-cd.downloadingWhat:=DW_ICON;
-cd.lastFN:=copy(url,2,1000);
-end; // sendPic
 
 procedure setupDownloadIcon(data: TconnData);
 var
@@ -1251,21 +1181,15 @@ var
   ti: TIcon;
   procedure painticon();
   var
-    bmp: Tbitmap;
-    s: string;
-    perc: real;
+    p: TIconParams;
   begin
-    perc := safeDiv(0.0+data.conn.bytesSentLastItem, data.conn.bytesPartial);
-    s := intToStr( trunc(perc*100) )+'%';
-    bmp := getBaseTrayIcon(perc, TRAY_ICON_SIZE);
-    drawTrayIconNumber(bmp.canvas, s, TRAY_ICON_SIZE);
-  //  data.tray_ico.Handle:=bmpToHico(bmp);
-    ti.Handle := bmp2ico32(bmp);
-    bmp.free;
-    tr.setIcon(ti);
+    p.perc := safeDiv(0.0+data.conn.bytesSentLastItem, data.conn.bytesPartial);
+    p.str := intToStr( trunc(p.perc*100) )+'%';
+    p.isActive := mainFrm.fileSrv.httpServIsActive;
+    p.size := TRAY_ICON_SIZE;
+    data.setIcon(p);
     tr.setTip(
-      if_( (data.conn.reply.bodyMode=RBM_RAW)or(data.conn.reply.bodyMode=RBM_TEXT),
-           decodeURL(data.conn.request.url), data.lastFN )
+      data.getLastRequested
       +trayNL+format('%.1f KB/s', [data.averageSpeed/1000])
       +trayNL+dotted(data.conn.bytesSentLastItem)+' bytes sent'
       +trayNL+data.address
@@ -1280,8 +1204,7 @@ begin
   ti := data.getIcon;
 
   if assigned(tr)
-   and ((data.conn.state <> HCS_REPLYING_BODY) or
-  (data.conn.bytesSentLastItem = data.conn.bytesPartial)) then
+   and data.isReplyFinished then
   begin
     data.clearGuiData;
     tr.hide();
@@ -1289,7 +1212,7 @@ begin
     ti.free;
     exit;
   end;
-  if not isSendingFile(data) then
+  if not data.isSendingFile then
     exit;
 
   if not data.countAsDownload then
@@ -1301,13 +1224,46 @@ begin
       tr := data.getTray;
       ti := data.getIcon;
     end;
-  if mainfrm.trayfordownloadChk.checked and isSendingFile(data) then
+  if mainfrm.trayfordownloadChk.checked and data.isSendingFile then
     paintIcon()
    else
     tr.hide();
 end; // setupDownloadIcon
 
-function getDynLogFilename(cd:TconnDataMain):string; overload;
+procedure OnInitConnData(data: TconnData);
+begin
+  data.guiData := TConnDataGui.Create;
+  data.ConnBoxAdded := True;
+  {$IFDEF USE_VTV}
+  mainFrm.vconnBox.AddChild(mainFrm.vconnBox.RootNode);
+  {$ELSE ~USE_VTV}
+  mainFrm.ConnBox.items.Count := mainFrm.ConnBox.items.Count + 1;
+//  mainFrm.ConnBox.items.add();
+  {$ENDIF ~USE_VTV}
+end;
+
+procedure OnRemoveConnData(data: TconnData);
+begin
+ if data.ConnBoxAdded then
+  {$IFDEF USE_VTV}
+  mainFrm.VConnBox.DeleteNode(mainFrm.VConnBox.GetLast());
+  mainFrm.vconnBox.invalidate();
+  {$ELSE ~USE_VTV}
+  with mainFrm.connBox.items do
+    count := count-1;
+  {$ENDIF ~USE_VTV}
+  data.ConnBoxAdded := false;
+end;
+
+procedure onUpdateTray(what: TUpdateTrayWhat);
+begin
+  if utIcon in what then
+    repaintTray(mainFrm.fileSrv);
+  if utTIP in what then
+    mainFrm.updateTrayTip();
+end;
+
+function getDynLogFilename(cd: TconnDataMain): String; overload;
 var
   d, m, y, w: word;
   u: string;
@@ -1325,6 +1281,25 @@ result:=xtpl(logFile.filename, [
 ]);
 end; // getDynLogFilename
 
+{$IFDEF FPC}
+function GetLocaleStr(LID, LT: Longint; const Def: string): AnsiString;
+var
+  L: Integer;
+  Buf: unicodestring;
+begin
+  L := GetLocaleInfoW(LID, LT, nil, 0);
+  if L > 0 then
+    begin
+      SetLength(Buf,L-1); // L includes terminating NULL
+      if l>1 Then
+        L := GetLocaleInfoW(LID, LT, @Buf[1], L);
+      result:=buf;
+    end
+  else
+    Result := Def;
+end;
+{$ENDIF FPC}
+
 procedure applyISOdateFormat();
 begin
   if mainfrm.useISOdateChk.checked then
@@ -1335,7 +1310,11 @@ end;
 
 procedure Tmainfrm.add2log(lines: String; cd: TconnDataMain=NIL; clr: Tcolor= Graphics.clDefault);
 var
-  s, ts, first, rest, addr: string;
+  s: UnicodeString;
+  ts, first, rest, addr: string;
+ {$IFDEF FPC}
+  fp: TFontParams;
+ {$ENDIF FPC}
 begin
   if not logOnVideoChk.checked
    and ((logFile.filename = '') or (logFile.apacheFormat > '')) then
@@ -1369,8 +1348,13 @@ begin
       +ifThen(cd.conn.v6, '['+cd.address+']', cd.address)
       +':'+cd.conn.port
       +nonEmptyConcat(' {', localDNSget(cd.address), '}')
+  else if assigned(cd)  then
+    addr := nonEmptyConcat('', cd.usr, '@')
+      + cd.address
+      + nonEmptyConcat(' {', localDNSget(cd.address), '}')
    else
     addr := '';
+
 
   if (logFile.filename > '') and (logFile.apacheFormat = '') then
    begin
@@ -1386,13 +1370,40 @@ begin
      else
       s := s+CRLF+rest;
 
-    includeTrailingString(s,CRLF);
+    includeTrailingString(s, CRLF);
     appendFileU(getDynLogFilename(cd), s);
    end;
 
   if not logOnVideoChk.checked then
     exit;
 
+ {$IFDEF FPC}
+  logbox.selstart := length(logbox.Text);
+  logBox.SelText := ts+'  ';
+  fp.Name:=logFontName;
+  fp.Color:=clRed;
+  if logFontSize > 0 then
+    fp.size := logFontSize
+   else ;
+    fp.Size:= logBox.Font.Size;
+  logbox.SetTextAttributes(logbox.selstart, logbox.SelLength, fp);
+
+  if addr > '' then
+  begin
+    logbox.selstart := length(logbox.Text);
+    logBox.SelText := addr+'  ';
+    fp.Color := ADDRESS_COLOR;
+    logbox.SetTextAttributes(logbox.selstart, logbox.SelLength, fp);
+  end;
+  logbox.selstart := length(logbox.Text);
+  logBox.SelText := first+CRLF;
+  fp.Color := clr;
+  logbox.SetTextAttributes(logbox.selstart, logbox.SelLength, fp);
+  fp.Color := clBlue;
+  logbox.selstart := length(logbox.Text);
+  logBox.SelText := rest;
+  logbox.SetTextAttributes(logbox.selstart, logbox.SelLength, fp);
+ {$ELSE ~FPC}
   logbox.selstart := length(logbox.Text);
   logBox.SelAttributes.name := logFontName;
   if logFontSize > 0 then
@@ -1402,17 +1413,20 @@ begin
   if addr > '' then
   begin
     logBox.SelAttributes.Color:=ADDRESS_COLOR;
-    logBox.SelText:=addr+'  ';
+    logBox.SelText := addr+'  ';
   end;
   logBox.SelAttributes.color:=clr;
   logBox.SelText:=first+CRLF;
   logBox.selAttributes.color:=clBlue;
-  logBox.SelText:=rest;
+  logBox.SelText := rest;
+ {$ENDIF ~FPC}
 
   if (logMaxLines = 0) or (logBox.Lines.Count <= logMaxLines) then
     exit;
   // found no better way to remove multiple lines with a single move
+ {$IFNDEF FPC}
   logbox.LockDrawing;
+ {$ENDIF ~FPC}
   //logBox.perform(WM_SETREDRAW, 0, 0);
   try
     logBox.SelStart := 0;
@@ -1422,34 +1436,21 @@ begin
    finally
   //  logBox.perform(WM_SETREDRAW, 1, 0);
   //  logBox.invalidate();
+   {$IFNDEF FPC}
     logBox.UnlockDrawing;
+   {$ENDIF ~FPC}
   end;
 end; // add2log
 
-function isBanned(address:string; out comment:string):boolean; overload;
-begin
-result:=TRUE;
-for var i: Integer :=0 to length(banlist)-1 do
-  if addressMatch(banlist[i].ip, address) then
-    begin
-    comment:=banlist[i].comment;
-    exit;
-    end;
-result:=FALSE;
-end; // isBanned
-
-function isBanned(cd:TconnData):boolean; overload;
-begin result:=assigned(cd) and isBanned(cd.address, cd.banReason) end;
-
-procedure kickBannedOnes();
+procedure kickBannedOnes(fs: TFileServer);
 var
   i: integer;
   d: TconnData;
 begin
 i:=0;
-while i < srv.conns.count do
+while i < fs.getConnectionsCount do
   begin
-  d:=conn2data(i);
+  d := fs.conn2data(i);
   if isBanned(d) then
     d.disconnect(first(d.disconnectReason, 'kick banned'));
   inc(i);
@@ -1465,141 +1466,42 @@ var
   fn: string;
   msg: String;
 begin
-try fn:=extractFileName(pid2file(port2pid(port)));
-except fn:='' end;
+  try
+    fn:=extractFileName(pid2file(port2pid(port)));
+   except
+    fn:=''
+  end;
   msg := MSG_CANT_OPEN_PORT+#13;
   if fn>'' then
     msg := msg + format(MSG_PORT_USED_BY,[fn])
    else
     msg := msg + MSG_PORT_BLOCKED;
-msgDlg(msg, MB_ICONERROR);
+  msgDlg(msg, MB_ICONERROR);
 end; // sayPortBusy
 
-procedure toggleServer();
+procedure toggleServer(fs: TFileServer);
 resourcestring
   MSG_KICK_ALL = 'There are %d connections open.'#13'Do you want to close them now?';
 begin
-if srv.active then stopServer()
-else
-  if not startServer() then
-    sayPortBusy(srv.port);
-if (srv.conns.count = 0) or srv.active then exit;
-if msgDLg(format(MSG_KICK_ALL,[srv.conns.count]), MB_ICONQUESTION+MB_YESNO) = IDYES then
-  kickByIP('*');
+  if fs.httpServIsActive then
+    stopServer(fs.htSrv)
+   else
+    if not fs.startServer() then
+      sayPortBusy(fs.htSrv.port);
+  if (fs.getConnectionsCount = 0) or fs.httpServIsActive then
+    exit;
+  if msgDLg(format(MSG_KICK_ALL,[fs.getConnectionsCount]), MB_ICONQUESTION+MB_YESNO) = IDYES then
+    fs.kickByIP('*');
 end; // toggleServer
 
-procedure updatePortBtn();
+procedure updatePortBtn(fs: TFileServer);
 begin
-if assigned(srv) then
-  mainfrm.portBtn.Caption:=format(S_PORT_LABEL, [
-    if_(srv.active, srv.port, first(port,S_PORT_ANY))]);
+  if assigned(fs) then
+    mainfrm.portBtn.Caption := format(S_PORT_LABEL, [first(fs.getListenPorts(), S_PORT_ANY)]);
 end; // updatePortBtn
 
-procedure removeFilesFromComments(files: TStringDynArray);
-var
-  fn, lastPath, path: string;
-  trancheStart, trancheEnd: integer; // the tranche is a window within 'selection' of items sharing the same path
-  ss: TstringList;
-
-  procedure doTheTranche();
-  var
-    b: integer;
-    fn, s: string;
-    sa: RawByteString;
-    anyChange: boolean;
-  begin
-  // leave only the files' name
-  for var i: Integer :=trancheStart to trancheEnd do
-    files[i]:=copy(files[i],length(lastPath)+1,MAXINT);
-  // comments file
-  try
-    fn:=lastPath+COMMENTS_FILE;
-    ss.loadFromFile(fn, TEncoding.UTF8);
-    anyChange:=FALSE;
-    for var i: Integer :=trancheStart to trancheEnd do
-      begin
-      b:=ss.indexOfName(files[i]);
-      if b < 0 then continue;
-      ss.delete(b);
-      anyChange:=TRUE;
-      end;
-    if anyChange then
-      if ss.count = 0 then
-        deleteFile(fn)
-      else
-        ss.saveToFile(fn, TEncoding.UTF8);
-  except end;
-  // descript.ion
-  if not mainfrm.supportDescriptionChk.checked then exit;
-  try
-    fn:=path+DESCRIPT_ION;
-    sa:=loadFile(fn);
-    if sa = '' then exit;
-    if mainfrm.oemForIonChk.checked then
-      begin
-        SetLength(s, Length(sa));
-        OEMToCharBuff(@sa[1], @s[1], length(s));
-      end
-     else
-      s := UnUTF(sa);
-    anyChange:=FALSE;
-    for var i: Integer :=trancheStart to trancheEnd do
-      begin
-      b:=findNameInDescriptionFile(s, files[i]);
-      if b = 0 then continue;
-      delete(s, b, findEOL(s,b)-b+1);
-      anyChange:=TRUE;
-      end;
-    if anyChange then
-      if s='' then
-        deleteFile(fn)
-      else
-        saveTextfile(fn, s);
-  except end;
-  end; // doTheTranche
-
-begin
-// collect files with same path in tranche, then process it
-sortArray(files);
-trancheStart:=0;
-ss:=TstringList.create(); // we'll use this in doTheTranche(), but create the object once, as an optimization
-try
-  ss.caseSensitive:=FALSE;
-  for trancheEnd:=0 to length(files)-1 do
-    begin
-    fn:=files[trancheEnd];
-    path:=getTill(lastDelimiter('\/', fn), fn);
-    if trancheEnd = 0 then
-      lastPath:=path;
-    if path <> lastPath then
-      begin
-      doTheTranche();
-      // init the new tranche
-      trancheStart:=trancheEnd+1;
-      lastPath:=path;
-      end;
-    end;
-  trancheEnd:=length(files)-1; // after the for-loop, the variable seems to not be reliable
-  doTheTranche();
-finally ss.free end;
-end; // removeFilesFromComments
-
-procedure runTplImport();
-var
-  f, fld: Tfile;
-begin
-  f:=Tfile.create(mainFrm.filesBox, tplFilename);
-  fld:=Tfile.create(mainFrm.filesBox, extractFilePath(tplFilename));
-  try
-    runScript(mainFrm.fileSrv, mainFrm.fileSrv.tpl['special:import'], NIL, mainFrm.fileSrv.tpl, f, fld);
-   finally
-    freeAndNIL(f);
-    freeAndNIL(fld);
-  end;
-end; // runTplImport
-
 // returns true if template was patched
-function setTplText(text:string=''):boolean;
+function setTplText(fs: TFileServer; text: UnicodeString=''): Boolean;
 resourcestring
   MSG_TPL_INCOMPATIBLE = 'The template you are trying to load is not compatible with current HFS version.'
     +#13'HFS will now use default template.'
@@ -1607,1579 +1509,53 @@ resourcestring
 var
   sec: PtplSection;
 begin
-result:=FALSE; // mod by mars
-//patch290();
-if trim(text) = trim(defaultTpl.fullTextS) then
-  text:='';
-mainFrm.fileSrv.tpl.fullTextS := text;
-sec:= mainFrm.fileSrv.tpl.getSection('api level', FALSE);
-if (text>'')
-and ((sec=NIL) or (strToIntDef(sec.txt.trim,0) < 2)) then
-  begin
-  mainFrm.fileSrv.tpl.fullText:='';
-  tplFilename:='';
-  tplImport:=FALSE;
-  msgDlg(MSG_TPL_INCOMPATIBLE, MB_ICONERROR);
-  end;
-tplIsCustomized:= mainFrm.fileSrv.tpl.fullTextS > '';
-if boolOnce(tplImport) then
-  runTplImport();
+  result := FALSE; // mod by mars
+  //patch290();
+  if trim(text) = trim(fs.defTpl.fullTextS) then
+    text := '';
+  fs.tpl.fullTextS := text;
+  sec := fs.tpl.getSection('api level', FALSE);
+  if (text>'')
+    and ((sec=NIL) or (strToIntDef(sec.txt.trim,0) < 2)) then
+   begin
+    fs.tpl.fullText := '';
+    tplFilename := '';
+    tplImport := FALSE;
+    msgDlg(MSG_TPL_INCOMPATIBLE, MB_ICONERROR);
+   end;
+  tplIsCustomized := fs.tpl.fullTextS > '';
+  if boolOnce(tplImport) then
+    runTplImport(fs);
 end; // setTplText
 
-procedure keepTplUpdated();
+procedure keepTplUpdated(fs: TFileServer);
+var
+  tplData: RawByteString;
+  tplText: UnicodeString;
 begin
 if fileExists(tplFilename) then
   begin
   if newMtime(tplFilename, tplLast) then
-    if setTplText(UnUTF(loadFile(tplFilename))) then
-      saveFile2(tplFilename, mainFrm.fileSrv.tpl.fullText);
+    begin
+      tplData := loadFile(tplFilename);
+      tplText := UnUTF(tplData);
+      if setTplText(fs, tplText) then
+        saveFile2(tplFilename, fs.tpl.fullText);
+    end;
   end
 else if tplLast <> 0 then
   begin
   tplLast:=0; // we have no modified-time in this case, but this will stop the refresh
-  setTplText();
+  setTplText(fs);
   end;
 end; // keepTplUpdated
 
-procedure setNewTplFile(fn:string);
+procedure setNewTplFile(const fn:string);
 begin
-tplFilename:=fn;
-tplImport:=TRUE;
-tplLast:=0;
+  tplFilename := fn;
+  tplImport := TRUE;
+  tplLast := 0;
 end; // setNewTplFile
-
-procedure Tmainfrm.httpEvent(event: ThttpEvent; conn: ThttpConn);
-resourcestring
-  MSG_LOG_SERVER_START = 'Server start';
-  MSG_LOG_SERVER_STOP = 'Server stop';
-  MSG_LOG_CONNECTED = 'Connected';
-  MSG_LOG_DISC_SRV = 'Disconnected by server';
-  MSG_LOG_DISC = 'Disconnected';
-  MSG_LOG_GOT = 'Got %d bytes';
-  MSG_LOG_BYTES_SENT = '%s bytes sent';
-  MSG_LOG_SERVED = 'Served %s';
-  MSG_LOG_HEAD = 'Served head';
-  MSG_LOG_NOT_MOD = 'Not modified, use cache';
-  MSG_LOG_REDIR = 'Redirected to %s';
-  MSG_LOG_NOT_SERVED = 'Not served: %d - %s';
-  MSG_LOG_UPL = 'Uploading %s';
-  MSG_LOG_UPLOADED = 'Fully uploaded %s - %s @ %sB/s';
-  MSG_LOG_UPL_FAIL = 'Upload failed %s';
-  MSG_LOG_DL = 'Fully downloaded - %s @ %sB/s - %s';
-var
-  data: TconnData;
-  f: Tfile;
-  url: string;
-
-  Freq, StartCount, StopCount: Int64;
-  TimingSeconds: real;
-
-  procedure switchToDefaultFile();
-  var
-    default: Tfile;
-  begin
-  if (f = NIL) or not f.isFolder() then exit;
-  default:=f.getDefaultFile();
-  if default = NIL then exit;
-  freeIfTemp(f);
-  f:=default;
-  end; // switchToDefaultFile
-
-  function calcAverageSpeed(bytes:int64):integer;
-  begin result:=round(safeDiv(bytes, (now()-data.fileXferStart)*SECONDS)) end;
-
-  function runEventScript(const event: String; table: array of String): String; overload;
-  var
-    md: TmacroData;
-    pleaseFree: boolean;
-  begin
-  result:=trim(eventScripts[event]);
-  if result = '' then exit;
-  ZeroMemory(@md, sizeOf(md));
-  md.cd:=data;
-  md.table:=toSA(table);
-  md.tpl:=eventScripts;
-  addArray(md.table, ['%event%', event]);
-  pleaseFree:=FALSE;
-  try
-    if isReceivingFile(data) then
-      begin
-      // we must encapsulate it in a Tfile to expose file properties to the script. we don't need to cache the object because we need it only once.
-
-      md.folder:=data.lastFile;
-      if assigned(md.folder) then
-        md.f := Tfile.createTemp(mainFrm.filesBox, data.uploadDest, md.folder)
-       else
-        md.f := Tfile.createTemp(mainFrm.filesBox, data.uploadDest)
-        ;
-      md.f.size := sizeOfFile(data.uploadDest);
-      pleaseFree:=TRUE;
-
-      end
-    else if assigned(f) then
-      md.f:=f
-    else if assigned(data) then
-      md.f:=data.lastFile;
-
-    if assigned(md.f) and (md.folder = NIL) then
-      md.folder:=md.f.parent;
-
-    tryApplyMacrosAndSymbols(fileSrv, result, md);
-
-  finally
-    if pleaseFree then
-      freeIfTemp(md.f);
-    end;
-  end; // runEventScript
-
-  function runEventScript(const event:string):string; overload;
-  begin result:=runEventScript(event, []) end;
-
-  procedure doLog();
-  var
-    i: integer;
-    s: string;
-     function decodedUrl():string;
-      begin
-      if conn = NIL then
-        exit('');
-      result:=decodeURL(conn.request.url);
-     end;
-  begin
-  if assigned(data) and data.dontLog and (event <> HE_DISCONNECTED) then exit; // we exit expect for HE_DISCONNECTED because dontLog is always set AFTER connections, so HE_CONNECTED is always logged. The coupled HE_DISCONNECTED should be then logged too.
-
-  if assigned(data) and (data.preReply = PR_BAN)
-  and not logBannedChk.checked then exit;
-
-  if not (event in [HE_OPEN, HE_CLOSE, HE_CONNECTED, HE_DISCONNECTED, HE_GOT]) then
-    if not logIconsChk.checked and (data.downloadingWhat = DW_ICON)
-    or not logBrowsingChk.checked and (data.downloadingWhat = DW_FOLDERPAGE)
-    or not logProgressChk.checked and (decodedUrl() = '/~progress') then
-      exit;
-
-  if not (event in [HE_OPEN, HE_CLOSE])
-  and addressMatch(dontLogAddressMask, data.address) then
-    exit;
-
-  case event of
-    HE_OPEN: if logServerstartChk.Checked then add2log(MSG_LOG_SERVER_START);
-    HE_CLOSE: if logServerstopChk.checked then add2log(MSG_LOG_SERVER_STOP);
-    HE_CONNECTED: if logconnectionsChk.Checked then add2log(MSG_LOG_CONNECTED, data);
-    HE_DISCONNECTED: if logDisconnectionsChk.checked then
-      add2log(if_(conn.disconnectedByServer, MSG_LOG_DISC_SRV,MSG_LOG_DISC)
-        +nonEmptyConcat(': ', data.disconnectReason)
-        +if_(conn.bytesSent>0, ' - '+format(MSG_LOG_BYTES_SENT, [dotted(conn.bytesSent)])),
-      data);
-    HE_GOT:
-      begin
-      i:=conn.bytesGot-data.lastBytesGot;
-      if i <= 0 then exit;
-      if logBytesreceivedChk.Checked then
-        if now()-data.bytesGotGrouping.since <= BYTES_GROUPING_THRESHOLD then
-          inc(data.bytesGotGrouping.bytes, i)
-        else
-          begin
-          add2log(format(MSG_LOG_GOT,[i+data.bytesGotGrouping.bytes]), data);
-          data.bytesGotGrouping.since:=now();
-          data.bytesGotGrouping.bytes:=0;
-          end;
-      inc(data.lastBytesGot, i);
-      end;
-    HE_SENT:
-      begin
-      i:=conn.bytesSent-data.lastBytesSent;
-      if i <= 0 then exit;
-      if logBytessentChk.checked then
-        if now()-data.bytesSentGrouping.since <= BYTES_GROUPING_THRESHOLD then
-          inc(data.bytesSentGrouping.bytes, i)
-        else
-          begin
-          add2log(format(MSG_LOG_BYTES_SENT,[dotted(i+data.bytesSentGrouping.bytes)]), data);
-          data.bytesSentGrouping.since:=now();
-          data.bytesSentGrouping.bytes:=0;
-          end;
-      inc(data.lastBytesSent, i);
-      end;
-    HE_REQUESTED:
-      if not logOnlyServedChk.checked
-      or (conn.reply.mode in [HRM_REPLY, HRM_REPLY_HEADER, HRM_REDIRECT]) then
-        begin
-        data.logLaterInApache:=TRUE;
-        if logRequestsChk.Checked then
-          begin
-          s:=subStr(conn.getHeader('Range'), 7);
-          if s > '' then
-            s:=TAB+'['+s+']';
-          add2log(format('Requested %s %s%s', [ METHOD2STR[conn.request.method], decodedUrl(), s ]), data);
-          end;
-        if dumprequestsChk.checked then
-          add2log(RawByteString('Request dump')+CRLF+conn.request.full, data);
-        end;
-    HE_REPLIED:
-      if logRepliesChk.checked then
-       case conn.reply.mode of
-          HRM_REPLY: if not data.fullDLlogged then add2log(format(MSG_LOG_SERVED, [smartSize(conn.bytesSentLastItem)]), data);
-          HRM_REPLY_HEADER: add2log(MSG_LOG_HEAD, data);
-          HRM_NOT_MODIFIED: add2log(MSG_LOG_NOT_MOD, data);
-          HRM_REDIRECT: add2log(format(MSG_LOG_REDIR, [conn.reply.url]), data);
-          else if not logOnlyServedChk.checked then
-            add2log(format(MSG_LOG_NOT_SERVED, [HRM2CODE[conn.reply.mode], HRM2STR[conn.reply.mode] ])
-              +nonEmptyConcat(': ', data.error), data);
-          end;
-    HE_POST_FILE:
-      if logUploadsChk.checked and (data.uploadFailed = '') then
-        add2log(format(MSG_LOG_UPL, [data.uploadSrc]), data);
-    HE_POST_END_FILE:
-      if logUploadsChk.checked then
-        if data.uploadFailed = '' then
-          add2log(format(MSG_LOG_UPLOADED, [
-            data.uploadSrc,
-            smartSize(conn.bytesPostedLastItem),
-            smartSize(calcAverageSpeed(conn.bytesPostedLastItem)) ]), data)
-        else
-          add2log(format(MSG_LOG_UPL_FAIL, [data.uploadSrc]), data);
-    HE_LAST_BYTE_DONE:
-      if logFulldownloadsChk.checked
-      and data.countAsDownload
-      and (data.downloadingWhat in [DW_FILE, DW_ARCHIVE]) then
-        begin
-        data.fullDLlogged := TRUE;
-        add2log(format(MSG_LOG_DL, [
-          smartSize(conn.bytesSentLastItem),
-          smartSize(calcAverageSpeed(conn.bytesSentLastItem)),
-          decodedUrl()]), data);
-        end;
-    end;
-
-  { apache format log is only related to http events, that's why it resides
-  { inside httpEvent(). moreover, it needs to access to some variables. }
-  if (logFile.filename = '') or (logFile.apacheFormat = '')
-  or (data = NIL) or not data.logLaterInApache
-  or not (event in [HE_LAST_BYTE_DONE, HE_DISCONNECTED]) then exit;
-
-  data.logLaterInApache:=FALSE;
-  s:=xtpl(logfile.apacheFormat, [
-    '\t', TAB,
-    '\r', #13,
-    '\n', #10,
-    '\"', '"',
-    '\\', '\'
-  ]);
-  s:=reCB('%(!?[0-9,]+)?(\{([^}]+)\})?>?([a-z])', s, apacheLogCb, data);
-  appendFileU(getDynLogFilename(data), s+CRLF);
-  end; // doLog
-
-  function limitsExceededOnConnection():boolean;
-  begin
-  if noLimitsFor(data.account) then result:=FALSE
-  else
-    result:=(maxConnections>0) and (srv.conns.count > maxConnections)
-      or (maxConnectionsIP>0)
-        and (countConnectionsByIP(data.address) > maxConnectionsIP)
-      or (maxIPs>0) and (countIPs() > maxIPs)
-  end; // limitsExceededOnConnection
-
-  function limitsExceededOnDownload():boolean;
-  var
-    was: string;
-  begin
-    result:=FALSE;
-    data.disconnectReason:='';
-
-    if data.conn.ignoreSpeedLimit then exit;
-
-    if (maxContempDLs > 0) and (countDownloads() > maxContempDLs)
-    or (maxContempDLsIP > 0) and (countDownloads(data.address) > maxContempDLsIP) then
-      data.disconnectReason:=MSG_MAX_SIM_DL
-    else if (maxIPsDLing > 0) and (countIPs(TRUE) > maxIPsDLing) then
-      data.disconnectReason:=MSG_MAX_SIM_ADDR_DL
-    else if preventLeechingChk.checked and (countDownloads(data.address, '', f) > 1) then
-      data.disconnectReason:='Leeching';
-
-    was:=data.disconnectReason;
-    runEventScript('download');
-
-    result:=data.disconnectReason > '';
-    if not result then
-      exit;
-    data.countAsDownload:=FALSE;
-    fileSrv.getPage(if_(was=data.disconnectReason, 'max contemp downloads', 'deny'), data);
-  end; // limitsExceededOnDownload
-
-  procedure extractParams();
-  const
-    MAX = 1000;
-  var
-    s: string;
-    i: integer;
-  begin
-    s:=url;
-    url:=chop('?',s);
-    data.urlvars.clear();
-    if s > '' then
-      begin
-        extractStrings(['&'], [], @s[1], data.urlvars);
-        for i:=0 to data.urlvars.count-1 do
-          data.urlvars[i]:=decodeURL(data.urlvars[i]);
-      end;
-  end; // extractParams
-
-  procedure closeUploadingFile();
-  begin
-    if data.f = NIL then
-      exit;
-    closeFile(data.f^);
-    dispose(data.f);
-    data.f := NIL;
-  end; // closeUploadingFile
-
-  // close and eventually delete/rename
-  procedure closeUploadingFile_partial();
-  begin
-    if (data = NIL) or (data.f = NIL) then
-      exit;
-    closeUploadingFile();
-    if deletePartialUploadsChk.checked then
-      deleteFile(data.uploadDest)
-     else if renamePartialUploads = '' then
-      exit;
-    if ipos('%name%', renamePartialUploads) = 0 then
-      renameFile(data.uploadDest, data.uploadDest+renamePartialUploads)
-     else
-      renameFile(data.uploadDest,
-        extractFilePath(data.uploadDest) + xtpl(renamePartialUploads,['%name%',extractFileName(data.uploadDest)]) );
-  end; // closeUploadingFile_partial
-
-  function isDownloadManagerBrowser(): boolean;
-  begin
-  result:=(pos('GetRight',data.agent)>0)
-    or (pos('FDM',data.agent)>0)
-    or (pos('FlashGet',data.agent)>0)
-  end; // isDownloadManagerBrowser
-
-  procedure logUploadFailed();
-  begin
-  if not logUploadsChk.checked then exit;
-  add2log(format(MSG_LOG_UPL_FAIL, [data.uploadSrc])+' : '+data.uploadFailed, data);
-  end; // logUploadFile
-
-  function eventToFilename(const event: String; table:array of String): String;
-  var
-    i: integer;
-  begin
-  result:=trim(stripChars(runEventScript(event, table), [TAB,#10,#13]));
-  // turn illegal chars into underscores
-  for i:=1 to length(result) do
-    if result[i] in ILLEGAL_FILE_CHARS-[':','\'] then
-      result[i]:='_';
-  end; // eventToFilename
-
-  procedure getUploadDestinationFileName();
-  var
-    i: integer;
-    fn, ext, s: string;
-  begin
-  new(data.f);
-  fn:=data.uploadSrc;
-
-  data.uploadDest:=f.resource+'\'+fn;
-  assignFile(data.f^, data.uploadDest );
-
-  // see if an event script wants to change the name
-  s:=eventToFilename('upload name', []);
-
-  if validFilepath(s) then // is it valid anyway?
-    begin
-    if pos('\', s) = 0 then  // it's just the file name, no path specified: must include the path of the current folder
-      s:=f.resource+'\'+s;
-    // ok, we'll use this new name
-    data.uploadDest:=s;
-    fn:=extractFileName(s);
-    end;
-
-  if numberFilesOnUploadChk.checked then
-    begin
-    ext:=extractFileExt(fn);
-    setLength(fn, length(fn)-length(ext));
-    i:=0;
-    while fileExists(data.uploadDest) do
-      begin
-      inc(i);
-      data.uploadDest:=format('%s\%s (%d)%s', [f.resource, fn, i, ext]);
-      end;
-    end;
-  assignFile(data.f^, data.uploadDest);
-  end; // getUploadDestinationFileName
-
-  procedure addContentDisposition(fn: String; attach:boolean=TRUE);
-  begin
-//  conn.addHeader( 'Content-Disposition: '+if_(attach, 'attachment; ')+'filename*=UTF-8''"'+UTF8encode(data.lastFN)+'";');
-//  conn.addHeader('Content-Disposition', RawByteString('attachment; filename="')+encodeURL(data.lastFN)+'";');
-//  conn.addHeader('Content-Disposition', if_(attach, RawByteString('attachment; ')) + RawByteString('filename*=UTF-8''"')+encodeURL(UTF8encode(fn))+'";');
-  conn.setHeaderIfNone(RawByteString('Content-Disposition'), if_(attach, RawByteString('attachment; ')) + RawByteString('filename="')+ encodeURLA(fn)+ RawByteString('";'));
-  end;
-
-  function sessionRedirect():boolean;
-  var
-    s: TSession;
-  begin
-    if (data.sessionID = '') or (sessions.noSession(data.sessionID)) then
-      exit(FALSE);
-    s := sessions[data.sessionid];
-    if s.redirect = '' then
-      exit(FALSE);
-    conn.reply.mode := HRM_REDIRECT;
-    conn.reply.url := s.redirect;
-    s.redirect := ''; // only once
-    result := TRUE;
-  end; // sessionRedirect
-
-  function sessionSetup():boolean;
-  var
-//    idx: Integer;
-    sid: TSessionId;
-    s: Tsession;
-  begin
-    result:=TRUE;
-    if data = NIL then
-      Exit;
-    data.usr:='';
-    data.pwd:='';
-//    if sessions.noSession(data.sessionID) then
-     begin
-      sid := conn.getCookie(SESSION_COOKIE);
-      if (sid = '') then
-        sid:=data.urlvars.Values[SESSION_COOKIE];
-      if (sid = Tsession.sanitizeSID(sid))  and (sid.length >= 10) then
-        data.sessionID := sid
-       else
-        data.sessionID := ''
-        ;
-      if sessions.noSession(data.sessionID) then
-      begin
-      data.sessionID:= sessions.initNewSession(conn.address, data.sessionID);
-      if sid <> data.sessionID then
-        conn.setCookie(SESSION_COOKIE, data.sessionID, ['path','/'], 'HttpOnly'); // the session is site-wide, even if this request was related to a folder
-      end;
-     end;
-    s := sessions[data.sessionID];
-    if Assigned(s) then
-     begin
-        if s.ip <> conn.address then
-          begin
-          conn.delCookie(SESSION_COOKIE); // legitimate clients that changed address must clear their cookie, or they will be stuck with this invalid session
-          conn.reply.mode:=HRM_DENY;
-          result:=FALSE;
-          exit;
-          end;
-      s.keepAlive();
-     end;
-    if (conn.request.user > '') then
-      begin
-      data.usr:=conn.request.user;
-      data.pwd:=conn.request.pwd;
-      data.account:=getAccount(data.usr);
-      exit;
-      end;
-    if Assigned(s) then
-     begin
-      data.account:=getAccount(s.user);
-     end;
-    if data.account <> NIL then
-      begin
-       data.usr:=data.account.user;
-       data.pwd:=data.account.pwd;
-      end;
-  end; // sessionSetup
-
-  procedure serveTar();
-  var
-    tar: TtarStream;
-    nofolders, selection, itsAsearch: boolean;
-
-    procedure addFolder(f:Tfile; ignoreConnFilters:boolean=FALSE);
-    var
-      i, ofs: integer;
-      listing: TfileListing;
-      fi: Tfile;
-      fIsTemp: boolean;
-      s: string;
-    begin
-    if not f.accessFor(data) then exit;
-    listing:=TfileListing.create();
-    try
-      listing.ignoreConnFilter:=ignoreConnFilters;
-      listing.timeout:= now()+1/MINUTES;
-      listing.fromFolder(getLP, f, data, shouldRecur(data));
-      fIsTemp:=f.isTemp();
-      ofs:=length(f.resource)-length(f.name)+1;
-      for i:=0 to length(listing.dir)-1 do
-        begin
-        if conn.state = HCS_DISCONNECTED then
-          break;
-
-        fi:=listing.dir[i];
-        // we archive only files, folders are just part of the path
-        if not fi.isFile() then continue;
-        if not fi.accessFor(data) then continue;
-
-        // build the full path of this file as it will be in the archive
-        if noFolders then
-          s:=fi.name
-        else if fIsTemp and not (FA_SOLVED_LNK in fi.flags)then
-          s:=copy(fi.resource, ofs, MAXINT) // pathTill won't work this case, because f.parent is an ancestor but not necessarily the parent
-        else
-          s:= fileSrv.pathTill(fi, f.parent); // we want the path to include also f, so stop at f.parent
-
-        tar.addFile(fi.resource, s);
-        end
-    finally listing.free end;
-    end; // addFolder
-
-    procedure addSelection();
-    var
-      t: string;
-      ft: Tfile;
-    begin
-    selection:=FALSE;
-    for var s in data.getFilesSelection() do
-        begin
-        selection:=TRUE;
-        if dirCrossing(s) then 
-          continue;
-        ft := fileSrv.findFilebyURL(s, getLP, f);
-        if ft = NIL then 
-          continue;
-        try
-          if not ft.accessFor(data) then
-            continue;
-          // case folder
-          if ft.isFolder() then
-            begin
-            addFolder(ft, TRUE);
-            continue;
-            end;
-          // case file
-          if not fileExists(ft.resource) then
-            continue;
-          if noFolders then
-            t:=substr(s, lastDelimiter('\/', s)+1)
-          else
-            t:=s;
-          tar.addFile(ft.resource, t);
-        finally freeIfTemp(ft) end;
-        end;
-    end; // addSelection
-
-  begin
-  if not f.hasRecursive(FA_ARCHIVABLE) then
-    begin
-    fileSrv.getPage('deny', data);
-    exit;
-    end;
-  data.downloadingWhat := DW_ARCHIVE;
-  data.countAsDownload := TRUE;
-  if limitsExceededOnDownload() then
-    exit;
-
-  // this will let you get all files as flatly arranged in the root of the archive, without folders
-  noFolders:=not stringExists(data.postVars.values['nofolders'], ['','0','false']);
-  itsAsearch:=data.urlvars.values['search'] > '';
-
-  tar := TtarStream.create(); // this is freed by ThttpSrv
-  try
-    tar.fileNamesOEM := oemTarChk.checked;
-    addSelection();
-    if not selection then
-      addFolder(f);
-
-    if tar.count = 0 then
-      begin
-      tar.free;
-      data.disconnectReason:='There is no file you are allowed to download';
-      fileSrv.getPage('deny', data, f);
-      exit;
-      end;
-    data.fileXferStart:=now();
-    conn.reply.mode:=HRM_REPLY;
-    conn.reply.contentType:=DEFAULT_MIME;
-    conn.reply.bodyMode:=RBM_STREAM;
-    conn.reply.bodyStream:=tar;
-
-    if f.name = '' then exit; // can this really happen?
-    data.lastFN:=if_(f.name='/', 'home', f.name)
-      +'.'+if_(selection, 'selection', if_(itsAsearch, 'search', 'folder'))
-      +'.tar';
-    data.lastFN:=first(eventToFilename('archive name', [
-      '%archive-name%', data.lastFN,
-      '%mode%', if_(selection, 'selection','folder'),
-      '%archive-size%', intToStr(tar.size)
-    ]), data.lastFN);
-    if not noContentdispositionChk.checked then
-      addContentDisposition(data.lastFN);
-  except tar.free end;
-  end; // serveTar
-
-  procedure checkCurrentAddress();
-  begin
-  if selftesting then exit;
-  if limitsExceededOnConnection() then
-    data.preReply:=PR_OVERLOAD;
-  if isBanned(data)  then
-    begin
-    data.disconnectReason:='banned';
-    data.preReply:=PR_BAN;
-    if noReplyBan then conn.reply.mode:=HRM_CLOSE;
-    end;
-  end; // checkCurrentAddress
-
-  procedure handleRequest();
-  var
-    dlForbiddenForWholeFolder, specialGrant: boolean;
-    mode, urlCmd: string;
-    acc: Paccount;
-
-    function accessGranted(forceFile:Tfile=NIL):boolean;
-    resourcestring
-      MSG_LOGIN_FAILED = 'Login failed';
-    begin
-      result := FALSE;
-      if assigned(forceFile) then
-        f := forceFile;
-      if f = NIL then
-        exit;
-      if f.isFile() and (dlForbiddenForWholeFolder or f.isDLforbidden()) then
-        begin
-          fileSrv.getPage('deny', data);
-          exit;
-        end;
-      result := f.accessFor(data);
-      // sections are accessible. You can implement protection in place, if needed.
-      if not result  and (f = fileSrv.rootFile)
-      and ((mode='section') or startsStr('~', urlCmd) and fileSrv.tpl.sectionExist(copy(urlCmd,2,MAXINT))) then
-        begin
-        result := TRUE;
-        specialGrant := TRUE;
-        end;
-      if result then
-        exit;
-      if f.isFolder() and sessionRedirect() then // forbidden folder, but we were asked to go elsewhere
-        exit;
-      conn.reply.realm := f.getShownRealm();
-      runEventScript('unauthorized');
-      fileSrv.getPage('login', data, f);
-      // log anyone trying to guess the password
-      if (forceFile = NIL) and stringExists(data.usr, getAccountList(TRUE, FALSE))
-      and logOtherEventsChk.checked then
-        add2log(MSG_LOGIN_FAILED, data);
-    end; // accessGranted
-
-    function isAllowedReferer():boolean;
-    var
-      r: string;
-    begin
-      result := TRUE;
-      if allowedReferer = '' then exit;
-      r:=hostFromURL(conn.getHeader('Referer'));
-      if (r = '') or (r = data.getSafeHost(data)) then exit;
-      result:=fileMatch(allowedReferer, r);
-    end; // isAllowedReferer
-
-    procedure replyWithString(s:string);
-    var
-      a: String;
-    begin
-    if (data.disconnectReason > '') and not data.disconnectAfterReply then
-      begin
-      fileSrv.getPage('deny', data);
-      exit;
-      end;
-
-    if conn.reply.contentType = '' then
-      conn.reply.contentType:=if_(trim(getTill('<', s))='', RawByteString('text/html'), RawByteString('text/plain'));
-    a := conn.getHeader('Accept-Charset');
-    if (a <> '') and ( (ipos('utf-8', a) = 0) and (pos('*', a) = 0)) then
-      conn.reply.body := UnicodeToAnsi(s, 28591) // ISO 8859-1 Latin 1; Western European (ISO)
-     else
-      conn.reply.bodyU := s;
-
-    conn.reply.mode:=HRM_REPLY;
-    conn.reply.bodyMode := RBM_TEXT;
-    fileSrv.compressReply(data);
-    end; // replyWithString
-
-    procedure replyWithStringB(const s: RawByteString);
-    begin
-    if (data.disconnectReason > '') and not data.disconnectAfterReply then
-      begin
-      fileSrv.getPage('deny', data);
-      exit;
-      end;
-
-    if conn.reply.contentType = '' then
-      conn.reply.contentType:=if_(trim(getTill(RawByteString('<'), s))='', RawByteString('text/html'), RawByteString('text/plain'));
-    conn.reply.mode:=HRM_REPLY;
-    conn.reply.bodyMode := RBM_RAW;
-    conn.reply.body := s;
-    fileSrv.compressReply(data);
-    end; // replyWithStringB
-
-    procedure replyWithRes(const res: String; contType: RawByteString);
-    var
-      s: RawByteString;
-      isGZ: Boolean;
-    begin
-      if (data.disconnectReason > '') and not data.disconnectAfterReply then
-        begin
-        fileSrv.getPage('deny', data);
-        exit;
-        end;
-
-        s := getRes(pchar(res), 'ZTEXT');
-        isGZ := s <> '';
-        if not isGZ then
-          s := getRes(pchar(res));
-      if contType <> '' then
-        conn.reply.contentType := contType;
-      if conn.reply.contentType = '' then
-        conn.reply.contentType:=if_(trim(getTill(RawByteString('<'), s))='', RawByteString('text/html'), RawByteString('text/plain'));
-      conn.reply.mode:=HRM_REPLY;
-      conn.reply.bodyMode := RBM_RAW;
-      conn.reply.body := s;
-      conn.reply.IsGZiped := isGZ;
-      fileSrv.compressReply(data);
-    end; // replyWithRes
-
-    procedure deletion();
-    var
-      asUrl, s: string;
-      doneRes, done, errors: TStringDynArray;
-    begin
-    if (conn.request.method <> HM_POST)
-    or (data.postVars.values['action'] <> 'delete')
-    or not accountAllowed(FA_DELETE, data, f) then exit;
-
-    doneRes:=NIL;
-    errors:=NIL;
-    done:=NIL;
-    for asUrl in data.getFilesSelection() do
-
-      begin
-        s:=uri2disk(asUrl, f);
-        if (s = '') or not fileOrDirExists(s) then  // ignore
-          continue;
-        runEventScript('file deleting', ['%item-deleting%', s]);
-        moveToBin(toSA([s, s+'.md5', s+COMMENT_FILE_EXT]) , TRUE);
-        if fileOrDirExists(s) then
-          begin
-          addString(asUrl, errors);
-          continue; // this was not deleted. permissions problem?
-          end;
-
-        addString(s, doneRes);
-        addString(asUrl, done);
-        runEventScript('file deleted', ['%item-deleted%', s]);
-      end;
-
-    removeFilesFromComments(doneRes);
-
-    if logDeletionsChk.checked and assigned(done) then
-      add2log('Deleted files in '+url+CRLF+join(CRLF, done), data);
-    if logDeletionsChk.checked and assigned(errors) then
-      add2log('Failed deletion in '+url+CRLF+join(CRLF, errors), data);
-    end; // deletion
-
-    function getAccountRedirect(acc:Paccount=NIL):string;
-    begin
-    result:='';
-    if acc = NIL then
-      acc:=data.account;
-    acc:=accountRecursion(acc, ARSC_REDIR);
-    if acc = NIL then exit;
-    result:=acc.redir;
-    if (result = '') or ansiContainsStr(result, '://') then exit;
-    // if it's not a complete url, it may require some fixing
-    if not ansiStartsStr('/', result) then result:='/'+result;
-    result:=xtpl(result,['\','/']);
-    end; // getAccountRedirect
-
-    function addNewAddress():boolean;
-    begin
-    result:=ipsEverConnected.indexOf(data.address) < 0;
-    if not result then exit;
-    ipsEverConnected.add(data.address);
-    end; // addNewAddress
-
-    // parameters: u(username), e(?expiration_UTC), s2(sha256(rest+pwd))
-    function urlAuth():string;
-    var
-      s, sign: string;
-      ss: Tsession;
-    begin
-    result:='';
-    if mode <> 'auth' then
-      exit;
-    acc:=getAccount(data.urlVars.values['u']);
-    if acc = NIL then
-      exit('username not found');
-    sign:=conn.request.url;
-    chop('?',sign);
-    s:=chop('&s2=',sign);
-    if strSHA256(s+acc.pwd)<>sign then
-      exit('bad sign');
-    ss := sessions[data.sessionID];
-    if Assigned(ss) then
-      begin
-        try ss.setTTL(TTimeZone.Local.ToLocalTime(StrToFloat(data.urlvars.Values['e'])) - now() )
-        except end;
-
-        if ss.ttl < 0 then
-          exit('expired');
-        ss.user:=acc.user;
-        ss.redirect:='.';
-      end;
-    data.account:=acc;
-    data.usr:=acc.user;
-    data.pwd:=acc.pwd;
-    runEventScript('login')
-    end; //urlAuth
-
-    function thumb():Boolean;
-    var
-      b: rawbytestring;
-      s, e: integer;
-    begin
-      if mode <> 'thumb' then
-        exit(FALSE);
-      result := TRUE;
-      b := loadFile(f.resource, 0, 96*KILO);
-      s := pos(rawbytestring(#$FF#$D8#$FF), b, 2);
-      if s > 0 then
-        e := pos(rawbytestring(#$FF#$D9), b, s)
-       else
-        e := 0;
-      if (s=0) or (e=0) then
-        begin
-          data.conn.reply.mode := HRM_NOT_FOUND;
-          exit;
-        end;
-      conn.reply.contentType:='image/jpeg';
-      conn.reply.mode := HRM_REPLY;
-      conn.reply.bodyMode := RBM_RAW;
-      conn.reply.Body := Copy(b, s, e-s+2);
-    end;
-
-    function sendIcon():Boolean;
-    var
-      i: Integer;
-    begin
-      if mode <> 'icon' then
-        exit(FALSE);
-      result := TRUE;
-      i := -1;
-      if ((useSystemIconsChk.checked) or (f.icon >= 0)) then
-        i := f.getSystemIcon;
-      if i >= 0 then
-        begin
-//          conn.reply.mode := HRM_MOVED;
-          conn.reply.mode := HRM_REDIRECT;
-          conn.reply.url := '/~img' + IntToStr(i);
-          data.dontLog := True;
-        end
-       else
-        begin
-          data.conn.reply.mode := HRM_NOT_FOUND;
-          exit;
-        end;
-{
-      conn.reply.contentType:='image/jpeg';
-      conn.reply.mode := HRM_REPLY;
-      conn.reply.bodyMode := RBM_RAW;
-      conn.reply.Body := Copy(b, s, e-s+2);
-}
-    end;
-
-  var
-    b: boolean;
-    s: string;
-//    i: integer;
-    section: PtplSection;
-  begin
-  // eventually override the address
-  if addressmatch(forwardedMask, conn.address) then
-    begin
-    data.address:=getTill(':', getTill(',', conn.getHeader('x-forwarded-for')));
-    if not checkAddressSyntax(data.address, false) then
-      data.address:=conn.address;
-    end;
-
-  checkCurrentAddress();
-
-  // update list
-  if (data.preReply = PR_NONE)
-  and addNewAddress()
-  and ipsEverFrm.visible then
-    ipsEverFrm.refreshData();
-
-  data.requestTime:=now();
-  data.downloadingWhat:=DW_UNK;
-  data.fullDLlogged:=FALSE;
-  data.countAsDownload:=FALSE;
-  conn.reply.contentType:='';
-  specialGrant:=FALSE;
-
-  data.lastFile:=NIL; // auto-freeing
-
-  with objByIp(data.address) do
-    begin
-    if speedLimitIP < 0 then limiter.maxSpeed:=MAXINT
-    else limiter.maxSpeed:=round(speedLimitIP*1000);
-    if conn.limiters.indexOf(limiter) < 0 then
-      conn.limiters.add(limiter);
-    end;
-
-  conn.addHeader('Accept-Ranges', 'bytes');
-  if sendHFSidentifierChk.checked then
-    conn.addHeader('Server', 'HFS '+ srvConst.VERSION);
-
-  case data.preReply of
-    PR_OVERLOAD:
-      begin
-      data.disconnectReason:='limits exceeded';
-      fileSrv.getPage('overload', data);
-      end;
-    PR_BAN:
-      begin
-      fileSrv.getPage('ban', data);
-      conn.reply.reason:= RawByteString('Banned: ')+ StrToUTF8(data.banReason);
-      end;
-    end;
-
-  runEventScript('pre-filter-request');
-  if conn.disconnectedByServer then
-    exit;
-  if data.disconnectReason > '' then
-    begin
-    fileSrv.getPage('deny', data);
-    exit;
-    end;
-
-  if (length(conn.request.user) > 100) or anycharIn('/\:?*<>|', conn.request.user) then
-    begin
-    conn.reply.mode:=HRM_BAD_REQUEST;
-    exit;
-    end;
-
-  if not (conn.request.method in [HM_GET,HM_HEAD,HM_POST]) then
-    begin
-    conn.reply.mode:=HRM_METHOD_NOT_ALLOWED;
-    exit;
-    end;
-  inc(hitsLogged);
-
-  if data.preReply <> PR_NONE then
-    exit;
-
-  url := conn.request.url;
-  extractParams();
-  url := decodeURL(url, True);
-  mode := data.urlvars.values['mode'];
-
-  data.lastFN:=extractFileName( xtpl(url,['/','\']) );
-  data.agent:=getAgentID(conn);
-
-  if selfTesting and (url = 'test') then
-    begin
-    replyWithString('HFS OK');
-    exit;
-    end;
-
-  if not sessionSetup() then
-    exit;
-  if mode = 'logout' then
-    begin
-    data.logout();
-    replyWithString('ok');
-    exit;
-    end;
-  if mode = 'login' then
-    begin
-    acc:=getAccount(data.postVars.values['user']);
-    if acc = NIL then
-      s:='bad password' // Should be the same error message as if bad password
-    else
-      if data.passwordValidation(acc.pwd) then
-        begin
-        s:='ok';
-        sessions[data.sessionID].user:=acc.user;
-        sessions[data.sessionID].redirect:=getAccountRedirect(acc);
-        end
-      else
-        begin
-        s:='bad password'; //TODO shouldn't this change http code?
-        end;
-
-    if s='ok' then
-      runEventScript('login')
-    else
-      runEventScript('unauthorized');
-    replyWithString(s);
-    exit;
-    end;
-  s:=urlAuth();
-  if s > '' then
-    begin
-    runEventScript('unauthorized');
-    conn.reply.mode := HRM_DENY;
-    replyWithString(s);
-    exit;
-    end;
-
-  conn.ignoreSpeedLimit := noLimitsFor(data.account);
-
-  // all URIs must begin with /
-  if (url = '') or (url[1] <> '/') then
-    begin
-    conn.reply.mode := HRM_BAD_REQUEST;
-    exit;
-    end;
-
-  runEventScript('request');
-  if data.disconnectReason > '' then
-    begin
-    fileSrv.getPage('deny', data);
-    exit;
-    end;
-  if conn.reply.mode = HRM_REDIRECT then
-    exit;
-
-  lastActivityTime:=now();
-  if conn.request.method = HM_HEAD then
-    conn.reply.mode:=HRM_REPLY_HEADER
-  else
-    conn.reply.mode:=HRM_REPLY;
-
-  if ansiStartsStr('/~img', url) then
-    begin
-    if not sendPic(data) then
-      fileSrv.getPage('not found', data);
-    exit;
-    end;
-  if mode = 'jquery' then
-    begin
-      if notModified(conn,'jquery'+FloatToStr(uptime), '') then
-        exit;
-      replyWithRes('jquery', 'text/javascript');
-      exit;
-    end;
-
-  // forbid using invalid credentials
-  if not freeLoginChk.checked and not specialGrant then
-    if (data.usr>'')
-    and ((data.account=NIL) or (data.account.pwd <> data.pwd))
-    and not usersInVFS.match(data.usr, data.pwd) then
-      begin
-      data.acceptedCredentials:=FALSE;
-      runEventScript('unauthorized');
-      fileSrv.getPage('unauth', data);
-      conn.reply.realm:='Invalid login';
-      exit;
-      end
-    else
-      data.acceptedCredentials:=TRUE;
-
-  f := fileSrv.findFileByURL(url, getLP);
-  urlCmd:=''; // urlcmd is only if the file doesn't exist
-  if f = NIL then
-    begin
-    // maybe the file doesn't exist because the URL has a final command in it
-    // move last url part from 'url' into 'urlCmd'
-    urlCmd:=url;
-    url:=chop(lastDelimiter('/', urlCmd)+1, 0, urlCmd);
-    // we know an urlCmd must begin with ~
-    // favicon is handled as an urlCmd: we provide HFS icon.
-    // a non-existent ~file will be detected a hundred lines below.
-    if ansiStartsStr('~', urlCmd) or (urlCmd = 'favicon.ico') then
-      f := fileSrv.findFileByURL(url, getLP);
-    end;
-  if f = NIL then
-    begin
-    if sameText(url, '/robots.txt') and stopSpidersChk.checked then
-      replyWithStringB('User-agent: *'+CRLF+'Disallow: /')
-     else
-      fileSrv.getPage('not found', data);
-    exit;
-    end;
-  if f.isFolder() and not ansiEndsStr('/',url) then
-    begin
-    conn.reply.mode := HRM_MOVED;
-    conn.reply.url:= fileSrv.url(f); // we use f.url() instead of just appending a "/" to url because of problems with non-ansi chars http://www.rejetto.com/forum/?topic=7837
-    exit;
-    end;
-  if f.isFolder() and (urlCmd = '') and (mode='') then
-    switchToDefaultFile();
-  if enableNoDefaultChk.checked and (urlCmd = '~nodefault') then
-    urlCmd:='';
-
-  if f.isRealFolder() and not sysutils.directoryExists(f.resource)
-  or f.isFile() and not fileExists(f.resource) then
-    begin
-    fileSrv.getPage('not found', data);
-    exit;
-    end;
-  dlForbiddenForWholeFolder:=f.isDLforbidden();
-
-  if not accessGranted() then
-    exit;
-
-  if urlCmd = 'favicon.ico' then
-    begin
-    sendPic(data, 23);
-    exit;
-    end;
-
-  b:=urlCmd = '~upload+progress';
-  if (b or (urlCmd = '~upload') or (urlCmd = '~upload-no-progress')) then
-    begin
-    if not f.isRealFolder() then
-      fileSrv.getPage('deny', data)
-    else if accountAllowed(FA_UPLOAD, data, f) then
-      fileSrv.getPage( if_(b,'upload+progress','upload'), data, f)
-    else
-      begin
-      fileSrv.getPage('unauth', data);
-      runEventScript('unauthorized');
-      end;
-    if b then  // fix for IE6
-      begin
-      data.disconnectAfterReply:=TRUE;
-      data.disconnectReason:='IE6 workaround';
-      end;
-    exit;
-    end;
-
-  if (conn.request.method = HM_POST) and assigned(data.uploadResults) then
-    begin
-    fileSrv.getPage('upload-results', data, f);
-    exit;
-    end;
-
-  // provide access to any [section] in the tpl, included [progress]
-  if mode = 'section' then
-    s:=first(data.urlvars.values['id'], 'no-id') // no way, you must specify the id
-  else if (f = fileSrv.rootFile) and (urlCmd > '') then
-    s:=substr(urlCmd,2)
-  else
-    s:='';
-  if (s > '') and f.isFolder() and not ansiStartsText('special:', s) then
-    with fileSrv.tplFromFile(f) do // temporarily builds from diff tpls
-      try
-        section:=getsection(s);
-        if assigned(section) and section.public then // it has to exist and be accessible
-          begin
-          if not section.cache
-          or not notModified(conn, s+floatToStr(section.ts), '') then
-            fileSrv.getPage(s, data, f, me());
-          exit;
-          end;
-      finally free
-        end;
-
-  if f.isFolder() and not (FA_BROWSABLE in f.flags)
-  and stringExists(urlCmd,['','~folder.tar','~files.lst']) then
-    begin
-    fileSrv.getPage('deny', data);
-    exit;
-    end;
-
-  if not isAllowedReferer()
-  or f.isFile() and f.isDLforbidden() then
-    begin
-    fileSrv.getPage('deny', data);
-    exit;
-    end;
-
-  if (urlCmd = '~folder.tar')
-  or (mode = 'archive') then
-    begin
-    serveTar();
-    exit;
-    end;
-
-  // please note: we accept also ~files.lst.m3u
-  if ansiStartsStr('~files.lst', urlCmd)
-  or f.isFolder() and (data.urlvars.values['tpl'] = 'list') then
-    begin
-    if conn.reply.mode=HRM_REPLY_HEADER then
-      exit;
-    // load from external file
-    s:=cfgPath+FILELIST_TPL_FILE;
-    if newMtime(s, lastFilelistTpl) then
-      filelistTpl.fullText:=loadfile(s);
-    // if no file is given, load from internal resource
-    if not fileExists(s) and (lastFilelistTpl > 0) then
-      begin
-      lastFilelistTpl:=0;
-      filelistTpl.fullText:=getRes('filelistTpl');
-      end;
-
-    data.downloadingWhat:=DW_FOLDERPAGE;
-    data.disconnectAfterReply:=TRUE; // needed for IE6... ugh...
-    data.disconnectReason:='IE6 workaround';
-    replyWithString(trim(getFolderPage(f, data, filelistTpl)));
-    exit;
-    end;
-
-  // from here on, we manage only services with no urlCmd.
-  // a non empty urlCmd means the url resource was not found.
-  if urlCmd > '' then
-    begin
-    fileSrv.getPage('not found', data);
-    exit;
-    end;
-
-  data.lastFile:=f; // auto-freeing
-
-  if f.isFolder() then
-    begin
-    if conn.reply.mode=HRM_REPLY_HEADER then
-      exit;
-    deletion();
-    if sessionRedirect() then
-      exit;
-    data.downloadingWhat:=DW_FOLDERPAGE;
-QueryPerformanceFrequency(Freq);
-QueryPerformanceCounter(StartCount);
-    if DMbrowserTplChk.Checked and isDownloadManagerBrowser() then
-      s := getFolderPage(f, data, dmBrowserTpl)
-    else
-      s := getFolderPage(f, data, fileSrv.tpl);
-    if conn.reply.mode <> HRM_REDIRECT then
-      replyWithString(s);
-QueryPerformanceCounter(StopCount);
-TimingSeconds := (StopCount - StartCount) / Freq;
-OutputDebugString(PChar('Prepared reply for folder by ' + floattostr(TimingSeconds)));
-    exit;
-    end;
-
-  if notModified(conn, f) then // calling notModified before limitsExceededOnDownload makes possible for [download] to manipualate headers set here
-    exit;
-  if thumb() then
-    Exit;
-  if mode = 'icon' then
-    begin
-      sendIcon;
-      Exit;
-    end;
-
-  data.countAsDownload := f.shouldCountAsDownload();
-  if data.countAsDownload and limitsExceededOnDownload() then
-    exit;
-
-  setupDownloadIcon(data);
-  data.eta.idx:=0;
-  conn.reply.contentType:=name2mimetype(f.name, DEFAULT_MIME);
-  conn.reply.bodyMode:=RBM_FILE;
-  conn.reply.bodyU := f.resource;
-  data.downloadingWhat := DW_FILE;
-  { I guess this would not help in any way for files since we are already handling the 'if-modified-since' field
-  try
-    conn.addHeader('ETag: '+getEtag(f.resource));
-  except end;
-  }
-  
-  data.fileXferStart:=now();
-  if data.countAsDownload and (flashOn = 'download') then flash();
-
-  b:=(openInBrowser <> '') and fileMatch(openInBrowser, f.name)
-    or inBrowserIfMIME and (conn.reply.contentType <> DEFAULT_MIME);
-
-  s:=first(eventToFilename('download name', []), f.name); // a script can eventually decide the name
-  // N-th workaround for IE. The 'accept' check should let us know if the save-dialog is displayed. More information at www.rejetto.com/forum/?topic=6275
-  if (data.agent = 'MSIE') and (conn.getHeader('Accept') = '*/*') then
-    s:=xtpl(s, [' ','%20']);
-  if not noContentdispositionChk.checked or not b then
-    addContentDisposition(s, not b);
-  end; // handleRequest
-
-  procedure lastByte();
-
-    procedure incDLcount(f:Tfile; res:string);
-    begin
-    if (f = NIL) or f.isTemp() then autoupdatedFiles.incInt(res)
-    else f.DLcount:=1+f.DLcount
-    end;
-
-  var
-    archive: TarchiveStream;
-    i: integer;
-  begin
-  if data.countAsDownload then
-    inc(downloadsLogged);
-  // workaround for a bug that was fixed in Wget/1.10
-  if stringExists(data.agent, ['Wget/1.7', 'Wget/1.8.2', 'Wget/1.9', 'Wget/1.9.1']) then
-    data.disconnect('wget bug workaround (consider updating wget)');
-  VFScounterMod:=TRUE;
-  case data.downloadingWhat of
-    DW_FILE:
-      if assigned(data) then
-        incDLcount(data.lastFile, data.lastFile.resource);
-    DW_ARCHIVE:
-      begin
-      archive := conn.reply.bodyStream as TarchiveStream;
-      for i:=0 to length(archive.flist)-1 do
-        incDLcount(Tfile(archive.flist[i].data), archive.flist[i].src);
-      end;
-    end;
-  if data.countAsDownload then
-    runEventScript('download completed');
-  end; // lastByte
-
-  function canWriteFile():boolean;
-  resourcestring
-    MSG_MIN_DISK_REACHED = 'Minimum disk space reached.';
-  begin
-  result:=FALSE;
-  if data.f = NIL then exit;
-  result:= minDiskSpace <= diskSpaceAt(data.uploadDest) div MEGA;
-  if result then exit;
-  closeUploadingFile_partial();
-  data.uploadFailed:=MSG_MIN_DISK_REACHED;
-  end; // canWriteFile
-
-  function complyUploadFilter():boolean;
-
-    function getMask():string;
-    begin
-    if f.isTemp() then result:=f.parent.uploadFilterMask
-    else result:=f.uploadFilterMask;
-    if result = '' then
-      result:='\'+PROTECTED_FILES_MASK; // the user can disable this default filter by inputing * as mask
-    end;
-
-  resourcestring
-    MSG_UPL_NAME_FORB = 'File name or extension forbidden.';
-  begin
-  result:=validFilename(data.uploadSrc)
-    and not sameText(data.uploadSrc, DIFF_TPL_FILE) // never allow this
-    and not isExtension(data.uploadSrc, '.lnk')  // security matters (by mars)
-    and fileMatch(getMask(), data.uploadSrc);
-  if not result then
-    data.uploadFailed:=MSG_UPL_NAME_FORB;
-  end; // complyUploadFilter
-
-  function canCreateFile():boolean;
-  resourcestring
-    MSG_UPL_CANT_CREATE = 'Error creating file.';
-  begin
-  IOresult;
-  rewrite(data.f^, 1);
-  result:=IOresult=0;
-  if result then exit;
-  data.uploadFailed:=MSG_UPL_CANT_CREATE;
-  end; // canCreateFile
-
-var
-  ur: TuploadResult;
-  i: integer;
-begin
-if assigned(conn) and (conn.getLockCount <> 1) then
-  add2log('please report on the forum about this message');
-
-f:=NIL;
-data:=NIL;
-if assigned(conn) then
-  data:=conn.data;
-if assigned(data) then
-  data.lastActivityTime:=now();
-
-if dumpTrafficChk.Checked and (event in [HE_GOT, HE_SENT]) then
-  appendFileA(exePath+'hfs-dump.bin', TLV(if_(event=HE_GOT,1,2),
-    TLV(10, str_(now()))+TLVS(11, data.address)+TLVS(12, conn.port)+TLV(13, conn.eventData)
-  ));
-
-if preventStandbyChk.checked and assigned(setThreadExecutionState) then
-  setThreadExecutionState(1);
-
-// this situation can happen when there is a call to processMessage() before this function ends
-if (data = NIL) and (event in [HE_REQUESTED, HE_GOT]) then
-  exit;
-
-case event of
-  HE_CANT_OPEN_FILE: data.error:='Can''t open file';
-  HE_OPEN:
-    begin
-    startBtn.Hide();
-    updateUrlBox();
-    // this happens when the server is switched on programmatically
-    usingFreePort:= port='';
-    updatePortBtn();
-    runEventScript('server start');
-    end;
-  HE_CLOSE:
-    begin
-    startBtn.show();
-    updatePortBtn();
-    updateUrlBox();
-    runEventScript('server stop');
-    end;
-  HE_REQUESTING:
-    begin
-    // do some clearing, due for persistent connections
-    data.vars.clear();
-    data.urlvars.clear();
-    data.postVars.clear();
-    data.tplCounters.clear();
-    refreshConn(data);
-    end;
-  HE_GOT_HEADER: runEventScript('got header');
-  HE_REQUESTED:
-    begin
-    data.dontLog:=FALSE;
-//QueryPerformanceFrequency(Freq);
-//QueryPerformanceCounter(StartCount);
-    handleRequest();
-//QueryPerformanceCounter(StopCount);
-//TimingSeconds := (StopCount - StartCount) / Freq;
-//OutputDebugString(PChar('Prepared request answer by ' + floattostr(TimingSeconds)));
-    // we save the value because we need it also in HE_REPLY, and temp files are not avaliable there
-    data.dontLog:=data.dontLog or assigned(f) and f.hasRecursive(FA_DONT_LOG);
-    if f <> data.lastFile then
-      freeIfTemp(f);
-    refreshConn(data);
-    end;
-  HE_STREAM_READY:
-    begin
-    i:=length(data.disconnectReason);
-    runEventScript('stream ready');
-    if (i=0) and (data.disconnectReason > '') then // only if it was not already disconnecting
-      begin
-      conn.reply.ClearAdditionalHeaders; // content-disposition would prevent the browser
-      fileSrv.getPage('deny', data);
-      conn.initInputStream();
-      end;
-    end;
-  HE_REPLIED:
-    begin
-    setupDownloadIcon(data); // remove the icon
-    data.lastBytesGot:=0;
-    if data.disconnectAfterReply then
-      data.disconnect('replied');
-    if updateASAP > '' then
-      data.disconnect('updating');
-    refreshConn(data);
-    end;
-  HE_LAST_BYTE_DONE:
-    begin
-    if (conn.reply.mode = HRM_REPLY) and (data.downloadingWhat in [DW_FILE, DW_ARCHIVE]) then
-      lastByte();
-    runEventScript('request completed');
-    end;
-  HE_CONNECTED:
-    begin
-    //** lets see if this helps with speed
-    i:=-1;
-    WSocket_setsockopt(conn.sock.HSocket, IPPROTO_TCP, TCP_NODELAY, @i, sizeOf(i));
-
-    data := TconnData.createWithGUI(conn);
-    conn.limiters.add(globalLimiter); // every connection is bound to the globalLimiter
-    conn.sndBuf:=STARTING_SNDBUF;
-    data.address:=conn.address;
-    checkCurrentAddress();
-    connBox.items.add();
-    if (flashOn = 'connection') and (conn.reply.mode <> HRM_CLOSE) then flash();
-    runEventScript('connected');
-    end;
-  HE_DISCONNECTED:
-    begin
-    closeUploadingFile_partial();
-    data.deleting:=TRUE;
-    toDelete.add(data);
-    with connBox.items do count:=count-1;
-    runEventScript('disconnected');
-    connBox.invalidate();
-    end;
-  HE_GOT: lastActivityTime := now();
-  HE_SENT:
-    begin
-      lastActivityTime := now();
-      if data.nextDloadScreenUpdate <= lastActivityTime then
-        begin
-        data.nextDloadScreenUpdate := lastActivityTime + DOWNLOAD_MIN_REFRESH_TIME;
-  //      refreshConn(data, false);
-        refreshConn(data);
-        setupDownloadIcon(data);
-        end;
-      if (lastActivityTime - lastEverySec) > OneSecond then
-        Application.ProcessMessages;
-    end;
-  HE_POST_FILE:
-    begin
-    sessionSetup();
-    data.downloadingWhat:=DW_UNK;
-    data.agent:=getAgentID(conn);
-    data.fileXferStart:=now();
-    f := fileSrv.findFileByURL(decodeURL(getTill('?',conn.request.url)), getLP);
-    data.lastFile:=f; // auto-freeing
-    data.uploadSrc:=conn.post.filename;
-    data.uploadFailed:='';
-    if (f = NIL) or not accountAllowed(FA_UPLOAD, data, f) or not f.accessFor(data) then
-      data.uploadFailed:=if_(f=NIL, 'Folder not found.', 'Not allowed.')
-    else
-      begin
-      closeUploadingFile();
-      getUploadDestinationFileName();
-
-      if complyUploadFilter() and canWriteFile() and canCreateFile() then
-        saveFileA(data.f^, conn.post.data);
-      repaintTray();
-      end;
-    if data.uploadFailed > '' then
-      logUploadFailed();
-    end;
-  HE_POST_MORE_FILE:
-    if canWriteFile() then
-      saveFileA(data.f^, conn.post.data);
-  HE_POST_END_FILE:
-    begin
-    // fill the record
-    ur.fn:=first(extractFilename(data.uploadDest), data.uploadSrc);
-    if data.f = NIL then ur.size:=-1
-    else ur.size:=filesize(data.f^);
-    ur.speed:=calcAverageSpeed(conn.bytesPostedLastItem);
-    // custom scripts
-    if assigned(data.f) then inc(uploadsLogged);
-    closeUploadingFile();
-    if data.uploadFailed = '' then
-      data.uploadFailed:=trim(runEventScript('upload completed'))
-    else
-      runEventScript('upload failed');
-    ur.reason:=data.uploadFailed;
-    if data.uploadFailed > '' then
-      deleteFile(data.uploadDest);
-    // queue the record
-    i:=length(data.uploadResults);
-    setLength(data.uploadResults, i+1);
-    data.uploadResults[i]:=ur;
-
-    refreshConn(data);
-    end;
-  HE_POST_VAR: data.postVars.add(conn.post.varname+'='+UnUTF(conn.post.data));
-  HE_POST_VARS:
-    if conn.post.mode = PM_URLENCODED then
-      urlToStrings(conn.post.data, data.postVars);
-  // default case
-  else refreshConn(data);
-  end;//case
- if Assigned(data) then
-   sessions.keepAlive(data.sessionID);
-if event in [HE_CONNECTED, HE_DISCONNECTED, HE_OPEN, HE_CLOSE, HE_REQUESTED, HE_POST_END, HE_LAST_BYTE_DONE] then
-  begin
-  repaintTray();
-  updateTrayTip();
-  end;
-doLog();
-end; // httpEvent
 
 procedure findSimilarIP(fromIP:string);
 
@@ -3217,9 +1593,10 @@ end; // findSimilarIP
 procedure setLimitOption(var variable:integer; newValue:integer;
   menuItem:TmenuItem; menuLabel:string);
 begin
-if newValue < 0 then newValue:=0;
-variable:=newValue;
-menuItem.caption:=menuLabel
+  if newValue < 0 then
+    newValue:=0;
+  variable := newValue;
+  menuItem.caption := menuLabel
   +format(MSG_MENU_VAL, [if_(newValue=0,DISABLED,intToStr(newValue))]);
 end; // setLimitOption
 
@@ -3246,8 +1623,8 @@ resourcestring
   FINGERPRINT = 'Create fingerprint on addition under %d KB';
   NO_FINGERPRINT = 'Create fingerprint on addition: disabled';
 begin
-autoFingerprint:=v;
-mainfrm.Createfingerprintonaddition1.caption:=format(if_(v=0, NO_FINGERPRINT, FINGERPRINT), [v]);
+  autoFingerprint := v;
+  mainfrm.Createfingerprintonaddition1.caption := format(if_(v=0, NO_FINGERPRINT, FINGERPRINT), [v]);
 end;
 
 function createFingerprint(const fn: String; showProgress: Boolean): String;
@@ -3255,7 +1632,10 @@ var
   b: TBytes;
 begin
   result := '';
-  b := getFileMD5(fn, Prog);
+  if showProgress then
+    b := getFileMD5(fn, Prog)
+   else
+    b := getFileMD5(fn, NIL);
   for var i: Integer :=0 to 15 do
     result := result+intToHex(byte(b[i]), 2);
 end; // createFingerprint
@@ -3268,14 +1648,14 @@ end; // applyFilesBoxRatio
 
 procedure TmainFrm.FormResize(Sender: TObject);
 begin
-urlBox.Width:=urlToolbar.ClientWidth-browseBtn.Width-copyBtn.width;
-applyFilesBoxRatio();
+  urlBox.Width := urlToolbar.ClientWidth-browseBtn.Width-copyBtn.width;
+  applyFilesBoxRatio();
 end;
 
 procedure checkIfOnlyCountersChanged();
 begin
-if not VFSmodified and VFScounterMod then
-  mainfrm.saveVFS(lastFileOpen)
+  if not VFSmodified and VFScounterMod then
+    mainfrm.saveVFS(lastFileOpen)
 end;
 
 function checkVfsOnQuit():boolean;
@@ -3284,23 +1664,25 @@ resourcestring
 var
   s: string;
 begin
-result:=TRUE;
-if loadingVFS.disableAutosave then exit;
-checkIfOnlyCountersChanged();
-if not VFSmodified or mainfrm.quitWithoutAskingToSaveChk.checked then exit;
-if mainfrm.autosaveVFSchk.checked then
-  mainfrm.saveVFS(lastFileOpen)
-else if windowsShuttingDown then
-  begin
-  s:=lastFileOpen; // don't change this
-  mainfrm.saveVFS(VFS_TEMP_FILE);
-  lastFileOpen:=s;
-  end
-else
-  case msgDlg(MSG_SAVE_VFS, MB_ICONQUESTION+if_(quitASAP, MB_YESNO, MB_YESNOCANCEL)) of
-    IDYES: mainfrm.saveVFS(lastFileOpen);
-    IDNO: ; // just go on
-    IDCANCEL: result:=FALSE;
+  result := TRUE;
+  if loadingVFS.disableAutosave then
+    exit;
+  checkIfOnlyCountersChanged();
+  if not VFSmodified or mainfrm.quitWithoutAskingToSaveChk.checked then
+    exit;
+  if mainfrm.autosaveVFSchk.checked then
+    mainfrm.saveVFS(lastFileOpen)
+   else if windowsShuttingDown then
+    begin
+      s := lastFileOpen; // don't change this
+      mainfrm.saveVFS(VFS_TEMP_FILE);
+      lastFileOpen := s;
+    end
+   else
+    case msgDlg(MSG_SAVE_VFS, MB_ICONQUESTION+if_(quitASAP, MB_YESNO, MB_YESNOCANCEL)) of
+      IDYES: mainfrm.saveVFS(lastFileOpen);
+      IDNO: ; // just go on
+      IDCANCEL: result:=FALSE;
     end;
 end; // checkVfsOnQuit
 
@@ -3309,28 +1691,22 @@ resourcestring
   MSG_INP_COMMENT= 'Please insert a comment for "%s".'
     +#13'You should use HTML: <br> for break line.';
 begin
-VFSmodified:=inputqueryLong('Comment', format(MSG_INP_COMMENT, [f.name]), f.comment);
+  VFSmodified := inputqueryLong('Comment', format(MSG_INP_COMMENT, [f.name]), f.comment);
 end; // inputComment
 
-function Tmainfrm.addFile(f:Tfile; parent:Ttreenode=NIL; skipComment:boolean=FALSE):Tfile;
-var
-  n: TTreeNode;
-begin
-  Result := addFile(f, parent, skipComment, n);
-end;
-
-function Tmainfrm.addFile(f:Tfile; parent: TTreeNode; skipComment: boolean; var newNode: TTreeNode): Tfile;
+{
+function Tmainfrm.addFile(f: Tfile; parent: TFileNode; skipComment: boolean; var newNode: TFileNode): Tfile;
 resourcestring
   MSG_FILE_ADD_ABORT = 'File addition was aborted.'#13'The list of files is incomplete.';
 begin
   newNode := NIL;
   abortBtn.show();
   fileSrv.stopAddingItems := FALSE;
-    try
-      result := fileSrv.addFileRecur(f, parent, newNode);
-     finally
-      abortBtn.hide()
-    end;
+  try
+    result := fileSrv.addFileRecur(f, parent, newNode);
+   finally
+    abortBtn.hide()
+  end;
   if result = NIL then
     exit;
   if fileSrv.stopAddingItems then
@@ -3345,20 +1721,46 @@ begin
   application.bringToFront();
   inputComment(f);
 end; // addFile
+}
+procedure TmainFrm.OnBeforeAddFile(Sender: TObject);
+begin
+  abortBtn.show();
+end;
 
+procedure TmainFrm.OnAfterAddFile(f: Tfile; parentNode, node: TFileNode; skipComment: Boolean; addingStoped: Boolean);
+resourcestring
+  MSG_FILE_ADD_ABORT = 'File addition was aborted.'#13'The list of files is incomplete.';
+begin
+  abortBtn.hide();
+  if f = NIL then
+    exit;
+  if addingStoped then
+    msgDlg(MSG_FILE_ADD_ABORT, MB_ICONWARNING);
+  if assigned(parentNode) then
+    parentNode.expanded := TRUE;
+  SetSelectedFile(f, node);
 
-procedure TmainFrm.filesBoxCollapsing(Sender: TObject; Node: TTreeNode;
+  if skipComment or not autoCommentChk.checked then
+    exit;
+  application.restore();
+  application.bringToFront();
+  inputComment(f);
+end;
+
+procedure TmainFrm.filesBoxCollapsing(Sender: TObject; Node: TFileNode;
   var AllowCollapse: Boolean);
 begin
-AllowCollapse:=node.parent<>NIL;
+  AllowCollapse := node.parent<>NIL;
 end;
 
 procedure TmainFrm.Newlink1Click(Sender: TObject);
 var
   name: string;
+  n: TFileNode;
 begin
-  name := fileSrv.getUniqueNodeName('New link', filesBox.Selected);
-  addfile(Tfile.createLink(filesBox, name), filesBox.Selected).node.Selected:=TRUE;
+  n := filesBox.Selected;
+  name := fileSrv.getUniqueNodeName('New link', n);
+  fileSrv.addFileGUI(Tfile.createLink(fileSrv, name), n, false).node.Selected := TRUE;
   setURL1click(sender);
 end;
 
@@ -3367,102 +1769,92 @@ var
   name: string;
 begin
   name := fileSrv.getUniqueNodeName('New folder', filesBox.selected);
-with addFile(Tfile.createVirtualFolder(filesBox, name), filesBox.Selected).node do
+  with fileSrv.addFileGUI(Tfile.createVirtualFolder(fileSrv, name), filesBox.Selected, False).node do
   begin
-  Selected:=TRUE;
-  editText();
+    Selected:=TRUE;
+    editText();
   end;
 end;
 
-procedure TmainFrm.filesBoxEditing(Sender: TObject; Node: TTreeNode;
+procedure TmainFrm.filesBoxEditing(Sender: TObject; Node: TFileNode;
   var AllowEdit: Boolean);
 begin
-if node = NIL then exit;
-{ disable shortcuts, to be used in editbox. Shortcuts need to be re-activated,
-{ but when the node text is left unchanged, no event is notified, so we got to
-{ use timerEvent to do the work. }
-copyURL1.ShortCut:=0;
-remove1.ShortCut:=0;
-Paste1.ShortCut:=0;
+  if node = NIL then
+    exit;
+  { disable shortcuts, to be used in editbox. Shortcuts need to be re-activated,
+  { but when the node text is left unchanged, no event is notified, so we got to
+  { use timerEvent to do the work. }
+  copyURL1.ShortCut:=0;
+  remove1.ShortCut:=0;
+  Paste1.ShortCut:=0;
 
-allowedit:=allowedit and not nodeToFile(node).isRoot()
+  allowedit := allowedit and not nodeToFile(node).isRoot()
 end;
 
-procedure TmainFrm.filesBoxEdited(Sender:TObject; Node:TTreeNode; var S:String);
+procedure TmainFrm.filesBoxEdited(Sender: TObject; Node: TFileNode; var S: String);
 resourcestring
   MSG_INV_FILENAME = 'Invalid filename';
 var
   f: Tfile;
 begin
-f:=node.data;
-s:=trim(s); // mod by mars
-if f.name = s then exit;
+  f := node.data;
+  s := trim(s); // mod by mars
+  if f.name = s then
+    exit;
 
-if f.isFileOrFolder() and not validFilename(s)
-or (s = '')
-or (pos('/',s) > 0)
-then
-  begin
-  s:=node.text;
-  msgDlg(MSG_INV_FILENAME, MB_ICONERROR);
-  exit;
-  end;
-
-if filesrv.existsNodeWithName(s, node.parent)
-and (msgDlg(MSG_SAME_NAME, MB_ICONWARNING+MB_YESNO) <> IDYES) then
-  begin
-  s:=node.text; // mod by mars
-  exit;
-  end;
-
-f.name:=s;
-VFSmodified:=TRUE;
-updateUrlBox();
-end;
-
-function setNilChildrenFrom(nodes: TtreeNodeDynArray; father: integer): integer;
-var
-  i: integer;
-begin
-result:=0;
-for i:=father+1 to length(nodes)-1 do
-  if nodes[i].Parent = nodes[father] then
+  if f.isFileOrFolder() and not validFilename(s)
+     or (s = '')
+     or (pos('/',s) > 0)
+   then
     begin
-    nodes[i]:=NIL;
-    inc(result);
+      s := nodeText(node);
+      msgDlg(MSG_INV_FILENAME, MB_ICONERROR);
+      exit;
     end;
-end; // setNilChildrenFrom
+
+  if filesrv.existsNodeWithName(s, node.parent)
+     and (msgDlg(MSG_SAME_NAME, MB_ICONWARNING+MB_YESNO) <> IDYES) then
+    begin
+      s := nodeText(node); // mod by mars
+      exit;
+    end;
+
+  f.name := s;
+  VFSmodified := TRUE;
+  updateUrlBox();
+end;
 
 procedure Tmainfrm.remove(f: TFile=NIL);
 begin
   if f = NIL then
-    remove(Ttreenode(NIL))
+    remove(TFileNode(NIL))
    else
     if f.node <> NIL then
       remove(f.node);
 end;
 
-procedure Tmainfrm.remove(node:Ttreenode=NIL);
+procedure Tmainfrm.remove(node: TFileNode=NIL);
 resourcestring
   MSG_DELETE = 'Delete?';
 var
   i: integer;
-  list: TtreenodeDynArray;
+  list: TFileNodeDynArray;
   warn: boolean;
 begin
-if assigned(node) then
-  begin
-  if node.parent = NIL then exit;
-  if nodeIsLocked(node) then
-    begin
-    msgDlg(MSG_ITEM_LOCKED, MB_ICONERROR);
+  if assigned(node) then
+   begin
+    if node.parent = NIL then
+      exit;
+    if fileSrv.nodeIsLocked(node) then
+      begin
+        msgDlg(MSG_ITEM_LOCKED, MB_ICONERROR);
+        exit;
+      end;
+    node.Delete();
     exit;
-    end;
-  node.Delete();
-  exit;
-  end;
+   end;
 
-i:=filesbox.SelectionCount;
+  i := filesBox.SelectionCount;
 if (i = 0) or (i = 1) and selectedFile.isRoot() then exit;
 if not deleteDontAskChk.checked
 and (msgDlg(MSG_DELETE, MB_ICONQUESTION+MB_YESNO) = IDNO) then
@@ -3472,13 +1864,13 @@ list:=copySelection();
 warn:=FALSE;
 for i:=0 to length(list)-1 do
   if assigned(list[i]) and assigned(list[i].parent) then
-    if assigned(list[i].data) and nodeIsLocked(list[i]) then
+    if assigned(list[i].data) and fileSrv.nodeIsLocked(list[i]) then
       warn:=TRUE
     else
       begin
       // avoid messing with children that will automatically be deleted as soon as the father is
-      setNilChildrenFrom(list, i);
-      list[i].Delete();
+        setNilChildrenFrom(list, i);
+        list[i].Delete();
       end;
 
 if warn then
@@ -3488,67 +1880,78 @@ end; // remove
 procedure TmainFrm.Remove1Click(Sender: TObject);
 begin
 // this method is bound to the DEL key also while a renaming is ongoing
-if not filesBox.IsEditing() then remove(Ttreenode(NIL))
+  if not filesBox.IsEditing() then
+    remove(TFileNode(NIL))
 end;
 
 procedure TmainFrm.startBtnClick(Sender: TObject);
-begin toggleServer() end;
+begin toggleServer(fileSrv) end;
 
-function Tmainfrm.pointedConnection():TconnData;
+function Tmainfrm.pointedConnection(point: TPoint): TconnData;
 var
   li: TlistItem;
 begin
-result:=NIL;
-with connbox.screenToClient(mouse.cursorPos) do
-  li:=connbox.getItemAt(x,y);
-if li = NIL then exit;
-result:=conn2data(li);
+  result := NIL;
+  with point do
+    li := connbox.getItemAt(x,y);
+  if li = NIL then
+    exit;
+  result := conn2data(fileSrv, li);
 end; // pointedConnection
 
-function Tmainfrm.pointedFile(strict:boolean=TRUE):Tfile;
+function Tmainfrm.pointedFile(strict: boolean=TRUE): Tfile;
 var
-  n: Ttreenode;
+  n: TFileNode;
   p: Tpoint;
 begin
-result:=NIL;
-p:=filesbox.screenToClient(mouse.cursorPos);
-if strict and not (htOnItem in filesBox.getHitTestInfoAt(p.x,p.y)) then exit;
-n:=filesbox.getNodeAt(p.x,p.y);
-if (n = NIL) or (n.data = NIL) then exit;
-result:=n.data;
+  result := NIL;
+  p := filesBox.screenToClient(mouse.cursorPos);
+  if strict and not (htOnItem in filesBox.getHitTestInfoAt(p.x,p.y)) then
+    exit;
+  n := filesBox.getNodeAt(p.x,p.y);
+  if (n = NIL) or (n.data = NIL) then
+    exit;
+  result := n.data;
 end; // pointedFile
 
 procedure Tmainfrm.updateUrlBox();
 var
   f: Tfile;
 begin
-if quitting then exit;
-if selectedFile = NIL then f:= fileSrv.rootFile
-else f:=selectedFile;
+  if quitting then
+    exit;
+  if selectedFile = NIL then
+    f := fileSrv.rootFile
+   else
+    f := selectedFile;
 
-if f = NIL then urlBox.Text:=''
-else urlBox.text:= fileSrv.fullURL(f)
+  if f = NIL then
+    urlBox.Text := ''
+   else
+    urlBox.text := fileSrv.fullURL(f)
 end; // updateUrlBox
 
-procedure TmainFrm.filesBoxChange(Sender: TObject; Node: TTreeNode);
+procedure TmainFrm.filesBoxChange(Sender: TObject; Node: TFileNode);
 begin
-if filesBox.SelectionCount = 0 then selectedFile:=NIL
-else selectedFile:=filesBox.selections[0].data;
-updateUrlBox()
+  if filesBox.SelectionCount = 0 then
+    selectedFile := NIL
+   else
+    selectedFile := filesBox.selections[0].data;
+  updateUrlBox()
 end;
 
 function Tmainfrm.selectedConnection():TconnData;
 begin
-if connBox.selected = NIL then
-  result:=NIL
-else
-  result:=conn2data(connBox.selected)
+  if connBox.selected = NIL then
+    result:=NIL
+   else
+    result := conn2data(fileSrv, connBox.selected)
 end;
 
 procedure TmainFrm.setLogToolbar(v:boolean);
 begin
-expandedPnl.visible:=v;
-collapsedPnl.visible:=not v;
+  expandedPnl.visible := v;
+  collapsedPnl.visible := not v;
 end; // setLogToolbar
 
 procedure TmainFrm.Kickconnection1Click(Sender: TObject);
@@ -3561,25 +1964,26 @@ cd.disconnect('kicked');
 end;
 
 procedure TmainFrm.Kickallconnections1Click(Sender: TObject);
-begin kickByIP('*') end;
+begin fileSrv.kickByIP('*') end;
 
 procedure TmainFrm.KickIPaddress1Click(Sender: TObject);
 var
   cd: TconnData;
 begin
-cd:=selectedConnection();
-if cd = NIL then exit;
-kickByIP(cd.address);
+  cd:=selectedConnection();
+  if cd = NIL then
+    exit;
+  fileSrv.kickByIP(cd.address);
 end;
 
 procedure setAutosave(var rec:Tautosave; v:integer);
 resourcestring
   AUTOSAVE = 'Auto save every: ';
-  SECONDS = '%d seconds';
+  AS_SECONDS = '%d seconds';
 begin
 rec.every:=v;
 if assigned(rec.menu) then
-  rec.menu.caption:=AUTOSAVE + if_(v=0,DISABLED, format(SECONDS,[v]));
+  rec.menu.caption := AUTOSAVE + if_(v=0,DISABLED, format(AS_SECONDS,[v]));
 end; // setAutosave
 
 procedure updateMenuSpeed(menu: TMenuItem; const lab: String; v: Float32);
@@ -3587,30 +1991,34 @@ begin
   menu.caption := lab + format(MSG_MENU_VAL, [if_(v<0, DISABLED, format(MSG_SPEED_KBS, [v]))]);
 end;
 
-procedure setSpeedLimitIP(v:real);
+procedure setSpeedLimitIP(v: Real);
 resourcestring
   MSG_SPD_LIMIT_SING = 'Speed limit for single address';
 var
   i, vi: integer;
 begin
-speedLimitIP:=v;
-if v < 0 then vi:=MAXINT
-else vi:=round(v*1000);
-for i:=0 to ip2obj.Count-1 do
-  with ip2obj.Objects[i] as TperIp do
-    if not customizedLimiter then
-      limiter.maxSpeed:=vi;
-updateMenuSpeed(mainfrm.Speedlimitforsingleaddress1, MSG_SPD_LIMIT_SING, v);
+  speedLimitIP := v;
+  if v < 0 then
+    vi:=MAXINT
+   else
+    vi:=round(v*1000);
+  for i:=0 to ip2obj.Count-1 do
+    with ip2obj.Objects[i] as TperIp do
+      if not customizedLimiter then
+        limiter.maxSpeed := vi;
+  updateMenuSpeed(mainfrm.Speedlimitforsingleaddress1, MSG_SPD_LIMIT_SING, v);
 end; // setSpeedLimitIP
 
 procedure setSpeedLimit(v:real);
 resourcestring
   MSG_SPD_LIMIT = 'Speed limit';
 begin
-speedLimit:=v;
-if v < 0 then globalLimiter.maxSpeed:=MAXINT
-else globalLimiter.maxSpeed:=round(v*1000);
-updateMenuSpeed(mainfrm.speedLimit1, MSG_SPD_LIMIT, v);
+  speedLimit := v;
+  if v < 0 then
+    globalLimiter.maxSpeed := MAXINT
+   else
+    globalLimiter.maxSpeed := round(v*1000);
+  updateMenuSpeed(mainfrm.speedLimit1, MSG_SPD_LIMIT, v);
 end; // setSpeedLimit
 
 procedure autosaveClick(var rec:Tautosave; name:string);
@@ -3647,7 +2055,7 @@ else s:=intToStr(rec.every);
   until false;
 end; // autosaveClick
 
-function TmainFrm.getCfg(exclude: string=''): string;
+function TmainFrm.getCfg(exclude: String=''; skipTotals: Boolean = false): String;
 type
   Tencoding=(E_PLAIN, E_B64, E_ZIP);
 
@@ -3720,20 +2128,20 @@ type
       +xtpl(banlist[i].comment, ['|','\$pipe'])+'|';
   end;
 
-  function connColumnsToStr():string;
+  function connColumnsToStr(): String;
   var
     i: integer;
   begin
-  result:='';
-  for i:=0 to connBox.columns.count-1 do
-    with connBox.columns.items[i] do
-      result:=result+format('%s;%d|', [caption, width]);
+    result:='';
+    for i:=0 to connBox.columns.count-1 do
+      with connBox.columns.items[i] do
+        result := result+format('%s;%d|', [caption, width]);
   end; // connColumnsToStr
 
 var
-  iconMasksStr, userIconMasks: string;
+  iconMasksStr, userIconMasks: String;
 
-  function iconMasksToStr():string;
+  function iconMasksToStr(): String;
   var
     i, j: integer;
   begin
@@ -3755,15 +2163,14 @@ var
   end; // fontToStr
 
 begin
-userIconMasks:='';
-iconMasksStr:=iconMasksToStr();
-result:='HFS '+ srvConst.VERSION+' - Build #'+VERSION_BUILD+CRLF
-+'active='+yesno[srv.active]+CRLF
+  userIconMasks := '';
+  iconMasksStr := iconMasksToStr();
+  Result := 'HFS '+ srvConst.VERSION+' - Build #'+VERSION_BUILD+CRLF
++'active='+yesno[fileSrv.httpServIsActive]+CRLF
 +'only-1-instance='+yesno[only1instanceChk.checked]+CRLF
 +'window='+rectToStr(lastWindowRect)+CRLF
 +'window-max='+yesno[windowState = wsMaximized]+CRLF
 +'easy='+yesno[easyMode]+CRLF
-+'port='+port+CRLF
 +'files-box-ratio='+floatToStr(filesBoxRatio)+CRLF
 +'log-max-lines='+intToStr(logMaxLines)+CRLF
 +'log-read-only='+yesno[logbox.readonly]+CRLF
@@ -3773,24 +2180,26 @@ result:='HFS '+ srvConst.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'log-date='+yesno[LogdateChk.checked]+CRLF
 +'log-time='+yesno[LogtimeChk.checked]+CRLF
 +'log-to-screen='+yesno[logOnVideoChk.checked]+CRLF
-+'log-only-served='+yesno[logOnlyServedChk.checked]+CRLF
-+'log-server-start='+yesno[logServerstartChk.checked]+CRLF
-+'log-server-stop='+yesno[logServerstopChk.checked]+CRLF
-+'log-connections='+yesno[logConnectionsChk.checked]+CRLF
-+'log-disconnections='+yesno[logDisconnectionsChk.checked]+CRLF
-+'log-bytes-sent='+yesno[logBytessentChk.checked]+CRLF
-+'log-bytes-received='+yesno[logBytesreceivedChk.checked]+CRLF
-+'log-replies='+yesno[logRepliesChk.checked]+CRLF
-+'log-requests='+yesno[logRequestsChk.checked]+CRLF
-+'log-uploads='+yesno[logUploadsChk.checked]+CRLF
-+'log-deletions='+yesno[logDeletionsChk.checked]+CRLF
-+'log-full-downloads='+yesno[logFulldownloadsChk.checked]+CRLF
-+'log-dump-request='+yesno[DumprequestsChk.checked]+CRLF
-+'log-browsing='+yesno[logBrowsingChk.checked]+CRLF
-+'log-icons='+yesno[logIconsChk.checked]+CRLF
-+'log-progress='+yesno[logProgressChk.checked]+CRLF
-+'log-banned='+yesno[logBannedChk.checked]+CRLF
-+'log-others='+yesno[logOtherEventsChk.checked]+CRLF
+//+'log-banned='+yesno[logBannedChk.checked]+CRLF
+//+'log-icons='+yesno[logIconsChk.checked]+CRLF
+//+'log-browsing='+yesno[logBrowsingChk.checked]+CRLF
+//+'log-progress='+yesno[logProgressChk.checked]+CRLF
+//+'log-server-start='+yesno[logServerstartChk.checked]+CRLF
+//+'log-server-stop='+yesno[logServerstopChk.checked]+CRLF
+//+'log-connections='+yesno[logConnectionsChk.checked]+CRLF
+//+'log-disconnections='+yesno[logDisconnectionsChk.checked]+CRLF
+//+'log-uploads='+yesno[logUploadsChk.checked]+CRLF
+//+'log-full-downloads='+yesno[logFulldownloadsChk.checked]+CRLF
+//+'log-deletions='+yesno[logDeletionsChk.checked]+CRLF
+//+'log-others='+yesno[logOtherEventsChk.checked]+CRLF
+//+'log-bytes-received='+yesno[logBytesreceivedChk.checked]+CRLF
+//+'log-bytes-sent='+yesno[logBytessentChk.checked]+CRLF
+//+'log-only-served='+yesno[logOnlyServedChk.checked]+CRLF
+//+'log-requests='+yesno[logRequestsChk.checked]+CRLF
+//+'log-replies='+yesno[logRepliesChk.checked]+CRLF
+//+'log-dump-request='+yesno[DumprequestsChk.checked]+CRLF
+//+'port='+port+CRLF
+//+'listen-on='+listenOn+CRLF
 +'log-file-tabbed='+yesno[tabOnLogFileChk.checked]+CRLF
 +'log-apache-format='+logfile.apacheFormat+CRLF
 +'tpl-file='+tplFilename+CRLF
@@ -3802,7 +2211,6 @@ result:='HFS '+ srvConst.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'include-pwd-in-pages='+yesno[pwdInPagesChk.Checked]+CRLF
 +'ip='+defaultIP+CRLF
 +'custom-ip='+join(';',customIPs)+CRLF
-+'listen-on='+listenOn+CRLF
 +'external-ip-server='+customIPservice+CRLF
 +'dynamic-dns-updater='+b64utf8W(dyndns.url)+CRLF
 +'dynamic-dns-user='+dyndns.user+CRLF
@@ -3899,11 +2307,6 @@ result:='HFS '+ srvConst.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'do-not-log-address='+dontLogAddressMask+CRLF
 +'last-external-address='+dyndns.lastIP+CRLF
 +'min-disk-space='+intToStr(minDiskSpace)+CRLF
-+'out-total='+intToStr(outTotalOfs+srv.bytesSent)+CRLF
-+'in-total='+intToStr(inTotalOfs+srv.bytesReceived)+CRLF
-+'hits-total='+intToStr(hitsLogged)+CRLF
-+'downloads-total='+intToStr(downloadsLogged)+CRLF
-+'upload-total='+intToStr(uploadsLogged)+CRLF
 +'many-items-warning='+yesno[warnManyItems]+CRLF
 +'load-single-comment-files='+yesno[loadSingleCommentsChk.checked]+CRLF
 +'copy-url-on-start='+yesno[autocopyURLonstartChk.checked]+CRLF
@@ -3916,41 +2319,59 @@ result:='HFS '+ srvConst.VERSION+' - Build #'+VERSION_BUILD+CRLF
 +'ip-services='+join(';',IPservices)+CRLF
 +'ip-services-time='+floatToStr(IPservicesTime)+CRLF
 +'update-automatically='+yesno[updateAutomaticallyChk.checked]+CRLF
-+'prevent-standby='+yesno[preventStandbyChk.checked]+CRLF;
++'prevent-standby='+yesno[preventStandbyChk.checked]+CRLF
++'thumbs-get-for='+thumbsShowToExtStr+CRLF
+;
+  if not skipTotals then
+    result := result
+      +'out-total='+intToStr(outTotalOfs+ fileSrv.htSrv.bytesSent)+CRLF
+      +'in-total='+intToStr(inTotalOfs+ fileSrv.htSrv.bytesReceived)+CRLF
+      +'hits-total='+intToStr(hitsLogged)+CRLF
+      +'downloads-total='+intToStr(downloadsLogged)+CRLF
+      +'upload-total='+intToStr(uploadsLogged)+CRLF
+;
 
-if ipsEverConnected.Count < IPS_THRESHOLD then
-  result:=result+'ips-ever-connected='+ipsEverConnected.DelimitedText+CRLF;
+  result := result + fileSrv.prefs.getAllPrefsU;
+  if ipsEverConnected.Count < IPS_THRESHOLD then
+    result := result+'ips-ever-connected='+ipsEverConnected.DelimitedText+CRLF;
 
-if exclude = '' then exit;
-exclude:=stringReplace(exclude,'.','[^=]', [rfReplaceAll]); // optimization: since we are searching for keys, characters can't be "="
-result:=reReplace(result, '^('+exclude+')=.*$', '');
+  if exclude = '' then
+    exit;
+  exclude := stringReplace(exclude,'.','[^=]', [rfReplaceAll]); // optimization: since we are searching for keys, characters can't be "="
+  result := reReplace(result, '^('+exclude+')=.*$', '');
 end; // getCfg
 
 // this is to keep the "hashed" version updated
 var
   lastUcCFG: Tdatetime;
+
 procedure updateCurrentCFG();
 var
   s: string;
 begin
-if mainfrm = NIL then exit;
+  if mainfrm = NIL then
+    exit;
 
-// not faster
-if lastUcCFG+5/SECONDS > now() then exit;
-lastUcCFG:=now();
+  // not faster
+  if lastUcCFG+5/SECONDS > now() then
+    exit;
+  lastUcCFG := now();
 
-s:=mainfrm.getCFG('.*-total'); // these will change often and are of no interest, so we ignore them as an optimization
-if s = currentCFG then exit;
+//  s := mainfrm.getCFG('.*-total'); // these will change often and are of no interest, so we ignore them as an optimization
+  s := mainfrm.getCFG('', True); // these will change often and are of no interest, so we ignore them as an optimization
+  if s = currentCFG then
+    exit;
 
-if (currentCFG>'') // first time, it's not an update, it's an initialization
-and mainfrm.autoSaveOptionsChk.checked then
-  mainfrm.saveCFG();
+  if (currentCFG>'') // first time, it's not an update, it's an initialization
+  and mainfrm.autoSaveOptionsChk.checked then
+    mainfrm.saveCFG();
 
-currentCFG:=s;
-currentCFGhashed.text:=s; // re-parse
+  currentCFG := s;
+  currentCFGhashed.text := s; // re-parse
 end; // updateCurrentCFG
 
-function TmainFrm.setCfg(cfg:string; alreadyStarted:boolean):boolean;
+function TmainFrm.setCfg(const cfg: String; alreadyStarted: Boolean): Boolean;
+
 resourcestring
   MSG_BAN = 'Your ban configuration may have been screwed up.'
     +#13'Please verify it.';
@@ -3959,7 +2380,7 @@ var
   warnings: TStringDynArray;
   userIconOfs: integer;
 
-  function yes(s:string=''):boolean;
+  function yes(const s: String=''): Boolean;
   begin result:= if_(s>'',s,l)='yes' end;
 
   function int():int64;
@@ -3968,12 +2389,12 @@ var
   function real():TdateTime;
   begin try result:=strToFloat(l) except result:=0 end end;
 
-  procedure loadBanlist(s:string);
+  procedure loadBanlist(s: String);
   var
     p: string;
     i: integer;
   begin
-  { old versions wrongly used ; as ban-record separator, while it was already
+  { old versions wrongly used ; as ban-record separator, while it was already }
   { used as address separator }
   if (build < '018') and (pos(';',s) > 0) then
     begin
@@ -4125,220 +2546,530 @@ var
   i: integer;
   h: string;
   activateServer: boolean;
+  lPos: Integer;
 begin
-result:=FALSE;
-if cfg = '' then exit;
+  result := FALSE;
+  if cfg = '' then
+    exit;
+  lPos := 0;
+  // prior to build #230, this header was required
+  if ansiStartsStr('HFS ', cfg) then
+    begin
+//      l := chop(CRLF, cfg);
+      l := chopCRLFV(cfg, lPos);
+      chop(' - Build #', l);
+      build := l;
+    end
+   else
+    build:=VERSION_BUILD;
 
-// prior to build #230, this header was required
-if ansiStartsStr('HFS ', cfg) then
+  warnings := NIL;
+  if alreadyStarted then
+    activateServer := fileSrv.httpServIsActive
+   else
+    activateServer := TRUE;
+
+//  while cfg > '' do
+  while lPos < Length(cfg) do
   begin
-  l:=chop(CRLF,cfg);
-  chop(' - Build #',l);
-  build:=l;
-  end
-else
-  build:=VERSION_BUILD;
-
-warnings:=NIL;
-if alreadyStarted then activateServer:=srv.active
-else activateServer:=TRUE;
-
-while cfg > '' do
-  begin
-  l:=chop(CRLF,cfg);
-  h:=chop('=',l);
-  try
-    if h = 'banned-ips' then h:='ban-list';
-    if h = 'user-mime-types' then h:='mime-types';  // user-mime-types was an experiment made in build #258..260
-    if h = 'save-in-out-totals' then h:='save-totals';
-
-    if h = 'active' then activateServer:=yes;
-    if (h = 'window') and (l <> '0,0,0,0') then
-    	begin
-      lastWindowRect:=strToRect(l);
-      boundsRect:=lastWindowRect;
-      end;
-    if h = 'window-max' then windowstate:=BOOL2WS[yes];
-    if h = 'port' then
-      if srv.active then changePort(l)
-      else port:=l;
-    if h = 'ip' then savedip:=l
-     else
-    if h = 'custom-ip' then customIPs:=split(';',l)
-     else
-    if h = 'listen-on' then listenOn:=l
-     else
-    if h = 'dynamic-dns-updater' then dyndns.url:=decodeB64utf8(l)
-     else
-    if h = 'dynamic-dns-user' then dyndns.user:=l
-     else
-    if h = 'dynamic-dns-host' then dyndns.host:=l
-     else
-    if h = 'login-realm' then loginRealm:=l
-     else
-    if h = 'easy' then setEasyMode(yes)
-     else
-    if h = 'keep-bak-updating' then keepBakUpdatingChk.checked:=yes;
-		if h = 'encode-non-ascii' then encodenonasciiChk.checked:=yes;
-		if h = 'encode-spaces' then encodespacesChk.checked:=yes;
-		if h = 'search-better-ip' then searchbetteripChk.checked:=yes;
-    if h = 'start-minimized' then startMinimizedChk.checked:=yes;
-    if h = 'files-box-ratio' then filesBoxRatio:=real;
-    if h = 'log-max-lines' then logMaxLines:=int;
-    if h = 'log-file-name' then logFile.filename:=l;
-    if h = 'log-font-name' then logFontName:=l;
-    if h = 'log-font-size' then logFontSize:=int;
-    if h = 'log-date' then LogdateChk.checked:=yes;
-    if h = 'log-time' then LogtimeChk.checked:=yes;
-    if h = 'log-read-only' then logbox.readonly:=yes;
-    if h = 'log-browsing' then logBrowsingChk.checked:=yes;
-    if h = 'log-icons' then logIconsChk.checked:=yes;
-    if h = 'log-progress' then logProgressChk.checked:=yes;
-    if h = 'log-banned' then logBannedChk.checked:=yes;
-    if h = 'log-others' then logOtherEventsChk.checked:=yes;
-    if h = 'log-dump-request' then DumprequestsChk.checked:=yes;
-    if h = 'log-server-start' then logServerstartChk.checked:=yes;
-    if h = 'log-server-stop' then logServerstopChk.checked:=yes;
-    if h = 'log-connections' then logConnectionsChk.checked:=yes;
-    if h = 'log-disconnections' then logDisconnectionsChk.checked:=yes;
-    if h = 'log-bytes-sent' then logBytessentChk.checked:=yes;
-    if h = 'log-bytes-received' then logBytesreceivedChk.checked:=yes;
-    if h = 'log-replies' then logRepliesChk.checked:=yes;
-    if h = 'log-requests' then logRequestsChk.checked:=yes;
-    if h = 'log-uploads' then logUploadsChk.checked:=yes;
-    if h = 'log-deletions' then logDeletionsChk.checked:=yes;
-    if h = 'log-full-downloads' then logFulldownloadsChk.checked:=yes;
-    if h = 'log-apache-format' then logfile.apacheFormat:=l;
-    if h = 'log-only-served' then logOnlyServedChk.checked:=yes;
-    if h = 'log-to-screen' then logOnVideoChk.checked:=yes;
-    if h = 'log-file-tabbed' then tabOnLogFileChk.checked:=yes;
-    if h = 'confirm-exit' then confirmexitChk.checked:=yes;
-    if h = 'backup-saving' then backupSavingChk.checked:=yes;
-    if h = 'connections-height' then lastGoodConnHeight:=int;
-    if h = 'files-stay-flagged-for-minutes'then filesStayFlaggedForMinutes:=int;
-    if h = 'folders-before' then foldersbeforeChk.checked:=yes;
-    if h = 'include-pwd-in-pages' then pwdInPagesChk.Checked:=yes;
-    if h = 'minimize-to-tray' then MinimizetotrayChk.checked:=yes;
-    if h = 'prevent-standby' then preventStandbyChk.checked:=yes;
-		if h = 'use-system-icons' then usesystemiconsChk.checked:=yes;
-    if h = 'quit-dont-ask' then quitWithoutAskingToSaveChk.checked:=yes;
-		if h = 'auto-save-options' then autosaveoptionsChk.checked:=yes;
-    if h = 'use-comment-as-realm' then usecommentasrealmChk.checked:=yes;
-    if h = 'persistent-connections'then persistentconnectionsChk.checked:=yes;
-		if h = 'show-main-tray-icon' then showmaintrayiconChk.checked:=yes;
-    if h = 'delete-dont-ask' then deleteDontAskChk.checked:=yes;
-	  if h = 'tray-icon-for-each-download' then trayfordownloadChk.checked:=yes;
-    if h = 'copy-url-on-addition' then AutocopyURLonadditionChk.checked:=yes;
-    if h = 'copy-url-on-start' then autocopyURLonstartChk.checked:=yes;
-    if h = 'enable-macros' then enableMacrosChk.checked:=yes;
-    if h = 'update-daily' then updateDailyChk.checked:=yes;
-    if h = 'tray-instead-of-quit' then trayInsteadOfQuitChk.checked:=yes;
-    if h = 'modal-options' then modalOptionsChk.checked:=yes;
-    if h = 'beep-on-flash' then beepChk.checked:=yes;
-    if h = 'prevent-leeching' then preventLeechingChk.checked:=yes;
-    if h = 'list-hidden-files' then listfileswithhiddenattributeChk.checked:=yes;
-    if h = 'list-system-files' then listfileswithsystemattributeChk.checked:=yes;
-    if h = 'list-protected-items' then hideProtectedItemsChk.checked:=yes;
-    if h = 'always-on-top' then alwaysontopChk.checked:=yes;
-    if h = 'support-descript.ion' then supportDescriptionChk.Checked:=yes;
-    if h = 'oem-descript.ion' then oemForIonChk.checked:=yes;
-    if h = 'oem-tar' then oemTarChk.checked:=yes;
-    if h = 'free-login' then freeLoginChk.checked:=yes;
-    if h = 'https-url' then httpsUrlsChk.checked:=yes;
-    if h = 'enable-fingerprints' then fingerprintsChk.checked:=yes;
-    if h = 'save-fingerprints' then saveNewFingerprintsChk.checked:=yes;
-    if h = 'auto-fingerprint' then setAutoFingerprint(int);
-    if h = 'log-toolbar-expanded' then setLogToolbar(yes);
-    if h = 'last-update-check' then lastUpdateCheck:=real;
-    if h = 'recursive-listing' then recursiveListingChk.checked:=yes;
-    if h = 'enable-no-default' then enableNoDefaultChk.checked:=yes;
-    if h = 'browse-localhost' then browseUsingLocalhostChk.checked:=yes;
-    if h = 'tpl-file' then tplFilename:=l;
-    if h = 'tpl-editor' then tplEditor:=l;
-    if h = 'add-folder-default' then addFolderDefault:=l;
-    if h = 'default-sorting' then defSorting:=l;
-    if h = 'last-dialog-folder' then lastDialogFolder:=l;
-    if h = 'send-hfs-identifier' then sendHFSidentifierChk.checked:=yes;
-		if h = 'auto-save-vfs' then autosaveVFSchk.checked:=yes;
-    if h = 'add-to-folder' then addToFolder:=l;
-    if h = 'getright-template' then DMbrowserTplChk.checked:=yes;
-		if h = 'speed-limit' then setSpeedLimit(real);
-		if h = 'speed-limit-ip' then setSpeedLimitIP(real);
-    if h = 'no-download-timeout' then setNoDownloadTimeout(int);
-    if h = 'connections-timeout' then connectionsInactivityTimeout:=int;
-    if h = 'max-ips' then setMaxIPs(int);
-    if h = 'max-ips-downloading' then setMaxIPsDLing(int);
-    if h = 'max-connections' then setMaxConnections(int);
-    if h = 'max-connections-by-ip' then setMaxConnectionsIP(int);
-    if h = 'max-contemporary-dls' then setMaxDLs(int);
-    if h = 'max-contemporary-dls-ip' then setMaxDLsIP(int);
-		if h = 'tray-message' then trayMsg:=xtpl(unescapeNL(l), [CRLF, trayNL]);
-    if h = 'ban-list' then loadBanlist(l);
-    if h = 'no-reply-ban' then noReplyBan:=yes;
-    if h = 'save-totals' then saveTotalsChk.checked:=yes;
-    if h = 'allowed-referer' then allowedReferer:=l;
-    if h = 'open-in-browser' then openInBrowser:=l;
-		if h = 'last-file-open' then lastFileOpen:=l;
-		if h = 'reload-on-startup' then reloadonstartupChk.checked:=yes;
-    if h = 'stop-spiders' then stopSpidersChk.checked:=yes;
-    if h = 'find-external-on-startup' then findExtOnStartupChk.checked:=yes;
-    if h = 'dont-include-port-in-url' then noPortInUrlChk.checked:=yes;
-    if h = 'tray-shows' then trayshows:=strToTrayShow(l);
-    if h = 'auto-save-vfs-every' then setAutosave(autosaveVFS, int);
-    if h = 'external-ip-server' then customIPservice:=l;
-    if h = 'only-1-instance' then only1instanceChk.checked:=yes;
-		if h = 'graph-rate' then setGraphRate(int);
-		if h = 'graph-size' then graph.size:=int;
-    if h = 'forwarded-mask' then forwardedMask:=ifThen(l='127.0.0.1','::1;127.0.0.1',l)
-     else
-    if h = 'delete-partial-uploads' then deletePartialUploadsChk.checked:=yes;
-    if h = 'rename-partial-uploads' then renamePartialUploads:=l;
-    if h = 'do-not-log-address' then dontLogAddressMask:=l;
-    if h = 'out-total' then outTotalOfs:=int;
-    if h = 'in-total' then inTotalOfs:=int;
-    if h = 'hits-total' then hitsLogged:=int;
-    if h = 'downloads-total' then downloadsLogged:=int;
-    if h = 'upload-total' then uploadsLogged:=int;
-    if h = 'min-disk-space' then minDiskSpace:=int;
-    if h = 'flash-on' then flashOn:=l;
-    if h = 'last-external-address' then dyndns.lastIP:=l;
-    if h = 'recents' then recentFiles:=split(';',l);   // legacy: moved to recent-files because the split-char changed in #111
-    if h = 'recent-files' then recentFiles:=split('|',l);
-    if h = 'trusted-files' then trustedFiles:=split('|',l);
-    if h = 'ips-ever-connected' then ipsEverConnected.DelimitedText:=l;
-    if h = 'mime-types' then mimeTypes:=split('|',l);
-    if h = 'in-browser-if-mime' then inBrowserIfMIME:=yes;
-    if h = 'address2name' then address2name:=split('|',l);
-    if h = 'compressed-browsing' then compressedbrowsingChk.checked:=yes;
-    if h = 'hints4newcomers' then HintsfornewcomersChk.checked:=yes;
-    if h = 'tester-updates' then testerUpdatesChk.checked:=yes;
-    if h = 'number-files-on-upload' then numberFilesOnUploadChk.checked:=yes;
-    if h = 'many-items-warning' then warnManyItems:=yes;
-    if h = 'load-single-comment-files' then loadSingleCommentsChk.checked:=yes;
-    if h = 'accounts' then strToAccounts();
-    if h = 'use-iso-date-format' then useISOdateChk.Checked:=yes;
-    if h = 'auto-comment' then autoCommentChk.checked:=yes;
-    if h = 'icon-masks-user-images' then readUserIconMasks();
-    if h = 'icon-masks' then strToIconmasks();
-    if h = 'connections-columns' then serializedConnColumns:=l;
-    if h = 'ip-services' then IPservices:=split(';', l);
-    if h = 'ip-services-time' then IPservicesTime:=real;
-    if h = 'update-automatically' then updateAutomaticallyChk.checked:=yes;
-    if h = 'delayed-update' then delayUpdateChk.checked:=yes;
-    if h = 'links-before' then linksBeforeChk.checked:=yes;
-    if h = 'account-notes-wrap' then optionsFrm.notesWrapChk.checked:=yes;
-
-		if h = 'graph-visible' then
-      if yes then showGraph()
-      else hideGraph();
-    // extra commands for external use
-    if h = 'load-tpl-from' then setNewTplFile(l);
-  except end;
+//    l := chop(CRLF,cfg);
+    l := chopCRLFV(cfg, lPos);
+    h := chop('=', l);
+    try
+      if h = 'banned-ips' then
+        h:='ban-list'
+       else
+      if h = 'user-mime-types' then
+        h:='mime-types'  // user-mime-types was an experiment made in build #258..260
+       else
+      if h = 'save-in-out-totals' then
+        h:='save-totals'
+       else
+      if h = 'active' then
+        activateServer := yes
+       else
+      if (h = 'window') then
+        begin
+          if (l <> '0,0,0,0') then
+            begin
+              lastWindowRect := strToRect(l);
+              boundsRect := lastWindowRect;
+            end;
+        end
+       else
+      if h = 'window-max' then
+        windowstate:=BOOL2WS[yes]
+       else
+      if h = 'port' then
+        begin
+          if fileSrv.httpServIsActive then
+            fileSrv.changePort(l)
+           else
+            fileSrv.prefs.addPrefStr('port', l);
+        end
+       else
+      if h = 'ip' then
+        savedip := l
+       else
+      if h = 'custom-ip' then
+        customIPs := split(';',l)
+       else
+//      if h = 'listen-on' then
+//        listenOn := l
+//       else
+      if h = 'dynamic-dns-updater' then
+        dyndns.url:=decodeB64utf8(l)
+       else
+      if h = 'dynamic-dns-user' then
+        dyndns.user:=l
+       else
+      if h = 'dynamic-dns-host' then
+        dyndns.host:=l
+       else
+      if h = 'login-realm' then
+        loginRealm:=l
+       else
+      if h = 'easy' then
+        setEasyMode(yes)
+       else
+      if h = 'keep-bak-updating' then
+        keepBakUpdatingChk.checked := yes
+       else
+      if h = 'encode-non-ascii' then
+        encodenonasciiChk.checked := yes
+       else
+      if h = 'encode-spaces' then
+        encodespacesChk.checked := yes
+       else
+      if h = 'search-better-ip' then
+        searchbetteripChk.checked := yes
+       else
+      if h = 'start-minimized' then
+        startMinimizedChk.checked := yes
+       else
+      if h = 'files-box-ratio' then
+        filesBoxRatio := real
+       else
+      if h = 'log-max-lines' then
+        logMaxLines := int
+       else
+      if h = 'log-file-name' then
+        logFile.filename := l
+       else
+      if h = 'log-font-name' then
+        logFontName := l
+       else
+      if h = 'log-font-size' then
+        logFontSize := int
+       else
+      if h = 'log-date' then
+        LogdateChk.checked := yes
+       else
+      if h = 'log-time' then
+        LogtimeChk.checked := yes
+       else
+      if h = 'log-read-only' then
+        logbox.readonly := yes
+       else
+      if (h = 'log-banned') or
+         (h = 'log-icons') or
+         (h = 'log-browsing') or
+         (h = 'log-progress') or
+         (h = 'log-server-start') or
+         (h = 'log-server-stop') or
+         (h = 'log-connections') or
+         (h = 'log-disconnections') or
+         (h = 'log-uploads') or
+         (h = 'log-full-downloads') or
+         (h = 'log-deletions') or
+         (h = 'log-others') or
+         (h = 'log-bytes-received') or
+         (h = 'log-bytes-sent') or
+         (h = 'log-only-served') or
+         (h = 'log-requests') or
+         (h = 'log-replies') or
+         (h = 'log-dump-request') or
+         (h = 'listen-on')
+       then
+        begin
+          fileSrv.prefs.addPrefBlobOld(h, StrToUTF8(l));
+        end
+       else
+      if h = 'log-apache-format' then
+        logfile.apacheFormat := l
+       else
+      if h = 'log-to-screen' then
+        logOnVideoChk.checked := yes
+       else
+      if h = 'log-file-tabbed' then
+        tabOnLogFileChk.checked := yes
+       else
+      if h = 'confirm-exit' then
+        confirmexitChk.checked := yes
+       else
+      if h = 'backup-saving' then
+        backupSavingChk.checked := yes
+       else
+      if h = 'connections-height' then
+        lastGoodConnHeight := int
+       else
+      if h = 'files-stay-flagged-for-minutes'then
+        filesStayFlaggedForMinutes := int
+       else
+      if h = 'folders-before' then
+        foldersbeforeChk.checked := yes
+       else
+      if h = 'include-pwd-in-pages' then
+        pwdInPagesChk.Checked := yes
+       else
+      if h = 'minimize-to-tray' then
+        MinimizetotrayChk.checked := yes
+       else
+      if h = 'prevent-standby' then
+        preventStandbyChk.checked := yes
+       else
+      if h = 'use-system-icons' then
+        usesystemiconsChk.checked := yes
+       else
+      if h = 'quit-dont-ask' then
+        quitWithoutAskingToSaveChk.checked := yes
+       else
+      if h = 'auto-save-options' then
+        autosaveoptionsChk.checked := yes
+       else
+      if h = 'use-comment-as-realm' then
+        usecommentasrealmChk.checked := yes
+       else
+      if h = 'persistent-connections'then
+        persistentconnectionsChk.checked := yes
+       else
+      if h = 'show-main-tray-icon' then
+        showmaintrayiconChk.checked := yes
+       else
+      if h = 'delete-dont-ask' then
+        deleteDontAskChk.checked := yes
+       else
+      if h = 'tray-icon-for-each-download' then
+        trayfordownloadChk.checked := yes
+       else
+      if h = 'copy-url-on-addition' then
+        AutocopyURLonadditionChk.checked := yes
+       else
+      if h = 'copy-url-on-start' then
+        autocopyURLonstartChk.checked := yes
+       else
+      if h = 'enable-macros' then
+        enableMacrosChk.checked := yes
+       else
+      if h = 'update-daily' then
+        updateDailyChk.checked := yes
+       else
+      if h = 'tray-instead-of-quit' then
+        trayInsteadOfQuitChk.checked := yes
+       else
+      if h = 'modal-options' then
+        modalOptionsChk.checked := yes
+       else
+      if h = 'beep-on-flash' then
+        beepChk.checked := yes
+       else
+      if h = 'prevent-leeching' then
+        preventLeechingChk.checked := yes
+       else
+      if h = 'list-hidden-files' then
+        listfileswithhiddenattributeChk.checked := yes
+       else
+      if h = 'list-system-files' then
+        listfileswithsystemattributeChk.checked := yes
+       else
+      if h = 'list-protected-items' then
+        hideProtectedItemsChk.checked := yes
+       else
+      if h = 'always-on-top' then
+        alwaysontopChk.checked := yes
+       else
+      if h = 'support-descript.ion' then
+        supportDescriptionChk.Checked := yes
+       else
+      if h = 'oem-descript.ion' then
+        oemForIonChk.checked := yes
+       else
+      if h = 'oem-tar' then
+        oemTarChk.checked := yes
+       else
+      if h = 'free-login' then
+        freeLoginChk.checked := yes
+       else
+      if h = 'https-url' then
+        httpsUrlsChk.checked := yes
+       else
+      if h = 'enable-fingerprints' then
+        fingerprintsChk.checked := yes
+       else
+      if h = 'save-fingerprints' then
+        saveNewFingerprintsChk.checked := yes
+       else
+      if h = 'auto-fingerprint' then
+        setAutoFingerprint(int)
+       else
+      if h = 'log-toolbar-expanded' then
+        setLogToolbar(yes)
+       else
+      if h = 'last-update-check' then
+        lastUpdateCheck := real
+       else
+      if h = 'recursive-listing' then
+        recursiveListingChk.checked := yes
+       else
+      if h = 'enable-no-default' then
+        enableNoDefaultChk.checked := yes
+       else
+      if h = 'browse-localhost' then
+        browseUsingLocalhostChk.checked := yes
+       else
+      if h = 'tpl-file' then
+        tplFilename := l
+       else
+      if h = 'tpl-editor' then
+        tplEditor := l
+       else
+      if h = 'add-folder-default' then
+        addFolderDefault := l
+       else
+      if h = 'default-sorting' then
+        defSorting := l
+       else
+      if h = 'last-dialog-folder' then
+        lastDialogFolder := l
+       else
+      if h = 'send-hfs-identifier' then
+        sendHFSidentifierChk.checked := yes
+       else
+      if h = 'auto-save-vfs' then
+        autosaveVFSchk.checked := yes
+       else
+      if h = 'add-to-folder' then
+        addToFolder := l
+       else
+      if h = 'getright-template' then
+        DMbrowserTplChk.checked := yes
+       else
+      if h = 'speed-limit' then
+        setSpeedLimit(real)
+       else
+      if h = 'speed-limit-ip' then
+        setSpeedLimitIP(real)
+       else
+      if h = 'no-download-timeout' then
+        setNoDownloadTimeout(int)
+       else
+      if h = 'connections-timeout' then
+        connectionsInactivityTimeout := int
+       else
+      if h = 'max-ips' then
+        setMaxIPs(int)
+       else
+      if h = 'max-ips-downloading' then
+        setMaxIPsDLing(int)
+       else
+      if h = 'max-connections' then
+        setMaxConnections(int)
+       else
+      if h = 'max-connections-by-ip' then
+        setMaxConnectionsIP(int)
+       else
+      if h = 'max-contemporary-dls' then
+        setMaxDLs(int)
+       else
+      if h = 'max-contemporary-dls-ip' then
+        setMaxDLsIP(int)
+       else
+      if h = 'tray-message' then
+        trayMsg := xtpl(unescapeNL(l), [CRLF, trayNL])
+       else
+      if h = 'ban-list' then
+        loadBanlist(l)
+       else
+      if h = 'no-reply-ban' then
+        noReplyBan := yes
+       else
+      if h = 'save-totals' then
+        saveTotalsChk.checked := yes
+       else
+      if h = 'allowed-referer' then
+        allowedReferer := l
+       else
+      if h = 'open-in-browser' then
+        openInBrowser := l
+       else
+      if h = 'last-file-open' then
+        lastFileOpen := l
+       else
+      if h = 'reload-on-startup' then
+        reloadonstartupChk.checked := yes
+       else
+      if h = 'stop-spiders' then
+        stopSpidersChk.checked := yes
+       else
+      if h = 'find-external-on-startup' then
+        findExtOnStartupChk.checked := yes
+       else
+      if h = 'dont-include-port-in-url' then
+        noPortInUrlChk.checked := yes
+       else
+      if h = 'tray-shows' then
+        trayshows := strToTrayShow(l)
+       else
+      if h = 'auto-save-vfs-every' then
+        setAutosave(autosaveVFS, int)
+       else
+      if h = 'external-ip-server' then
+        customIPservice := l
+       else
+      if h = 'only-1-instance' then
+        only1instanceChk.checked := yes
+       else
+      if h = 'graph-rate' then
+        setGraphRate(int)
+       else
+      if h = 'graph-size' then
+        graph.size := int
+       else
+      if h = 'forwarded-mask' then
+        forwardedMask:=ifThen(l='127.0.0.1','::1;127.0.0.1',l)
+       else
+      if h = 'delete-partial-uploads' then
+        deletePartialUploadsChk.checked := yes
+       else
+      if h = 'rename-partial-uploads' then
+        renamePartialUploads := l
+       else
+      if h = 'do-not-log-address' then
+        dontLogAddressMask := l
+       else
+      if h = 'out-total' then
+        outTotalOfs := int
+       else
+      if h = 'in-total' then
+        inTotalOfs := int
+       else
+      if h = 'hits-total' then
+        hitsLogged := int
+       else
+      if h = 'downloads-total' then
+        downloadsLogged := int
+       else
+      if h = 'upload-total' then
+        uploadsLogged := int
+       else
+      if h = 'min-disk-space' then
+        minDiskSpace := int
+       else
+      if h = 'flash-on' then
+        flashOn := l
+       else
+      if h = 'last-external-address' then
+        dyndns.lastIP := l
+       else
+      if h = 'recents' then
+        recentFiles := split(';',l)   // legacy: moved to recent-files because the split-char changed in #111
+       else
+      if h = 'recent-files' then
+        recentFiles := split('|',l)
+       else
+      if h = 'trusted-files' then
+        trustedFiles := split('|',l)
+       else
+      if h = 'ips-ever-connected' then
+        ipsEverConnected.DelimitedText := l
+       else
+      if h = 'mime-types' then
+        mimeTypes := split('|',l)
+       else
+      if h = 'in-browser-if-mime' then
+        inBrowserIfMIME := yes
+       else
+      if h = 'address2name' then
+        address2name := split('|',l)
+       else
+      if h = 'compressed-browsing' then
+        compressedbrowsingChk.checked := yes
+       else
+      if h = 'hints4newcomers' then
+        HintsfornewcomersChk.checked := yes
+       else
+      if h = 'tester-updates' then
+        testerUpdatesChk.checked := yes
+       else
+      if h = 'number-files-on-upload' then
+        numberFilesOnUploadChk.checked := yes
+       else
+      if h = 'many-items-warning' then
+        warnManyItems := yes
+       else
+      if h = 'load-single-comment-files' then
+        loadSingleCommentsChk.checked := yes
+       else
+      if h = 'accounts' then
+        strToAccounts()
+       else
+      if h = 'use-iso-date-format' then
+        useISOdateChk.Checked := yes
+       else
+      if h = 'auto-comment' then
+        autoCommentChk.checked := yes
+       else
+      if h = 'icon-masks-user-images' then
+        readUserIconMasks()
+       else
+      if h = 'icon-masks' then
+        strToIconmasks()
+       else
+      if h = 'connections-columns' then
+        serializedConnColumns := l
+       else
+      if h = 'ip-services' then
+        IPservices := split(';', l)
+       else
+      if h = 'ip-services-time' then
+        IPservicesTime := real
+       else
+      if h = 'update-automatically' then
+        updateAutomaticallyChk.checked := yes
+       else
+      if h = 'delayed-update' then
+        delayUpdateChk.checked := yes
+       else
+      if h = 'links-before' then
+        linksBeforeChk.checked := yes
+       else
+      if h = 'account-notes-wrap' then
+        optionsFrm.notesWrapChk.checked := yes
+       else
+      if h = 'thumbs-get-for' then
+        begin
+          applyThumbsExtStr(l);
+        end
+       else
+      if h = 'graph-visible' then
+        begin
+          if yes then
+            showGraph()
+           else
+            hideGraph();
+        end
+       else
+      // extra commands for external use
+      if h = 'load-tpl-from' then setNewTplFile(l);
+     except
+    end;
   end;
 
-if not alreadyStarted then
+  updateGui;
+
+  if not alreadyStarted then
   // i was already seeing all the stuff, so please don't hide it
-  if (build > '') and (build < '006') then easyMode:=FALSE;
+    if (build > '') and (build < '006') then easyMode:=FALSE;
 
 if not alreadyStarted
 and not saveTotalsChk.checked then
@@ -4355,78 +3086,116 @@ if lastGoodLogWidth > 0 then
 if lastGoodConnHeight > 0 then
   connPnl.Height:=lastGoodConnHeight;
 if not fileExists(tplFilename) then
-  setTplText();
-srv.persistentConnections:=persistentconnectionsChk.Checked;
+  setTplText(fileSrv);
+fileSrv.htSrv.persistentConnections := persistentconnectionsChk.Checked;
 applyFilesBoxRatio();
 updateRecentFilesMenu();
-keepTplUpdated();
+keepTplUpdated(fileSrv);
 updateAlwaysOnTop();
 applyISOdateFormat();
 // the filematch() would be fooled by spaces, so lets trim
 for i:=0 to length(MIMEtypes)-1 do
   MIMEtypes[i]:=trim(MIMEtypes[i]);
 
-addMissingMimeTypes();
-for i:=0 to length(warnings)-1 do
-  msgDlg(warnings[i], MB_ICONWARNING);
-if alreadyStarted then
-  if activateServer <> srv.active then toggleServer()
-  else
-else
-  if activateServer then startServer();
-result:=TRUE;
+  fileSrv.syncSP;
+  fileSrv.syncLP;
+  fileSrv.syncLogP;
 
-updateCurrentCFG();
+  addMissingMimeTypes();
+  for i:=0 to length(warnings)-1 do
+    msgDlg(warnings[i], MB_ICONWARNING);
+  if alreadyStarted then
+    if activateServer <> fileSrv.httpServIsActive then
+      toggleServer(fileSrv)
+    else
+   else
+    if activateServer then
+      fileSrv.startServer();
+  result := TRUE;
+
+  updateCurrentCFG();
 end; // setcfg
 
-function loadCfg(var ini,tpl:string):boolean;
-
-  // until 2.2 the template could be kept in the registry, so we need to move it now.  
-  // returns true if the registry source can be deleted
-  function moveLegacyTpl(tpl:string):boolean;
+procedure TmainFrm.updateGui;
+  procedure getVal(menuItem: TMenuItem);
   begin
-  result:=FALSE;
-  if (tplFilename > '') or (tpl = '') then exit;
-  tplFilename:=cfgPath+TPL_FILE;
-  result := saveFileU(tplFilename, tpl);
+    if menuItem.Hint <> '' then
+      begin
+        menuItem.checked := fileSrv.prefs.getDPrefBool(menuItem.Hint);
+      end;
+  end;
+begin
+  getVal(logBannedChk);
+  getVal(logIconsChk);
+  getVal(logBrowsingChk);
+  getVal(logProgressChk);
+  getVal(logServerstartChk);
+  getVal(logServerstopChk);
+  getVal(logConnectionsChk);
+  getVal(logDisconnectionsChk);
+  getVal(logUploadsChk);
+  getVal(logFulldownloadsChk);
+  getVal(logDeletionsChk);
+  getVal(logOtherEventsChk);
+  getVal(logBytesreceivedChk);
+  getVal(logBytessentChk);
+  getVal(logOnlyServedChk);
+  getVal(logRequestsChk);
+  getVal(logRepliesChk);
+  getVal(DumprequestsChk);
+  getVal(macrosLogChk);
+end;
+
+function loadCfg(var ini, tpl: String): Boolean;
+
+  // until 2.2 the template could be kept in the registry, so we need to move it now.
+  // returns true if the registry source can be deleted
+  function moveLegacyTpl(const tpl: String):boolean;
+  begin
+    result := FALSE;
+    if (tplFilename > '') or (tpl = '') then
+      exit;
+    tplFilename := cfgPath+TPL_FILE;
+    result := saveFileU(tplFilename, tpl);
   end; // moveLegacyTpl
 
 begin
-result:=TRUE;
-ipsEverConnected.text:=UnUTF(loadfile(IPS_FILE));
-ini:=UnUTF(loadFile(cfgPath+CFG_FILE));
-if ini > '' then
-  begin
-  saveMode:=SM_FILE;
-  moveLegacyTpl(UnUTF(loadFile(cfgPath+TPL_FILE)));
-  exit;
-  end;
-ini:=loadregistry(CFG_KEY, '');
-if ini > '' then
-  begin
-  saveMode:=SM_USER;
-  if moveLegacyTpl(loadregistry(CFG_KEY, TPL_FILE)) then
-    deleteRegistry(CFG_KEY, TPL_FILE);
-  exit;
-  end;
-ini:=loadregistry(CFG_KEY, '', HKEY_LOCAL_MACHINE);
-if ini > '' then
-  begin
-  saveMode:=SM_SYSTEM;
-  if moveLegacyTpl(loadregistry(CFG_KEY, TPL_FILE, HKEY_LOCAL_MACHINE)) then
-    deleteRegistry(CFG_KEY, TPL_FILE, HKEY_LOCAL_MACHINE);
-  exit;
-  end;
-result:=FALSE;
+  result := TRUE;
+  ipsEverConnected.text := UnUTF(loadfile(IPS_FILE));
+  ini := UnUTF(loadFile(cfgPath+CFG_FILE));
+  if ini > '' then
+    begin
+      saveMode := SM_FILE;
+      moveLegacyTpl(UnUTF(loadFile(cfgPath+TPL_FILE)));
+      exit;
+    end;
+  ini := loadregistry(CFG_KEY, '');
+  if ini > '' then
+    begin
+      saveMode := SM_USER;
+      if moveLegacyTpl(loadregistry(CFG_KEY, TPL_FILE)) then
+        deleteRegistry(CFG_KEY, TPL_FILE);
+      exit;
+    end;
+  ini := loadregistry(CFG_KEY, '', HKEY_LOCAL_MACHINE);
+  if ini > '' then
+    begin
+      saveMode := SM_SYSTEM;
+      if moveLegacyTpl(loadregistry(CFG_KEY, TPL_FILE, HKEY_LOCAL_MACHINE)) then
+        deleteRegistry(CFG_KEY, TPL_FILE, HKEY_LOCAL_MACHINE);
+      exit;
+    end;
+  result := FALSE;
 end; // loadCfg
 
 procedure TmainFrm.Viewhttprequest1Click(Sender: TObject);
 var
   cd: TconnData;
 begin
-cd:=selectedConnection();
-if cd = NIL then exit;
-msgDlg(UnUTF(first([cd.conn.request.full, cd.conn.getBuffer(), RawByteString('(empty)')])));
+  cd := selectedConnection();
+  if cd = NIL then
+    exit;
+  msgDlg(UnUTF(first([cd.conn.httpRequest.full, cd.conn.getBuffer(), RawByteString('(empty)')])));
 end;
 
 procedure TmainFrm.connmenuPopup(Sender: TObject);
@@ -4436,25 +3205,26 @@ var
   i: integer;
   cd: TconnData;
 begin
-  cd:=selectedConnection();
-  bs:=assigned(cd);
-  ba:=FALSE;
-  for i:=0 to connBox.items.count-1 do
-    if conn2data(i).conn.state <> HCS_DISCONNECTED then
+  cd := selectedConnection();
+  bs := assigned(cd);
+  ba := FALSE;
+  if connBox.items.count > 0 then
+   for i:=0 to connBox.items.count-1 do
+    if not fileSrv.conn2data(i).conn.isDisconnected then
       begin
-      ba:=TRUE;
+      ba := TRUE;
       break;
       end;
-  Viewhttprequest1.enabled:=bs;
-  BanIPaddress1.enabled:=bs;
-  Kickconnection1.Enabled:=bs and (cd.conn.state <> HCS_DISCONNECTED);
-  KickIPaddress1.Enabled:=bs and ba;
-  Kickallconnections1.Enabled:=ba;
-  Kickidleconnections1.Enabled:=ba;
-  pause1.visible:=bs and isDownloading(cd);
-  Pause1.Checked:=bs and cd.conn.paused;
+  Viewhttprequest1.enabled := bs;
+  BanIPaddress1.enabled := bs;
+  Kickconnection1.Enabled := bs and not (cd.conn.isDisconnected);
+  KickIPaddress1.Enabled := bs and ba;
+  Kickallconnections1.Enabled := ba;
+  Kickidleconnections1.Enabled := ba;
+  pause1.visible := bs and cd.isDownloading;
+  Pause1.Checked := bs and cd.conn.paused;
 
-  trayiconforeachdownload1.visible:=trayfordownloadChk.Checked and fromTray;
+  trayiconforeachdownload1.visible := trayfordownloadChk.Checked and fromTray;
   AddIPasreverseproxy1.Visible := bs and (cd.conn.getHeader('x-forwarded-for') > '');
 end;
 
@@ -4462,36 +3232,37 @@ function expandAccountByLink(a: Paccount; noGroups: boolean=TRUE): TstringDynArr
 var
   i: integer;
 begin
-result:=NIL;
-if a = NIL then exit;
+  result := NIL;
+  if a = NIL then
+    exit;
 
-if not (a.group and noGroups) then
-  addString(a.user, result);
-if length(accounts)>0 then
-for i:=0 to length(accounts)-1 do
-  if not stringExists(accounts[i].user, result)
-  and stringExists(a.user, accounts[i].link) then
-    addArray(result, expandAccountByLink(@accounts[i]));
-uniqueStrings(result);
+  if not (a.group and noGroups) then
+    addString(a.user, result);
+  if length(accounts)>0 then
+  for i:=0 to length(accounts)-1 do
+    if not stringExists(accounts[i].user, result)
+    and stringExists(a.user, accounts[i].link) then
+      addArray(result, expandAccountByLink(@accounts[i]));
+  uniqueStrings(result);
 end; // expandAccountByLink
 
-function expandAccountsByLink(users:TStringDynArray; noGroups:boolean=TRUE):TstringDynArray;
+function expandAccountsByLink(users: TStringDynArray; noGroups:boolean=TRUE): TstringDynArray;
 var
   i: integer;
 begin
-result:=NIL;
-for i:=0 to length(users)-1 do
-  addArray(result, expandAccountByLink(getAccount(users[i], TRUE)));
-uniqueStrings(result);
+  result := NIL;
+  for i:=0 to length(users)-1 do
+    addArray(result, expandAccountByLink(getAccount(users[i], TRUE)));
+  uniqueStrings(result);
 end; // expandAccountsByLink
 
-procedure makeOwnerDrawnMenu(mi:Tmenuitem; included:boolean=FALSE);
+procedure makeOwnerDrawnMenu(mi: Tmenuitem; included: Boolean=FALSE);
 var
   i: integer;
 begin
   if included then
     begin
-    mi.onDrawItem:=mainfrm.menuDraw;
+    mi.onDrawItem := mainfrm.menuDraw;
     mi.OnMeasureItem:=mainfrm.menuMeasure;
     end;
   for i:=0 to mi.count-1 do
@@ -4509,27 +3280,27 @@ var
   f: Tfile;
   a: TStringDynArray;
 
-  function onlySatisfied(only:integer):boolean;
+  function onlySatisfied(only: Integer): Boolean;
   begin
   result:=(only=ONLY_ANY)
     or (only=ONLY_EASY) and easyMode
     or (only=ONLY_EXPERT) and not easyMode
   end; // onlySatisfied
 
-  procedure visibleAs(mi:Tmenuitem; other:Tmenuitem; only:integer=ONLY_ANY);
+  procedure visibleAs(mi: Tmenuitem; other: Tmenuitem; only: Integer=ONLY_ANY);
   begin mi.visible:=other.visible and onlySatisfied(only) end;
 
-  procedure visibleIf(mi:Tmenuitem; should:boolean; only:integer=ONLY_ANY);
+  procedure visibleIf(mi: Tmenuitem; should: Boolean; only: Integer=ONLY_ANY);
   begin if should then
     mi.visible:=TRUE and onlySatisfied(only) end;
 
-  procedure checkedIf(mi:Tmenuitem; should:boolean);
+  procedure checkedIf(mi: Tmenuitem; should: Boolean);
   begin if should then mi.checked:=TRUE end;
 
-  procedure enabledIf(mi:Tmenuitem; should:boolean);
+  procedure enabledIf(mi: Tmenuitem; should: Boolean);
   begin if should then mi.enabled:=TRUE end;
 
-  procedure setDefaultValues(mi:TmenuItem);
+  procedure setDefaultValues(mi: TmenuItem);
   var
     i: integer;
   begin
@@ -4541,36 +3312,36 @@ var
     end;
   end; // setDefaultValues
 
-  function itemsVisible(mi:TmenuItem):integer;
+  function itemsVisible(mi: TmenuItem): integer;
   var
     i: integer;
   begin
-  result:=0;
-  for i:=0 to mi.count-1 do
-    if mi.Items[i].visible then
-      inc(result);
+    result := 0;
+    for i:=0 to mi.count-1 do
+      if mi.Items[i].visible then
+        inc(result);
   end; // itemsVisible
 
 begin
 // default values
-setDefaultValues(filemenu.items);
-Addfiles1.visible:=TRUE;
-Addfolder1.visible:=TRUE;
-Properties1.visible:=TRUE;
+  setDefaultValues(filemenu.items);
+  Addfiles1.visible:=TRUE;
+  Addfolder1.visible:=TRUE;
+  Properties1.visible:=TRUE;
 
-anyFileSelected:=selectedFile<>NIL;
-newfolder1.visible:=not anyFileSelected
-  or ((filesBox.SelectionCount=1) and selectedFile.isFolder());
-Setuserpass1.visible:=anyFileSelected;
-CopyURL1.visible:=anyFileSelected;
+  anyFileSelected := selectedFile<>NIL;
+  newfolder1.visible := not anyFileSelected
+    or ((filesBox.SelectionCount=1) and selectedFile.isFolder());
+  Setuserpass1.visible:=anyFileSelected;
+  CopyURL1.visible:=anyFileSelected;
 
-visibleIf(Bindroottorealfolder1, (filesBox.SelectionCount=1) and selectedFile.isRoot() and selectedFile.isVirtualFolder(), ONLY_EXPERT);
-visibleIf(Unbindroot1, (filesBox.SelectionCount=1) and selectedFile.isRoot() and selectedFile.isRealFolder(), ONLY_EXPERT);
+  visibleIf(Bindroottorealfolder1, (filesBox.SelectionCount=1) and selectedFile.isRoot() and selectedFile.isVirtualFolder(), ONLY_EXPERT);
+  visibleIf(Unbindroot1, (filesBox.SelectionCount=1) and selectedFile.isRoot() and selectedFile.isRealFolder(), ONLY_EXPERT);
 
   if filesBox.SelectionCount > 0 then
    for var i:=0 to filesBox.SelectionCount-1 do
      begin
-      f:=filesBox.selections[i].data;
+      f := filesBox.selections[i].data;
       visibleIf(setURL1, FA_LINK in f.flags);
       visibleIf(Remove1, not f.isRoot());
       visibleIf(Flagasnew1, not f.isNew() and (filesStayFlaggedForMinutes>0));
@@ -4580,37 +3351,38 @@ visibleIf(Unbindroot1, (filesBox.SelectionCount=1) and selectedFile.isRoot() and
       visibleIf(Resetuserpass1, f.user>'');
       visibleIf(CopyURLwithfingerprint1, f.isFile(), ONLY_EXPERT);
      end;
-visibleAs(newlink1, newfolder1, ONLY_EXPERT);
-visibleIf(purge1, anyFileSelected, ONLY_EXPERT);
+  visibleAs(newlink1, newfolder1, ONLY_EXPERT);
+  visibleIf(purge1, anyFileSelected, ONLY_EXPERT);
 
-if filesBox.SelectionCount = 1 then
+  if filesBox.SelectionCount = 1 then
   begin
-  f:=selectedFile;
-  visibleIf(Defaultpointtoaddfiles1, f.isFolder(), ONLY_EXPERT);
-  visibleIf(Editresource1, not (FA_VIRTUAL in f.flags), ONLY_EXPERT);
-  visibleAs(rename1, remove1);
-  visibleIf(openit1, not f.isVirtualFolder());
-  visibleIf(browseIt1, TRUE, ONLY_EXPERT);
-  paste1.visible:=clipboard.HasFormat(CF_HDROP);
+    f := selectedFile;
+    visibleIf(Defaultpointtoaddfiles1, f.isFolder(), ONLY_EXPERT);
+    visibleIf(Editresource1, not (FA_VIRTUAL in f.flags), ONLY_EXPERT);
+    visibleAs(rename1, remove1);
+    visibleIf(openit1, not f.isVirtualFolder());
+    visibleIf(browseIt1, TRUE, ONLY_EXPERT);
+    paste1.visible := clipboard.HasFormat(CF_HDROP);
 
-  a:=NIL;
-  if anyFileSelected then
-    a:=expandAccountsByLink(selectedFile.getAccountsFor(FA_ACCESS, TRUE))
-      +expandAccountsByLink(selectedFile.getAccountsFor(FA_UPLOAD, TRUE))
-      +expandAccountsByLink(selectedFile.getAccountsFor(FA_DELETE, TRUE));
-  visibleIf(CopyURLwithpassword1, assigned(a), ONLY_EXPERT);
-  copyURLwithpassword1.Clear();
-  uniqueStrings(a, FALSE);
-  for var s in a do
-    copyURLwithpassword1.add( newItem( s, 0, FALSE, TRUE, copyURLwithPasswordMenuClick, 0, '') );
+    a:=NIL;
+    if anyFileSelected then
+      a := expandAccountsByLink(selectedFile.getAccountsFor(FA_ACCESS, TRUE))
+        +expandAccountsByLink(selectedFile.getAccountsFor(FA_UPLOAD, TRUE))
+        +expandAccountsByLink(selectedFile.getAccountsFor(FA_DELETE, TRUE));
+    visibleIf(CopyURLwithpassword1, assigned(a), ONLY_EXPERT);
+    copyURLwithpassword1.Clear();
+    uniqueStrings(a, FALSE);
+    for var s in a do
+      copyURLwithpassword1.add( newItem( s, 0, FALSE, TRUE, copyURLwithPasswordMenuClick, 0, '') );
   end;
 
-a:=getPossibleAddresses();
-if length(a) = 1 then a:=NIL;
-visibleIf(CopyURLwithdifferentaddress1, anyFileSelected and assigned(a), ONLY_EXPERT);
-copyURLwithdifferentaddress1.clear();
-for var s in a do
-  copyURLwithdifferentaddress1.add( newItem( s, 0, FALSE, TRUE, copyURLwithAddressMenuclick, 0, '') );
+  a := getPossibleAddresses();
+  if length(a) = 1 then
+    a:=NIL;
+  visibleIf(CopyURLwithdifferentaddress1, anyFileSelected and assigned(a), ONLY_EXPERT);
+  copyURLwithdifferentaddress1.clear();
+  for var s in a do
+    copyURLwithdifferentaddress1.add( newItem( s, 0, FALSE, TRUE, copyURLwithAddressMenuclick, 0, '') );
 
 end;
 
@@ -4631,12 +3403,13 @@ function Tmainfrm.saveCFG():boolean;
 var
   cfg: string;
 begin
-result:=FALSE;
-if srv = NIL then exit;
+  result := FALSE;
+  if not Assigned(fileSrv) or (fileSrv.htSrv = NIL) then
+    exit;
 if quitting and (backuppedCfg > '') then
-  cfg:=backuppedCfg
+  cfg := backuppedCfg
 else
-  cfg:=getCfg();
+  cfg := getCfg();
 case saveMode of
 	SM_FILE:
   	begin
@@ -4676,82 +3449,120 @@ end; // saveCFG
 // this method is called by all "save options" ways
 procedure TmainFrm.tofile1Click(Sender: TObject);
 begin
-if sender = tofile1 then saveMode:=SM_FILE
-else if sender = toregistrycurrentuser1 then saveMode:=SM_USER
-else if sender = toregistryallusers1 then saveMode:=SM_SYSTEM
-else exit;
+  if sender = tofile1 then
+    saveMode:=SM_FILE
+   else if sender = toregistrycurrentuser1 then
+    saveMode:=SM_USER
+   else if sender = toregistryallusers1 then
+    saveMode:=SM_SYSTEM
+   else
+    exit;
 
-if saveCFG() then
-  msgDlg(MSG_OPTIONS_SAVED);
+  if saveCFG() then
+    msgDlg(MSG_OPTIONS_SAVED);
 end;
 
 procedure TmainFrm.About1Click(Sender: TObject);
 const
   copyright = 'HFS version %s'
   +#13'Copyright (C) 2002-2020  Massimo Melina (www.rejetto.com)'
+  +#13'Copyright (C) 2020-2025  Rapid D'
   +#13#13'HFS comes with ABSOLUTELY NO WARRANTY under the license GNU GPL 3.0. For details click Menu -> Web links -> License'
   +#13'This is FREE software, and you are welcome to redistribute it under certain conditions.'
   +#13#13'Build #%s';
-begin msgDlg(format(copyright, [srvConst.VERSION,VERSION_BUILD + ' ' + DateTimeToStr(BuiltTime)])) end;
+var
+  libs: String;
+begin
+  libs := getLibs;
+  msgDlg(format(copyright, [srvConst.VERSION,VERSION_BUILD + ' ' + DateTimeToStr(BuiltTime)]) + crlf  + libs)
+end;
 
 procedure Tmainfrm.purgeConnections();
 var
   i: integer;
   data: TconnData;
 begin
-i:=0;
+  i := toDelete.Count - 1;
   if toDelete.Count > 0 then
-while i < toDelete.Count do
-  begin
-  data:=toDelete[i];
-  inc(i);
-  if data = NIL then continue;
-  if assigned(data.conn) and data.conn.dontFree then continue;
-  toDelete[i-1]:=NIL;
-  setupDownloadIcon(data);
-  data.lastFile:=NIL; // auto-freeing
-
-  if assigned(data.limiter) then
+   while i >= 0 do
     begin
-    srv.limiters.remove(data.limiter);
-    freeAndNIL(data.limiter);
+      data := toDelete[i];
+      dec(i);
+      if data = NIL then
+        continue;
+      if assigned(data.conn) and data.conn.dontFree then
+        continue;
+      toDelete[i+1] := NIL;
+      setupDownloadIcon(data);
+
+      data.lastFile := NIL; // auto-freeing
+
+      if assigned(data.limiter) then
+        begin
+        fileSrv.htSrv.limiters.remove(data.limiter);
+        freeAndNIL(data.limiter);
+        end;
+      freeAndNIL(data.conn);
+      try freeAndNIL(data) except end;
     end;
-  freeAndNIL(data.conn);
-  try freeAndNIL(data) except end;
-  end;
-toDelete.clear();
+  toDelete.clear();
 end; // purgeConnections
 
 function Tmainfrm.recalculateGraph(): Boolean;
 begin
   Result := False;
-  if (srv = NIL) or quitting then
+  if (fileSrv.htSrv = NIL) or quitting then
     exit;
-  Result := srvUtils.recalculateGraph(srv);
+  Result := srvUtils.recalculateGraph(fileSrv.htSrv);
 end; // recalculateGraph
+
+procedure Tmainfrm.onServerStatusChanged(open: Boolean);
+begin
+  if Open then
+    begin
+      startBtn.Hide();
+      updateUrlBox();
+      // this happens when the server is switched on programmatically
+      if Assigned(fileSrv) then
+         begin
+          usingFreePort := fileSrv.prefs.getDPrefStr('port')='';
+          updatePortBtn(fileSrv);
+        end
+       else
+        usingFreePort := true;
+    end
+   else
+    begin
+      startBtn.show();
+      if Assigned(fileSrv) then
+        updatePortBtn(fileSrv);
+      updateUrlBox();
+    end;
+end;
 
 // parse the version-dependant notice
 procedure parseVersionNotice(s: String);
 var
   l, msg: string;
 begin
-while s > '' do
-  begin
-  l:=trim(chopLine(s));
-  // the line has to start with a @ followed by involved versions
-  if (length(l) < 2) or (l[1] <> '@') then continue;
-  delete(l,1,1);
-  // collect the message (until next @-starting line)
-  msg:='';
-  while (s > '') and (s[1] <> '@') do
-    msg:=msg+chopLine(s)+#13;
-  // before 2.0 beta14 a bare semicolon-separated string comparison was used
-  if filematch(l, srvConst.VERSION) or filematch(l, '#'+VERSION_BUILD) then
-    msgDlg(msg, MB_ICONWARNING);
-  end;
+  while s > '' do
+    begin
+      l:=trim(chopLine(s));
+      // the line has to start with a @ followed by involved versions
+      if (length(l) < 2) or (l[1] <> '@') then
+        continue;
+      delete(l,1,1);
+      // collect the message (until next @-starting line)
+      msg := '';
+      while (s > '') and (s[1] <> '@') do
+        msg := msg+chopLine(s)+#13;
+      // before 2.0 beta14 a bare semicolon-separated string comparison was used
+      if filematch(l, srvConst.VERSION) or filematch(l, '#'+VERSION_BUILD) then
+        msgDlg(msg, MB_ICONWARNING);
+    end;
 end; // parseVersionNotice
 
-function doTheUpdate(url:string):boolean;
+function doTheUpdate(const url: String): Boolean;
 resourcestring
   MSG_UPD_SAVE_ERROR = 'Cannot save the update';
   MSG_UPD_REQ_ONLY1 = 'The auto-update feature cannot work because it requires the "Only 1 instance" option enabled.'
@@ -4780,10 +3591,10 @@ if not mono.working then
   exit;
   end;
 if mainfrm.delayUpdateChk.checked
-and (srv.conns.count > 0) then
+and (mainfrm.fileSrv.getConnectionsCount > 0) then
   begin
   updateASAP:=url;
-  stopServer();
+  stopServer(mainfrm.fileSrv.htSrv);
   mainfrm.kickidleconnections1Click(NIL);
   mainfrm.setStatusBarText(MSG_UPD_WAIT, 20);
   exit;
@@ -4799,7 +3610,7 @@ try
   // a previous failed update attempt? avoid re-downloading if not necessary
   if (size <= 0) or (httpFileSize(url) <> size) then
     try
-      if not UtilLib.httpGetFileWithCheck(url, fn, 2, mainfrm.progFrmHttpGetUpdate) then
+      if not UtilLib.httpGetFileWithCheck(url, fn, 2, mainfrm.progFrmHttpProgress) then
         begin
         if not lockTimerevent then
           msgDlg(MSG_COMM_ERROR, MB_ICONERROR);
@@ -4847,37 +3658,37 @@ end; // promptForUpdating
 function downloadUpdateInfo():Ttpl;
 resourcestring
   MSG_REQUESTING = 'Requesting...';
-const
-  URL = 'https://www.rejetto.com/hfs/hfs.updateinfo.txt';
-  ON_DISK = 'hfs.updateinfo.txt';
 resourcestring
   MSG_FROMDISK = 'Update info has been read from local file.'
     +#13'To resume normal operation of the updater, delete the file '
-      +ON_DISK+' from the HFS program folder.';
+      +UPDATE_ON_DISK+' from the HFS program folder.';
 var
   s: RawByteString;
 begin
-lastUpdateCheck:=now();
-saveFileA(lastUpdateCheckFN, '');
-fileSetAttr(lastUpdateCheckFN, faHidden);
+  lastUpdateCheck := now();
+  saveFileA(lastUpdateCheckFN, '');
+  fileSetAttr(lastUpdateCheckFN, faHidden);
 
-result:=NIL;
-progFrm.show(MSG_REQUESTING);
-try
-  // this let the developer to test the parsing locally
-  if not fileExists(ON_DISK) then
-    try
-      s := httpGet(URL)
-     except
-    end
-  else
-    begin
-    s := loadFile(ON_DISK);
-    msgDlg(MSG_FROMDISK, MB_ICONWARNING);
-    end;
-finally progFrm.hide() end;
-if pos(RawByteString('[EOF]'), s) = 0 then exit;
-result:=Ttpl.create(s);
+  result := NIL;
+  progFrm.show(MSG_REQUESTING);
+  try
+    // this let the developer to test the parsing locally
+    if not fileExists(UPDATE_ON_DISK) then
+      try
+        s := httpGet(UPDATE_URL)
+       except
+      end
+    else
+      begin
+        s := loadFile(UPDATE_ON_DISK);
+        msgDlg(MSG_FROMDISK, MB_ICONWARNING);
+      end;
+   finally
+    progFrm.hide()
+  end;
+  if pos(RawByteString('[EOF]'), s) = 0 then
+    exit;
+  result := Ttpl.create(s);
 end; // downloadUpdateInfo
 
 procedure Tmainfrm.autoCheckUpdates();
@@ -4939,22 +3750,22 @@ end; // autoCheckUpdates
 
 procedure loadEvents();
 begin
-if not newMtime(cfgpath+EVENTSCRIPTS_FILE, eventScriptsLast) then
-  exit;
-eventScripts.fullText:=loadFile(cfgpath+EVENTSCRIPTS_FILE);
-runEventScript(mainFrm.fileSrv, 'init');
+  if not newMtime(cfgpath+EVENTSCRIPTS_FILE, eventScriptsLast) then
+    exit;
+  eventScripts.fullText:=loadFile(cfgpath+EVENTSCRIPTS_FILE);
+  runEventScript(mainFrm.fileSrv, 'init');
 end;
 
 procedure Tmainfrm.updateCopyBtn();
 resourcestring
-  TO_CLIP = 'Copy to clipboard';
-  ALREADY_CLIP = 'Already in clipboard';
+  MSG_TO_CLIP = 'Copy to clipboard';
+  MSG_ALREADY_CLIP = 'Already in clipboard';
 var
   s: string;
 begin
 s:=copyBtn.caption;
 try
-  copyBtn.Caption:=if_(clipboard.asText = urlBox.text, ALREADY_CLIP, TO_CLIP);
+  copyBtn.Caption:=if_(clipboard.asText = urlBox.text, MSG_ALREADY_CLIP, MSG_TO_CLIP);
   if copyBtn.caption <> s then FormResize(NIL);
 except end;
 end; // updateCopyBtn
@@ -4988,17 +3799,18 @@ var
 
   procedure every10minutes();
   begin
-  if dyndns.url > '' then
-    getExternalAddress(externalIP);
+    if dyndns.url > '' then
+      utilLib.getExternalAddress(externalIP, NIL, logOtherEventsChk.checked);
   end; // every10minutes
 
   procedure everyMinute();
   begin
     sessions.checkExpired;
-  if updateDailyChk.Checked then
-    autoCheckUpdates();
+    if updateDailyChk.Checked then
+      autoCheckUpdates();
   // purge icons older than 5 minutes, because sometimes icons change
-  iconsCache.purge(now_-(5*60)/SECONDS);
+    iconsCache.purge(now_-(5*60)/SECONDS);
+    updateCurrentCFG();
   end; // everyMinute
 
   procedure every10sec();
@@ -5011,24 +3823,24 @@ var
     s := join(';', sa);
     if (cachedIPs = s) and (defaultIP> '') and stringExists(defaultIP, sa) then
       Exit;
-  if not stringExists(defaultIP, sa) then
+    if not stringExists(defaultIP, sa) then
     // previous address not available anymore (it happens using dial-up)
-    findSimilarIP(defaultIP);
+      findSimilarIP(defaultIP);
     
-  if searchbetteripChk.checked
-  and not stringExists(defaultIP, customIPs) // we don't mess with custom IPs
-  and isLocalIP(defaultIP) then // we prefer non-local addresses
-    begin
-    s:=getIP();
-    if not isLocalIP(s) then // clearly better
-      setDefaultIP(s)
-    else if ansiStartsStr('169.', defaultIP) then // we consider the 169 worst of other locals
+    if searchbetteripChk.checked
+    and not stringExists(defaultIP, customIPs) // we don't mess with custom IPs
+    and isLocalIP(defaultIP) then // we prefer non-local addresses
       begin
-      ss:=getAcceptOptions();
-      if length(ss) > 1 then
-        setDefaultIP(ss[ if_(ss[0]=defaultIP, 1, 0) ]);
-      end;;
-    end;
+        s := getIP();
+        if not isLocalIP(s) then // clearly better
+          setDefaultIP(s)
+        else if ansiStartsStr('169.', defaultIP) then // we consider the 169 worst of other locals
+          begin
+            ss:=getAcceptOptions();
+            if length(ss) > 1 then
+              setDefaultIP(ss[ if_(ss[0]=defaultIP, 1, 0) ]);
+          end;;
+      end;
 
   end; // every10sec
 
@@ -5036,6 +3848,19 @@ var
   var
     i, outside, size: integer;
     data: TconnData;
+   {$IFDEF FPC}
+    fpFN: String;
+    th : IEZThread;//interface type
+    procedure calcFingerprint(Const AThread:IEZThread);
+    var
+      s: String;
+    begin
+      s := createFingerprint(fpFN, False);
+      if s > '' then
+        saveFileU(fpFN+'.md5', s);
+    end;
+   {$ENDIF FPC}
+
   begin
     // this is a already done in utilLib initialization, but it's a workaround to http://www.rejetto.com/forum/?topic=7724
       FormatSettings.decimalSeparator:='.';
@@ -5054,7 +3879,7 @@ var
     if dyndns.active and (dyndns.url > '') then
       begin
       if externalIP = '' then
-        getExternalAddress(externalIP);
+        utilLib.getExternalAddress(externalIP, NIL, logOtherEventsChk.checked);
       if not isLocalIP(externalIP) and (externalIP <> dyndns.lastIP)
       or (now()-dyndns.lastTime > 24) then
         updateDynDNS();
@@ -5070,7 +3895,7 @@ var
 
     if warnManyItems and (filesBox.items.count > MANY_ITEMS_THRESHOLD) then
       begin
-      warnManyItems:=FALSE;
+      warnManyItems := FALSE;
       msgDlg(MSG_MANY_ITEMS, MB_ICONWARNING);
       end;
 
@@ -5082,33 +3907,34 @@ var
         saveVFS(lastFileOpen);
         end;
 
-    if assigned(srv) and assigned(srv.conns) then
-      for i:=0 to srv.conns.count-1 do
-        begin
-        data:=conn2data(i);
+    if assigned(fileSrv.htSrv) and assigned(fileSrv.htSrv.conns)
+       and (fileSrv.getConnectionsCount > 0) then
+      for i:=0 to fileSrv.getConnectionsCount-1 do
+       begin
+        data := fileSrv.conn2data(i);
         if data = NIL then
           continue;
 
-        if isReceivingFile(data) then
+        if data.isReceivingFile then
           begin
           refreshConn(data); // even if no data is coming, we must update other stats
           calculateETA(data, data.conn.speedIn, data.conn.bytesToPost);
           end;
-        if isSendingFile(data) then
+        if data.isSendingFile then
           begin
           refreshConn(data);
           calculateETA(data, data.conn.speedOut, data.conn.bytesToSend);
 
           if userIcsBuffer > 0 then
-            data.conn.sock.bufSize:=userIcsBuffer;
+            data.conn.icsBufSize := userIcsBuffer;
 
           if userSocketBuffer > 0 then
-            data.conn.sndBuf:=userSocketBuffer
+            data.conn.sndBuf := userSocketBuffer
           else if highSpeedChk.checked then
             begin
             size:=minmax(8192, MEGA, round(data.averageSpeed));
             if safeDiv(0.0+size, data.conn.sndbuf, 2) > 2 then
-              data.conn.sndBuf:=size;
+              data.conn.sndBuf := size;
             end;
           end;
 
@@ -5116,7 +3942,7 @@ var
         if (connectionsInactivityTimeout > 0)
         and ((now_-data.lastActivityTime)*SECONDS >= connectionsInactivityTimeout) then
           data.disconnect('inactivity');
-        end;
+       end;
 
     // server inactivity timeout
     if noDownloadTimeout > 0 then
@@ -5127,12 +3953,11 @@ var
       lastWindowRect:=mainfrm.boundsRect;
 
     // update can be put off until there's no one connected
-    if (updateASAP > '') and (srv.conns.count = 0) then
+    if (updateASAP > '') and (fileSrv.getConnectionsCount = 0) then
       doTheUpdate(clearAndReturn(updateASAP)); // before we call the function, lets clear the request
 
     updateCopyBtn();
-    keepTplUpdated();
-    updateCurrentCFG();
+    keepTplUpdated(fileSrv);
     loadEvents();
 
     if assigned(runScriptFrm) and runScriptFrm.visible
@@ -5143,6 +3968,10 @@ var
       begin
         var fpFN: String := toAddFingerPrint[0];
         toAddFingerPrint.Delete(0);
+       {$IFDEF FPC}
+        th := NewEZThread;
+        th.Setup(@calcFingerprint).Start;
+       {$ELSE ~FPC}
         TTask.Create(procedure
         var
           s: String;
@@ -5151,6 +3980,7 @@ var
           if s > '' then
             saveFileU(fpFN+'.md5', s);
         end).Start;
+       {$ENDIF FPC}
 
       end;
 
@@ -5161,7 +3991,7 @@ var
   procedure everyTenth();
   var
     f: Tfile;
-    n: Ttreenode;
+    n: TFileNode;
   begin
   purgeConnections();
 
@@ -5182,7 +4012,7 @@ var
 
   if assigned(filesToAddQ) then
     begin
-    f := fileSrv.findFilebyURL(addToFolder, getLP);
+    f := fileSrv.findFilebyURL(addToFolder);
     if f = NIL then
       f:=selectedFile;
     if f = NIL then
@@ -5215,7 +4045,7 @@ var
 begin
 if quitASAP and not quitting and not queryingClose then
   begin
-  { close is not effective when lockTimerevent is TRUE, so we force it TRUE.
+  { close is not effective when lockTimerevent is TRUE, so we force it TRUE. }
   { it should not be necessary, but we want to be sure to quit even with bugs. }
   bak:=lockTimerevent;
   lockTimerevent:=FALSE;
@@ -5232,10 +4062,14 @@ try
 
   inc(clock);
   if every(1) then everyTenth();
-  if every(10*60*10) then every10minutes();
-  if every(60*10) then everyMinute();
-  if every(10*10) then every10sec();
-  if every(10) then everySec();
+  if every(10*60*10) then
+    every10minutes();
+  if every(60*10) then
+    everyMinute();
+  if every(10*10) then
+    every10sec();
+  if every(10) then
+    everySec();
   if every(STATUSBAR_REFRESH) then
     updateSbar();
   if every(graph.rate) then
@@ -5250,17 +4084,18 @@ procedure Tmainfrm.updateSbar();
 var
   pn: integer;
 
-  function addPanel(s:string; al:TAlignment=taCenter):integer;
+  function addPanel(const s: String; al: TAlignment=taCenter): Integer;
   begin
-  result:=pn;
-  inc(pn);
-  if sbar.Panels.count < pn then sbar.Panels.Add();
-  with sbar.panels[pn-1] do
-    begin
-    alignment:=al;
-    Text:=s;
-    width:=sbar.Canvas.TextWidth(s)+20;
-    end;
+    result:=pn;
+    inc(pn);
+    if sbar.Panels.count < pn then
+      sbar.Panels.Add();
+    with sbar.panels[pn-1] do
+     begin
+      alignment := al;
+      Text := s;
+      width := sbar.Canvas.TextWidth(s)+20;
+     end;
   end; // addPanel
 
   procedure checkDiskSpace();
@@ -5297,136 +4132,163 @@ var
 
   function getConnectionsString():string;
   resourcestring
-    CONN = 'Connections: %d';
+    MSG_CONN = 'Connections: %d';
   var
     i: integer;
   begin
-  result:=format(CONN, [srv.conns.Count]);
-  if easyMode then exit;
-  i:=countIPs();
-  if i < srv.conns.count then result:=result+' / '+intToStr(i);
+    result:=format(MSG_CONN, [fileSrv.getConnectionsCount]);
+    if easyMode then
+      exit;
+    i := fileSrv.countIPs;
+    if i < fileSrv.getConnectionsCount then
+      result:=result+' / '+intToStr(i);
   end;
 
 resourcestring
-  TOT_IN = 'Total In: %s';
-  TOT_OUT = 'Total Out: %s';
-  OUT_SPEED = 'Out: %.1f KB/s';
-  IN_SPEED = 'In: %.1f KB/s';
-  BANS = 'Ban rules: %d';
-  MEMORY = 'Mem';
-  stack = 'Stack';
-  CUST_TPL = 'Customized template';
-  VFS_ITEMS = 'VFS: %d items';
-  ITEMS_NS = 'VFS: %d items - not saved';
+  MSG_TOT_IN = 'Total In: %s';
+  MSG_TOT_OUT = 'Total Out: %s';
+  MSG_OUT_SPEED = 'Out: %.1f KB/s';
+  MSG_IN_SPEED = 'In: %.1f KB/s';
+  MSG_BANS = 'Ban rules: %d';
+  MSG_MEMORY = 'Mem';
+  MSG_stack = 'Stack';
+  MSG_CUST_TPL = 'Customized template';
+  MSG_VFS_ITEMS = 'VFS: %d items';
+  MSG_ITEMS_NS = 'VFS: %d items - not saved';
 var
   tempText: string;
 begin
-  if quitting then exit;
+  if quitting then
+    exit;
   FillMemory(@sbarIdxs, sizeOf(sbarIdxs), Byte(-1));
-if sbarTextTimeout < now() then tempText:=''
-else tempText:=sbar.Panels[sbar.Panels.Count-1].text;
-pn:=0;
-if not easyMode then
-  addPanel( getConnectionsString() );
-sbarIdxs.out:=addPanel( format(OUT_SPEED,[srv.speedOut/1000]) );
-addPanel( format(IN_SPEED,[srv.speedIn/1000]) );
-if not easyMode then
-  begin
-  sbarIdxs.totalOut:=addPanel( format(TOT_OUT,[
-    smartSize(outTotalOfs+srv.bytesSent)]) );
-  sbarIdxs.totalIn:=addPanel( format(TOT_IN,[
-    smartSize(inTotalOfs+srv.bytesReceived)]) );
-  sbarIdxs.notSaved:=addPanel( format(if_(VFSmodified, ITEMS_NS, VFS_ITEMS),[filesBox.items.count-1]));
-  if not vFsmodified then sbarIdxs.notSaved:=-1;
-  end;
-checkDiskSpace();
+  if sbarTextTimeout < now() then
+    tempText:=''
+   else
+    tempText := sbar.Panels[sbar.Panels.Count-1].text;
+  pn:=0;
+  if not easyMode then
+    addPanel( getConnectionsString() );
+  sbarIdxs.out := addPanel( format(MSG_OUT_SPEED,[fileSrv.htSrv.speedOut/1000]) );
+  addPanel( format(MSG_IN_SPEED,[fileSrv.htSrv.speedIn/1000]) );
+  if not easyMode then
+    begin
+      sbarIdxs.totalOut:=addPanel( format(MSG_TOT_OUT,[
+        smartSize(outTotalOfs+fileSrv.htSrv.bytesSent)]) );
+      sbarIdxs.totalIn:=addPanel( format(MSG_TOT_IN,[
+        smartSize(inTotalOfs+fileSrv.htSrv.bytesReceived)]) );
+      sbarIdxs.notSaved := addPanel( format(if_(VFSmodified, MSG_ITEMS_NS, MSG_VFS_ITEMS),[filesBox.items.count-1]));
+      if not vFsmodified then
+        sbarIdxs.notSaved:=-1;
+    end;
+  checkDiskSpace();
 
-if showMemUsageChk.checked then
-  begin
-    addPanel(MEMORY+': '+dotted(allocatedMemory()));
-    addPanel(Stack +': '+dotted(currentStackUsage()));
-  end;
+ {$IFNDEF FPC}
+  if showMemUsageChk.checked then
+   begin
+    addPanel(MSG_MEMORY+': '+dotted(allocatedMemory()));
+    addPanel(MSG_stack +': '+dotted(currentStackUsage()));
+   end;
+ {$ENDIF ~FPC}
 
-if assigned(banlist) then
-  sbarIdxs.banStatus:=addPanel(format(BANS, [length(banlist)]));
+  if assigned(banlist) then
+    sbarIdxs.banStatus := addPanel(format(MSG_BANS, [length(banlist)]));
 
-if tplIsCustomized then sbarIdxs.customTpl:=addPanel(CUST_TPL);
+  if tplIsCustomized then
+    sbarIdxs.customTpl := addPanel(MSG_CUST_TPL);
 
 // if tempText empty, ensures a final panel terminator
-addPanel(tempText, taLeftJustify);
+  addPanel(tempText, taLeftJustify);
 
 // delete excess panels
-while sbar.Panels.count > pn do sbar.Panels.delete(pn);
+  while sbar.Panels.count > pn do
+    sbar.Panels.delete(pn);
 end; // updateSbar
 
 procedure Tmainfrm.refreshIPlist();
 CONST
   INDEX_FOR_URL = 2;
-//  INDEX_FOR_NIC = 1;
-  INDEX_FOR_NIC = 2;
 var
   a: TStringDynArray;
+ {$IFDEF USE_IPv6}
   a6: TStringDynArray;
+ {$ENDIF USE_IPv6}
   i: integer;
+  delimIdx: Integer;
+  lAddr: String;
 begin
-while IPaddress1.Items[INDEX_FOR_URL].Caption <> '-' do
-  IPaddress1.delete(INDEX_FOR_URL);
-// fill 'IP address' menu
-a:=getPossibleAddresses();
-for i:=0 to length(a)-1 do
-  mainfrm.IPaddress1.Insert(INDEX_FOR_URL,
-    newItem(a[i], 0, a[i]=defaultIP, TRUE, ipmenuclick, 0, '') );
+  while IPaddress1.Items[INDEX_FOR_URL].Caption <> '-' do
+    IPaddress1.delete(INDEX_FOR_URL);
+  // fill 'IP address' menu
+  a := getPossibleAddresses();
+  for i:=0 to length(a)-1 do
+    mainfrm.IPaddress1.Insert(INDEX_FOR_URL,
+      newItem(a[i], 0, a[i]=defaultIP, TRUE, ipmenuclick, 0, '') );
 
-// fill 'Accept connections on' menu
-while Acceptconnectionson1.count > INDEX_FOR_NIC  do
-  Acceptconnectionson1.delete(INDEX_FOR_NIC);
+ ////////////////// Accept Menu /////////////////////////////
+  delimIdx := AddrDelim.MenuIndex;
+  // fill 'Accept connections on' menu
+  while Acceptconnectionson1.count > delimIdx+1  do
+    Acceptconnectionson1.delete(delimIdx+1);
 
-// IPv6
-AnyaddressV6.checked:= listenOn = '[*]';
-  a6 := listToArray(localIPlist(sfIPv6));
+  lAddr := fileSrv.prefs.getDPrefStr('listen-on');
+ {$IFDEF USE_IPv6}
+ // IPv6
+  AnyaddressV6.checked := lAddr = '[*]';
+  a6 := getLocalIPs(sfIPv6);
+//  a6 := listToArray(localIPlist(sfIPv6));
   addUniqueString('::1', a6);
   if length(a6) > 0 then
    for i:=0 to length(a6)-1 do
-    Acceptconnectionson1.Insert(INDEX_FOR_NIC,
+    Acceptconnectionson1.Insert(delimIdx+1,
       newItem( '[' + a6[i] + ']', 0,
-              ((a6[i]=listenOn)or (('[' + a6[i] + ']') = listenOn)),
+              ((a6[i]=lAddr)or (('[' + a6[i] + ']') = lAddr)),
               TRUE, acceptOnMenuclick, 0, '') );
-//IPv4
-Anyaddress1.checked:= listenOn = '';
-a:=listToArray(localIPlist);
-addUniqueString('127.0.0.1', a);
-for i:=0 to length(a)-1 do
-  Acceptconnectionson1.Insert(INDEX_FOR_NIC,
-    newItem( a[i], 0, a[i]=listenOn, TRUE, acceptOnMenuclick, 0, '') );
+  {$ELSE}
+  AnyaddressV6.visible := False;
+ {$ENDIF USE_IPv6}
+  //IPv4
+  Anyaddress1.checked := lAddr = '';
+  a := getLocalIPs({$IFDEF USE_IPv6}sfIPv4{$ENDIF USE_IPv6});
+  addUniqueString('127.0.0.1', a);
+  for i:=0 to length(a)-1 do
+    Acceptconnectionson1.Insert(delimIdx+1,
+      newItem( a[i], 0, a[i]=lAddr, TRUE, acceptOnMenuclick, 0, '') );
 end; // refreshIPlist
 
 procedure TmainFrm.filesBoxDblClick(Sender: TObject);
 begin
-if assigned(selectedFile) then setClip(fileSrv.fullURL(selectedFile));
-updateUrlBox();
+  if assigned(selectedFile) then
+    setClip(fileSrv.fullURL(selectedFile));
+  updateUrlBox();
 end;
 
-procedure fileMenuSetFlag(sender:Tobject; flagToSet:TfileAttribute; filter:TfilterMethod=NIL; negateFilter:boolean=FALSE; recursive:boolean=FALSE; f:Tfile=NIL);
+procedure fileMenuSetFlag(sender: Tobject; flagToSet: TfileAttribute; filter: TfilterMethod=NIL;
+                          negateFilter: boolean=FALSE; recursive: boolean=FALSE; f: Tfile=NIL);
 // parameter "f" is designed to be set only inside this function
 var
   newState: boolean;
 
-  procedure applyTo(f:Tfile);
+  procedure applyTo(f: Tfile);
   var
-    n: TtreeNode;
+    n: TFileNode;
   begin
-  n:=f.node.getFirstChild();
-  while assigned(n) do
-    begin
-    if assigned(n.data) then fileMenuSetFlag(sender, flagToSet, filter, negateFilter, TRUE, n.data);
-    n:=n.getNextSibling();
-    end;
+    n := f.node.getFirstChild();
+    while assigned(n) do
+     begin
+       if assigned(n.data) then
+         fileMenuSetFlag(sender, flagToSet, filter, negateFilter, TRUE, n.data);
+       n := n.getNextSibling();
+     end;
 
-  if assigned(filter) and (negateFilter = filter(f)) then exit;
-  if (flagToSet in f.flags) = newState then exit;
-  VFSmodified:=TRUE;
-  if newState then include(f.flags, flagToSet)
-  else exclude(f.flags, flagToSet);
+    if assigned(filter) and (negateFilter = filter(f)) then
+      exit;
+    if (flagToSet in f.flags) = newState then
+      exit;
+    VFSmodified := TRUE;
+    if newState then
+      include(f.flags, flagToSet)
+     else
+      exclude(f.flags, flagToSet);
   end; // applyTo
 
 var
@@ -5448,23 +4310,23 @@ end;
 
 procedure TmainFrm.HideClick(Sender: TObject);
 begin
-graphBox.Hide();
-graphSplitter.Hide();
+  graphBox.Hide();
+  graphSplitter.Hide();
 end;
 
 procedure TmainFrm.filesBoxMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-begin filesBox.Selected:=filesbox.GetNodeAt(x,y) end;
+begin filesBox.Selected:=filesBox.GetNodeAt(x,y) end;
 
 procedure setFilesBoxExtras(v:boolean);
 begin
 { let disable this silly feature for now
-if winVersion <> WV_VISTA then exit;
+if winVersion <> WV_VISTA then exit;}
 with mainfrm.filesBox do
   begin
   if isEditing then exit;
   ShowButtons:=v;
   ShowLines:=v;
-  end;}
+  end;
 end; // setFilesBoxExtras
 
 procedure TmainFrm.filesBoxMouseEnter(Sender: TObject);
@@ -5484,12 +4346,12 @@ if (shift = [ssAlt]) and (button = mbLeft) then
   Properties1.click();
 end;
 
-procedure TmainFrm.filesBoxCompare(Sender: TObject; Node1, Node2: TTreeNode; Data: Integer; var Compare: Integer);
+procedure TmainFrm.filesBoxCompare(Sender: TObject; Node1, Node2: TFileNode; Data: Integer; var Compare: Integer);
 var
   f1, f2: Tfile;
 begin
-  f1 := Tfile(node1.data);
-  f2 := Tfile(node2.data);
+  f1 := nodeToFile(node1);
+  f2 := nodeToFile(node2);
   if (f1 = NIL) or (f2 = NIL) then
     exit;
   if not foldersbeforeChk.checked or (f1.isFolder() = f2.isFolder()) then
@@ -5503,10 +4365,14 @@ end;
 
 procedure TmainFrm.foldersbeforeChkClick(Sender: TObject);
 var
-  n: TTreeNode;
+  n: TFileNode;
 begin
   n := fileSrv.getRootNode;
+ {$IFDEF FPC}
+  n.AlphaSort
+ {$ELSE ~FPC}
   n.AlphaSort(TRUE)
+ {$ENDIF FPC}
 end;
 
 procedure browse(url:string);
@@ -5515,7 +4381,7 @@ if mainfrm.browseUsingLocalhostChk.Checked then
   begin
   chop('//',url);
   chop('/',url);
-  url:='http://localhost:'+srv.port+'/'+url;
+  url:='http://localhost:' + mainFrm.fileSrv.htSrv.port+'/'+url;
   end;
 openURL(url);
 end; // browse
@@ -5536,11 +4402,11 @@ end;
 procedure TmainFrm.openLogBtnClick(Sender: TObject);
 var
   mask, fn: string;
-  s: TfastStringAppend;
+  s: TfastUStringAppend;
   i: integer;
 begin
   mask := logSearchBox.text;
-  s := TfastStringAppend.create;
+  s := TfastUStringAppend.create;
   try
     if sender = openLogBtn then
       s.append(logBox.text)
@@ -5563,29 +4429,18 @@ begin
     msgDlg(MSG_NO_TEMP, MB_ICONERROR);
 end;
 
-procedure Tmainfrm.ipmenuclick(sender:Tobject);
-var
-  ip: string;
-begin
-ip:=(sender as Tmenuitem).caption;
-delete(ip, pos('&',ip), 1);
-setDefaultIP(ip);
-searchbetteripChk.checked:=FALSE;
-setClip(urlBox.text);
-end; // ipmenuclick
-
 // returns the last file added
-function Tmainfrm.addFilesFromString(files:string; under:Ttreenode=NIL):Tfile;
+function Tmainfrm.addFilesFromString(files: String; under: TFileNode=NIL): Tfile;
 var
   folderKindFrm: TfolderKindFrm;
 
   function selectFolderKind():integer;
   begin
-  application.restore();
-  application.BringToFront();
-  Application.CreateForm(TfolderKindFrm, folderKindFrm);
-  result:=folderKindFrm.ShowModal();
-  folderKindFrm.Free;
+    application.restore();
+    application.BringToFront();
+    Application.CreateForm(TfolderKindFrm, folderKindFrm);
+    result:=folderKindFrm.ShowModal();
+    folderKindFrm.Free;
   end; // selectFolderKind
 
 resourcestring
@@ -5601,98 +4456,106 @@ var
   res: integer;
   upload, skipComment: boolean;
 begin
-result:=NIL;
-if files = '' then exit;
-upload:=FALSE;
-if singleLine(files) then
-  begin
-  files:=trim(files); // this let me treat 'files' as a simple filename, not caring of the trailing CRLF
-
-  // suggest template installation
-  if (lowerCase(extractFileExt(files)) = '.tpl')
-  and (msgDlg(MSG_INSTALL_TPL, MB_YESNO) = MRYES) then
-    begin
-    setNewTplFile(files);
+  result := NIL;
+  if files = '' then
     exit;
-    end;
-
-  upload:=(ipos('upload', extractFilename(files)) > 0)
-    and (msgDlg(MSG_FOLDER_UPLOAD, MB_YESNO) = MRYES);
-  end;
-// warn upon double filenames
-doubles:=NIL;
-s:=files;
-while s > '' do
-	begin
-  fn:=chopLine(s);
-  // we must resolve links here, or we may miss duplicates
-	if isExtension(fn, '.lnk') or fileExists(fn+'\target.lnk') then  // mod by mars
-    fn:=resolveLnk(fn);
-
-  if (length(fn) = 3) and (fn[2] = ':') then fn:=fn[1]+fn[2] // unit root folder
-	else fn:=ExtractFileName(fn);
-  if fileSrv.existsNodeWithName(fn, under) then
-    if addString(fn, doubles) > MAX_DUPE then
-      break;
-  end;
-if assigned(doubles) then
-  begin
-  filesBox.Repaint();
-  res:=length(doubles);
-  s:=if_(res > MAX_DUPE, intToStr(MAX_DUPE)+'+', intToStr(res));
-  s:=format(MSG_ITEM_EXISTS, [s, join(', ',doubles)]);
-  if msgDlg(s, MB_ICONWARNING+MB_YESNO) <> IDYES then exit;
-  end;
-
-f:=NIL;
-skipComment:=not singleLine(files);
-kind:=if_(upload, 'real', addFolderDefault);
-addingItemsCounter:=0;
-try
-	repeat
-  fn:=chopLine(files);
-  if fn = '' then continue;
-  f:=Tfile.create(filesBox, fn);
-  if f.isFolder() then
+  upload := FALSE;
+  if singleLine(files) then
     begin
-    if kind = '' then
-      begin // we didn't decide if real or virtual yet
-      res:=selectFolderKind();
+      files := trim(files); // this let me treat 'files' as a simple filename, not caring of the trailing CRLF
 
-      if isAbortResult(res) then
-        begin
-        f.free;
+      // suggest template installation
+      if (lowerCase(extractFileExt(files)) = '.tpl')
+      and (msgDlg(MSG_INSTALL_TPL, MB_YESNO) = MRYES) then
+       begin
+        setNewTplFile(files);
         exit;
-        end;
-      kind:=if_(res = mrYes, 'virtual', 'real');
+       end;
+
+      upload := (ipos('upload', extractFilename(files)) > 0)
+            and (msgDlg(MSG_FOLDER_UPLOAD, MB_YESNO) = MRYES);
+    end;
+  // warn upon double filenames
+  doubles := NIL;
+  s := files;
+  while s > '' do
+   begin
+    fn := chopLine(s);
+    // we must resolve links here, or we may miss duplicates
+    if isExtension(fn, '.lnk') or fileExists(fn+'\target.lnk') then  // mod by mars
+      fn := resolveLnk(fn);
+
+    if (length(fn) = 3) and (fn[2] = ':') then
+      fn := fn[1]+fn[2] // unit root folder
+     else
+      fn := ExtractFileName(fn);
+    if fileSrv.existsNodeWithName(fn, under) then
+      if addString(fn, doubles) > MAX_DUPE then
+        break;
+   end;
+  if assigned(doubles) then
+   begin
+    filesBox.Repaint();
+    res := length(doubles);
+    s := if_(res > MAX_DUPE, intToStr(MAX_DUPE)+'+', intToStr(res));
+    s := format(MSG_ITEM_EXISTS, [s, join(', ',doubles)]);
+    if msgDlg(s, MB_ICONWARNING+MB_YESNO) <> IDYES then
+      exit;
+   end;
+
+  f := NIL;
+  skipComment := not singleLine(files);
+  kind := if_(upload, 'real', addFolderDefault);
+  addingItemsCounter := 0;
+  try
+    repeat
+      fn := chopLine(files);
+      if fn = '' then
+        continue;
+      f := Tfile.create(fileSrv, fn);
+      if f.isFolder() then
+       begin
+        if kind = '' then
+         begin // we didn't decide if real or virtual yet
+           res := selectFolderKind();
+         {$IFNDEF FPC}
+          if isAbortResult(res) then
+            begin
+            f.free;
+            exit;
+            end;
+         {$ENDIF FPC}
+          kind := if_(res = mrYes, 'virtual', 'real');
+         end;
+
+        if kind = 'virtual' then
+          include(f.flags, FA_VIRTUAL);
+       end;
+
+      f.lock();
+      try
+        f.name := fileSrv.getUniqueNodeName(f.name, under);
+        fileSrv.addFileGUI(f, under, skipComment);
+       finally
+        f.unlock();
       end;
 
-    if kind = 'virtual' then                                             
-      include(f.flags, FA_VIRTUAL);
-    end;
-
-  f.lock();
-  try
-    f.name := fileSrv.getUniqueNodeName(f.name, under);
-    addFile(f, under, skipComment);
-  finally
-    f.unlock();
-    end;
-
-  until (files = '') or fileSrv.stopAddingItems;
-finally addingItemsCounter:=-1 end;
-
-if upload then
-  begin
-  addUniqueString(USER_ANYONE, f.accounts[FA_UPLOAD]);
-  sortArray(f.accounts[FA_UPLOAD]);
+    until (files = '') or fileSrv.stopAddingItems;
+   finally
+     addingItemsCounter:=-1
   end;
-if assigned(f) and autocopyURLonadditionChk.checked then
-  setClip(fileSrv.fullURL(f));
-result:=f;
+
+  if upload then
+   begin
+    addUniqueString(USER_ANYONE, f.accounts[FA_UPLOAD]);
+    sortArray(f.accounts[FA_UPLOAD]);
+   end;
+  if assigned(f) and autocopyURLonadditionChk.checked then
+    setClip(fileSrv.fullURL(f));
+  result := f;
 end; // addFilesFromString
 
-procedure Tmainfrm.addDropFiles(hnd: Thandle; under: Ttreenode);
+procedure Tmainfrm.addDropFiles(hnd: Thandle; under: TFileNode);
 var
   i, n: integer;
   buffer: array [0..2000] of char;
@@ -5717,8 +4580,8 @@ end; // addDropFiles
 
 procedure Tmainfrm.WMDropFiles(var msg: TWMDropFiles);
 begin
-with filesbox.screenToClient(mouse.cursorPos) do
-  addDropFiles(msg.Drop, filesbox.getNodeAt(x,y));
+with filesBox.screenToClient(mouse.cursorPos) do
+  addDropFiles(msg.Drop, filesBox.getNodeAt(x,y));
 inherited;
 end; // WMDropFiles
 
@@ -5772,7 +4635,7 @@ procedure TmainFrm.appEventsShowHint(var HintStr: String; var CanShow: Boolean; 
       end;
   end; // reduce
 
-  function fileHint():string;
+  function fileHint(): string;
   resourcestring
     MSG_VFS_DRAG_INVIT = 'Drag your files here';
     MSG_VFS_URL = 'URL: %s';
@@ -5829,88 +4692,99 @@ procedure TmainFrm.appEventsShowHint(var HintStr: String; var CanShow: Boolean; 
     end;
 
   begin
-  result:=if_(HintsfornewcomersChk.checked,MSG_VFS_DRAG_INVIT);
-  f:=pointedFile();
-  if f = NIL then exit;
-  parent:=f.parent;
+    result := if_(HintsfornewcomersChk.checked,MSG_VFS_DRAG_INVIT);
+    f := pointedFile();
+    if f = NIL then
+      exit;
+    parent := f.parent;
 
-  result:=format(MSG_VFS_URL,[fileSrv.URL(f)]);
-  if f.isRealFolder() or f.isFile() then
-    result := result + #13+format(MSG_VFS_PATH,[f.resource]);
-  if f.isFile() then
-    result:=result+format(#13+MSG_VFS_SIZE+#13+MSG_VFS_DLS,
-      [ smartsize(sizeofFile(f.resource)), dotted(f.DLcount) ]);
+    result := format(MSG_VFS_URL,[fileSrv.URL(f)]);
+    if f.isRealFolder() or f.isFile() then
+      result := result + #13+format(MSG_VFS_PATH,[f.resource]);
+    if f.isFile() then
+      result := result+format(#13+MSG_VFS_SIZE+#13+MSG_VFS_DLS,
+        [ smartsize(sizeofFile(f.resource)), dotted(f.DLcount) ]);
 
-  s:=flagR(MSG_VFS_INVISIBLE, FA_HIDDENTREE, TRUE);
-  if s = '' then s:=flag(MSG_VFS_INVISIBLE, FA_HIDDEN);
-  result:=result+s
-    +flag(MSG_VFS_DL_FORB, FA_DL_FORBIDDEN)
-    +flagR(MSG_VFS_DONT_LOG, FA_DONT_LOG);
+    s := flagR(MSG_VFS_INVISIBLE, FA_HIDDENTREE, TRUE);
+    if s = '' then
+      s:=flag(MSG_VFS_INVISIBLE, FA_HIDDEN);
+    result := result+s
+      +flag(MSG_VFS_DL_FORB, FA_DL_FORBIDDEN)
+      +flagR(MSG_VFS_DONT_LOG, FA_DONT_LOG);
 
-  if f.isFolder() then
+    if f.isFolder() then
     begin
-    if assigned(parent) and parent.hasRecursive(FA_HIDE_EMPTY_FOLDERS) then
-        result:=result+#13+MSG_VFS_HIDE_EMPTY+MSG_VFS_INHERITED;
+      if assigned(parent) and parent.hasRecursive(FA_HIDE_EMPTY_FOLDERS) then
+        result := result+#13+MSG_VFS_HIDE_EMPTY+MSG_VFS_INHERITED;
 
-    result:=result
-      +flag(MSG_VFS_NOT_BROW, FA_BROWSABLE, FALSE)
-      +flag(MSG_VFS_HIDE_EMPTY_FLD, FA_HIDE_EMPTY_FOLDERS)
-      +flagR(MSG_VFS_HIDE_EXT, FA_HIDE_EXT)
-      +flagR(MSG_VFS_ARCABLE, FA_ARCHIVABLE)
+      result := result
+        +flag(MSG_VFS_NOT_BROW, FA_BROWSABLE, FALSE)
+        +flag(MSG_VFS_HIDE_EMPTY_FLD, FA_HIDE_EMPTY_FOLDERS)
+        +flagR(MSG_VFS_HIDE_EXT, FA_HIDE_EXT)
+        +flagR(MSG_VFS_ARCABLE, FA_ARCHIVABLE)
     end;
 
-  s:=f.getRecursiveFileMask();
-  if (s > '') and (f.defaultFileMask = '') then s:=s+MSG_VFS_INHERITED;
-  if s > '' then result:=result+#13+format(MSG_VFS_DEF_MASK,[s]);
+    s := f.getRecursiveFileMask();
+    if (s > '') and (f.defaultFileMask = '') then
+      s := s+MSG_VFS_INHERITED;
+    if s > '' then
+      result := result+#13+format(MSG_VFS_DEF_MASK,[s]);
 
-  perm(FA_ACCESS, MSG_VFS_ACCESS);
-  if f.isRealFolder() then perm(FA_UPLOAD, MSG_VFS_UPLOAD);
-  perm(FA_DELETE, MSG_VFS_DELETE);
+    perm(FA_ACCESS, MSG_VFS_ACCESS);
+    if f.isRealFolder() then
+      perm(FA_UPLOAD, MSG_VFS_UPLOAD);
+    perm(FA_DELETE, MSG_VFS_DELETE);
 
-  s:=reduce(f.getDynamicComment(mainfrm.getLP));
-  if (s > '') and (f.comment = '') then s:=s+MSG_VFS_EXTERNAL;
-  if s > '' then result:=result+#13+format(MSG_VFS_COMMENT,[s]);
+    s := reduce(f.getDynamicComment(mainfrm.getLP));
+    if (s > '') and (f.comment = '') then
+      s := s+MSG_VFS_EXTERNAL;
+    if s > '' then
+     result := result+#13+format(MSG_VFS_COMMENT,[s]);
 
-  s:=reduce(f.getShownRealm());
-  if (s > '') and (f.realm = '') then s:=s+MSG_VFS_INHERITED;
-  if s > '' then result:=result+#13+format(MSG_VFS_REALM,[s]);
+    s := reduce(f.getShownRealm(fileSrv.lp));
+    if (s > '') and (f.realm = '') then
+      s := s+MSG_VFS_INHERITED;
+    if s > '' then
+      result := result+#13+format(MSG_VFS_REALM,[s]);
 
-  s:=reduce(f.getRecursiveDiffTplAsStr(@inheritd, @externl));
-  if s > '' then
+    s := reduce(f.getRecursiveDiffTplAsStr(@inheritd, @externl));
+    if s > '' then
     begin
-    if inheritd then s:=s+MSG_VFS_INHERITED;
-    if externl then s:=s+MSG_VFS_EXTERNAL;
-    result:=result+#13+format(MSG_VFS_DIFF_TPL,[s]);
+      if inheritd then
+        s := s+MSG_VFS_INHERITED;
+      if externl then
+        s := s+MSG_VFS_EXTERNAL;
+      result := result+#13+format(MSG_VFS_DIFF_TPL,[s]);
     end;
 
-  f.getFiltersRecursively(s, s2);
-  result:=result
-    +if_(s>'', #13+format(MSG_VFS_FILES_FLT,[s])
-      +if_(f.filesFilter = '', MSG_VFS_INHERITED))
-    +if_(s2>'', #13+format(MSG_VFS_FLD_FLT, [s2])
-      +if_(f.foldersFilter = '', MSG_VFS_INHERITED))
-    +if_(f.uploadFilterMask>'', #13+format(MSG_VFS_UPL_FLT,[f.uploadFilterMask]))
-    +flag(MSG_VFS_DONT_CONS_DL, FA_DONT_COUNT_AS_DL)
-    +if_(f.dontCountAsDownloadMask>'',
-      #13+format(MSG_VFS_DONT_CONS_DL_MASK, [f.dontCountAsDownloadMask]))
+    f.getFiltersRecursively(s, s2);
+    result := result
+      +if_(s>'', #13+format(MSG_VFS_FILES_FLT,[s])
+        +if_(f.filesFilter = '', MSG_VFS_INHERITED))
+      +if_(s2>'', #13+format(MSG_VFS_FLD_FLT, [s2])
+        +if_(f.foldersFilter = '', MSG_VFS_INHERITED))
+      +if_(f.uploadFilterMask>'', #13+format(MSG_VFS_UPL_FLT,[f.uploadFilterMask]))
+      +flag(MSG_VFS_DONT_CONS_DL, FA_DONT_COUNT_AS_DL)
+      +if_(f.dontCountAsDownloadMask>'',
+        #13+format(MSG_VFS_DONT_CONS_DL_MASK, [f.dontCountAsDownloadMask]))
   end; // filehint
 
-  function connHint():string;
+  function connHint(): String;
   resourcestring
     MSG_CON_HINT = 'Connection time: %s'#13'Last request time: %s'#13'Agent: %s';
   var
     cd: TconnData;
     st: string;
   begin
-  cd:=pointedConnection();
+    cd := pointedConnection(HintInfo.CursorPos);
   if assigned(cd) then
     begin
-    if isSendingFile(cd) then
+    if cd.isSendingFile then
       st:=format(MSG_CON_SENT, [
         dotted(cd.conn.bytesSentLastItem),
         dotted(cd.conn.bytesPartial)
       ])
-    else if isReceivingFile(cd) then
+    else if cd.isReceivingFile then
       st:=format(MSG_CON_received, [
         dotted(cd.conn.bytesPosted),
         dotted(cd.conn.post.length)
@@ -5929,24 +4803,24 @@ procedure TmainFrm.appEventsShowHint(var HintStr: String; var CanShow: Boolean; 
   end;
 
 begin
-if hintinfo.HintControl = filesBox then
-  begin
-  hintinfo.ReshowTimeout:=800;
-  hintStr:=filehint();
-  end;
-if hintinfo.HintControl = connBox then
-  begin
-  hintinfo.ReshowTimeout:=800;
-  hintStr:=connHint();
-  end;
+  if hintinfo.HintControl = filesBox then
+    begin
+      hintinfo.ReshowTimeout:=800;
+      hintStr:=filehint();
+    end;
+  if hintinfo.HintControl = connBox then
+    begin
+      hintinfo.ReshowTimeout:=800;
+      hintStr:=connHint();
+    end;
 
-if not hintsForNewcomersChk.checked
-and ((hintinfo.hintcontrol = modeBtn)
-  or (hintinfo.hintcontrol = menuBtn)
-  or (hintinfo.hintcontrol = graphBox))
-then hintStr:='';
-hintStr:=chop(#0, hintStr); // info past null char are used for extra data storing
-canShow:=hintstr > '';
+  if not hintsForNewcomersChk.checked
+  and ((hintinfo.hintcontrol = modeBtn)
+    or (hintinfo.hintcontrol = menuBtn)
+    or (hintinfo.hintcontrol = graphBox))
+  then hintStr:='';
+  hintStr := chop(#0, hintStr); // info past null char are used for extra data storing
+  canShow := hintstr > '';
 end;
 
 procedure TmainFrm.logmenuPopup(Sender: TObject);
@@ -6051,8 +4925,8 @@ begin logBox.Clear() end;
 
 procedure TmainFrm.Clearandresettotals1Click(Sender: TObject);
 begin
-logBox.clear();
-resetTotals();
+  logBox.clear();
+  resetTotals(fileSrv);
 end;
 
 procedure TmainFrm.Copy1Click(Sender: TObject);
@@ -6113,13 +4987,13 @@ var
   var
     i: integer;
   begin
-    i:=((r.bottom-r.top)-cnv.textHeight(s)) div 2; // vertical margin, to center vertically
+    i := ((r.bottom-r.top)-cnv.textHeight(s)) div 2; // vertical margin, to center vertically
     inc(r.top, i);
-    drawCentered(cnv,r,s);
+    drawCentered(cnv, r, s);
     dec(r.top, i);
   end; // textCentered
 
-  procedure drawProgress(now,total,lowerbound,upperbound:int64);
+  procedure drawProgress(now,total,lowerbound,upperbound: int64);
   var
     d: real;
     selected: boolean;
@@ -6127,44 +5001,46 @@ var
     x: integer;
     colors:array [boolean] of Tcolor;
   begin
-  if (total <= 0) or (lowerbound >= upperbound) then exit;
-  colors[false]:=clWindow;
-  colors[true]:=blend(clWindow, clWindowText, 0.25);
-  selected:=cdsSelected in state;
-  r1:=rect(r.Left+1,r.Top+1,r.Right-1,r.Bottom-1);
-  // paint a shadow for non requested piece of data
-  cnv.brush.Color:=blend(clWindow, clHotLight, 0.30);
-  cnv.Brush.Style:=bsSolid;
-  cnv.FillRect(r1);
-  // and shrink the rectangle
-  x:=r1.Right-r1.Left;
-  cnv.pen.color:=colors[selected];
-  cnv.pen.Style:=psSolid;
-  if lowerbound > 0 then
-    begin
-    inc( r1.Left, round(x*lowerbound/total) );
-    cnv.MoveTo(r1.Left-1, r1.Top);
-    cnv.LineTo(r1.Left-1, r1.Bottom);
-    end;
-  if upperbound > 0 then dec( r1.Right, round(x*(total-upperbound)/total) );
-  // border + non filled part
-  cnv.brush.Color:=colors[not selected];
-  cnv.Brush.Style:=bsSolid;
-  cnv.FillRect(r1);
-  // filled part
-  d:=now / (upperbound-lowerbound);
-  if d > 1 then d:=1;
-  inc(r1.Left, 1+round(d*(r1.right-r1.Left-2)));
-  dec(r1.right); dec(r1.bottom); inc(r1.top);
-  cnv.brush.Color:=colors[selected];
-  if not IsRectEmpty(r1) then cnv.FillRect(r1);
-  // label
-  cnv.Font.Name:='Small Fonts';
-  cnv.font.Size:=7;
-  cnv.font.Color:=clWindowText;
-  SetBkMode(cnv.handle, TRANSPARENT);
-  inc(r.top);
-  textCenter(format('%d%%', [trunc(d*100)]));
+    if (total <= 0) or (lowerbound >= upperbound) then
+      exit;
+    colors[false] := clWindow;
+    colors[true] := blend(clWindow, clWindowText, 0.25);
+    selected := cdsSelected in state;
+    r1 := rect(r.Left+1,r.Top+1,r.Right-1,r.Bottom-1);
+    // paint a shadow for non requested piece of data
+    cnv.brush.Color := blend(clWindow, clHotLight, 0.30);
+    cnv.Brush.Style := bsSolid;
+    cnv.FillRect(r1);
+    // and shrink the rectangle
+    x := r1.Right-r1.Left;
+    cnv.pen.color := colors[selected];
+    cnv.pen.Style := psSolid;
+    if lowerbound > 0 then
+      begin
+      inc( r1.Left, round(x*lowerbound/total) );
+      cnv.MoveTo(r1.Left-1, r1.Top);
+      cnv.LineTo(r1.Left-1, r1.Bottom);
+      end;
+    if upperbound > 0 then
+      dec( r1.Right, round(x*(total-upperbound)/total) );
+    // border + non filled part
+    cnv.brush.Color := colors[not selected];
+    cnv.Brush.Style := bsSolid;
+    cnv.FillRect(r1);
+    // filled part
+    d:=now / (upperbound-lowerbound);
+    if d > 1 then d:=1;
+    inc(r1.Left, 1+round(d*(r1.right-r1.Left-2)));
+    dec(r1.right); dec(r1.bottom); inc(r1.top);
+    cnv.brush.Color:=colors[selected];
+    if not IsRectEmpty(r1) then cnv.FillRect(r1);
+    // label
+    cnv.Font.Name := 'Small Fonts';
+    cnv.font.Size := 7;
+    cnv.font.Color:=clWindowText;
+    SetBkMode(cnv.handle, TRANSPARENT);
+    inc(r.top);
+    textCenter(format('%d%%', [trunc(d*100)]));
   end; // drawProgress
 
 var
@@ -6172,56 +5048,41 @@ var
 begin
   if subItem <> 5 then
     exit;
-  cd := conn2data(item);
+  cd := conn2data(fileSrv, item);
   if cd = NIL then
     exit;
   cnv := connBox.canvas;
   r := ListView_GetSubItemRect(connBox, item.index, subItem);
-  if isSendingFile(cd) or (cd.conn.reply.bodyMode = RBM_STREAM) then
+  if cd.isSendingFile or (cd.conn.isSendingStream) then
     drawProgress( cd.conn.bytesSentLastItem, cd.conn.bytesFullBody, cd.conn.reply.firstByte, cd.conn.reply.lastByte )
-   else if isReceivingFile(cd) then
+   else if cd.isReceivingFile then
     drawProgress( cd.conn.bytesPosted, cd.conn.post.length, 0, cd.conn.post.length);
 end;
 
-function TmainFrm.connBoxDataRefresh(Sender: TObject; Item: TListItem; checkProgress: Boolean = True): Boolean;
- resourcestring
-  MSG_CON_STATE_IDLE  = 'idle';
-  MSG_CON_STATE_REQ   = 'requesting';
-  MSG_CON_STATE_RCV   = 'receiving';
-  MSG_CON_STATE_THINK = 'thinking';
-  MSG_CON_STATE_REP   = 'replying';
-  MSG_CON_STATE_SEND  = 'sending';
-  MSG_CON_STATE_DISC  = 'disconnected';
- const
-  HCS2STR: array [ThttpConnState] of string = (MSG_CON_STATE_IDLE, MSG_CON_STATE_REQ, MSG_CON_STATE_RCV,
-    MSG_CON_STATE_THINK, MSG_CON_STATE_REP, MSG_CON_STATE_SEND, MSG_CON_STATE_DISC);
- var
+function TmainFrm.connBoxDataRefresh(Sender: TObject; var Item: TListItem; checkProgress: Boolean = True): Boolean;
+var
   data: TconnData;
   changed: Boolean;
 
   function getFname(): String;
   begin
-    if isSendingFile(data) then
-      result := data.lastFN
-     else if isReceivingFile(data) then
-      result := data.uploadSrc
-     else result:='-'
+    Result := data.getFileName;
   end;
 
   function getStatus(): String;
   begin
-    if isSendingFile(data) then
+    if data.isSendingFile then
      begin
       if data.conn.paused then
         result := MSG_CON_PAUSED
-      else
+       else
         result := format(MSG_CON_SENT, [
           smartsize(data.conn.bytesSentLastItem),
           smartsize(data.conn.bytesPartial)
         ]);
       exit;
      end;
-    if isReceivingFile(data) then
+    if data.isReceivingFile then
      begin
       result := format(MSG_CON_received, [
         smartsize(data.conn.bytesPosted),
@@ -6229,28 +5090,24 @@ function TmainFrm.connBoxDataRefresh(Sender: TObject; Item: TListItem; checkProg
       ]);
       exit;
      end;
-    result := HCS2STR[data.conn.state]
-      +if_(data.conn.state = HCS_IDLE, ' '+intToStr(data.conn.requestCount))
+    result := data.getHTTPStateString
   end; // getStatus
 
   function getSpeed(): string;
   var
     d: real;
   begin
-    case data.conn.state of
-      HCS_REPLYING_BODY: d := data.conn.speedOut;
-      HCS_POSTING: d := data.conn.speedIn;
-      else d := data.averageSpeed;
-      end;
+    d := data.getSpeed;
     if d < 1 then
       result := '-'
      else
       result := format(MSG_SPEED_KBS,[d/1000])
   end; // getSpeed
 
-  procedure changeSubItem(itemIndex: Integer; val: String);
+  procedure changeSubItem(itemIndex: Integer; const val: String);
   begin
-    if item.subItems[itemIndex] <> val then
+    if item.subItems.Count > itemIndex then
+     if item.subItems[itemIndex] <> val then
       begin
         changed := True;
         item.subItems[itemIndex] := val;
@@ -6267,30 +5124,35 @@ begin
     exit;
   if item = NIL then
     exit;
-  data := conn2data(item);
+  data := conn2data(fileSrv, item);
   if data = NIL then
     exit;
   Result := False;
   s := nonEmptyConcat('', data.usr, '@')+data.address+':'+data.conn.port;
+  Changed := false;
   if item.caption <> s then
-    item.caption := s;
+    begin
+      item.caption := s;
+      Changed := True;
+    end;
   while item.subitems.count < 5 do
     begin
       item.subitems.add('');
+      Changed := True;
       Result := True;
     end;
 
 
   img := -1;
   progress := -1;
-  if data.conn.state = HCS_DISCONNECTED then
+  if data.conn.isDisconnected then
     img := 21
-   else if isSendingFile(data) then
+   else if data.isSendingFile then
     begin
       img := 32;
       progress := data.conn.bytesSentLastItem / data.conn.bytesPartial;
     end
-   else if isReceivingFile(data) then
+   else if data.isReceivingFile then
     begin
       img := 33;
       progress := data.conn.bytesPosted / data.conn.post.length;
@@ -6298,10 +5160,10 @@ begin
   if img <> item.imageIndex then
     begin
       item.imageIndex := img;
+      Changed := True;
       Result := True;
     end;
 
-  Changed := false;
   changeSubItem(0, getFname());
   changeSubItem(1, getStatus());
   changeSubItem(2, getSpeed());
@@ -6326,11 +5188,11 @@ begin
   connBoxDataRefresh(Sender, Item, false);
 end;
 
-function TmainFrm.appEventsHelp(Command: Word; Data: NativeInt;
+function TmainFrm.appEventsHelp(Command: Word; Data: THelpEventData;
   var CallHelp: Boolean): Boolean;
 begin
-callHelp:=FALSE; // avoid exception to be thrown
-result:=FALSE;
+  callHelp := FALSE; // avoid exception to be thrown
+  result := FALSE;
 end;
 
 procedure TmainFrm.appEventsMinimize(Sender: TObject);
@@ -6342,30 +5204,31 @@ end;
 
 procedure TmainFrm.appEventsRestore(Sender: TObject);
 begin
-trayed:=FALSE;
-if not showmaintrayiconChk.checked then tray.hide();
+  trayed := FALSE;
+  if not showmaintrayiconChk.checked then
+    tray.hide();
 end;
 
-procedure Tmainfrm.trayEvent(sender:Tobject; ev:TtrayEvent);
+procedure Tmainfrm.trayEvent(sender: Tobject; ev: TtrayEvent);
 begin
-updateTrayTip();
-if userInteraction.disabled then exit;
-case ev of
-  TE_RCLICK:
-    begin
-    setForegroundWindow(handle); // application.bringToFront() will act up when the window is minimized: the popped up menu will stay up forever
-    with mouse.cursorPos do
+  updateTrayTip();
+  if userInteraction.disabled then exit;
+  case ev of
+    TE_RCLICK:
      begin
-      menu.popup(x,y);
+      setForegroundWindow(handle); // application.bringToFront() will act up when the window is minimized: the popped up menu will stay up forever
+      with mouse.cursorPos do
+       begin
+        menu.popup(x,y);
+       end;
      end;
-    end;
-  TE_CLICK:
-    application.bringToFront();
-  TE_2CLICK:
-    begin
-    application.restore();
-    application.bringToFront();
-    end;
+    TE_CLICK:
+      application.bringToFront();
+    TE_2CLICK:
+     begin
+      application.restore();
+      application.bringToFront();
+     end;
   end;
 end; // trayEvent
 
@@ -6382,16 +5245,27 @@ begin
       forwardedMask := forwardedMask + ';' + cd.conn.address;
 end;
 
+procedure TmainFrm.addProgramToFirewllExceptionMnuClick(Sender: TObject);
+var
+  h: String;
+  p: String;
+begin
+  p := exePath + ExtractFileName(ParamStr(0));
+  h := strSHA256(p);
+  if not DSiAddApplicationToFirewallExceptionList('HFS.'+h, p) then
+    msgDlg('Couldn''t add exception to firewall');
+end;
+
 procedure Tmainfrm.downloadtrayEvent(sender: Tobject; ev: TtrayEvent);
 var
   i: integer;
 begin
   if userInteraction.disabled then
     exit;
-
-  for i:=connBox.items.count-1 downto 0 do
-    if conn2data(i) = (sender as TmyTrayicon).usrData then
-      connBox.itemIndex:=i;
+  if connBox.items.count > 0 then
+   for i:=connBox.items.count-1 downto 0 do
+    if fileSrv.conn2data(i) = (sender as TmyTrayicon).usrData then
+      connBox.itemIndex := i;
 
 case ev of
   TE_CLICK,
@@ -6421,14 +5295,14 @@ if quitting or (fileSrv.rootFile = NIL) then
   exit;
   end;
   a := ['%ip%', defaultIP,
-  '%port%', srv.port,
+  '%port%', fileSrv.htSrv.port,
   '%version%', srvConst.VERSION,
   '%build%', VERSION_BUILD];
   pat := first(tpl, trayMsg);
   Result := xtpl(pat, a);
 
   if ipos('%uptime%', pat)>0 then
-    Result := xtpl(Result, ['%uptime%', uptimestr()]);
+    Result := xtpl(Result, ['%uptime%', fileSrv.uptimestr()]);
   if ipos('%url%', pat)>0 then
     Result := xtpl(Result, ['%url%', fileSrv.fullURL(fileSrv.rootFile)]);
   if ipos('%hits%', pat)>0 then
@@ -6440,7 +5314,9 @@ if quitting or (fileSrv.rootFile = NIL) then
 end; // getTrayTipMsg
 
 procedure Tmainfrm.updateTrayTip();
-begin tray.setTip(getTrayTipMsg()) end;
+begin
+  tray.setTip(getTrayTipMsg())
+end;
 
 procedure TmainFrm.Restore1Click(Sender: TObject);
 begin
@@ -6461,11 +5337,12 @@ procedure TmainFrm.Restoredefault1Click(Sender: TObject);
 resourcestring
   MSG_TPL_RESET = 'The template has been reset';
 begin
-if msgDlg(MSG_CONTINUE, MB_ICONQUESTION+MB_YESNO) = MRNO then exit;
-tplFilename:='';
-tplLast:=-1;
-tplImport:=TRUE;
-setStatusBarText(MSG_TPL_RESET);
+  if msgDlg(MSG_CONTINUE, MB_ICONQUESTION+MB_YESNO) = MRNO then
+    exit;
+  tplFilename:='';
+  tplLast:=-1;
+  tplImport:=TRUE;
+  setStatusBarText(MSG_TPL_RESET);
 end;
 
 procedure TmainFrm.Reverttopreviousversion1Click(Sender: TObject);
@@ -6509,8 +5386,8 @@ begin setTrayShows(TS_hits) end;
 //procedure Tmainfrm.setTrayShows(s:string);
 procedure Tmainfrm.setTrayShows(s: TTrayShows);
 begin
-trayShows:=s;
-repainttray();
+  trayShows := s;
+  repaintTray(fileSrv);
 end; // setTrayShows
 
 procedure TmainFrm.Exit1Click(Sender: TObject);
@@ -6530,8 +5407,8 @@ begin flashOn:='' end;
 
 procedure Tmainfrm.addTray();
 begin
-repaintTray();
-tray.show();
+  repaintTray(fileSrv);
+  tray.show();
 end; // addTray
 
 procedure TmainFrm.Allowedreferer1Click(Sender: TObject);
@@ -6547,14 +5424,23 @@ end;
 // addtray
 
 procedure TmainFrm.FormShow(Sender: TObject);
+var
+  ppi: Integer;
 begin
   if trayed then
     showWindow(application.handle, SW_HIDE);
   updateTrayTip();
   connBox.DoubleBuffered := true;
 
-  logBox.Font.PixelsPerInch := Self.CurrentPPI;
-  IconsDM.images.SetSize(MulDiv(16, Self.CurrentPPI, 96), MulDiv(16, Self.CurrentPPI, 96));
+ {$IFDEF FPC}
+  ppi := Self.PixelsPerInch;
+ {$ELSE ~FPC}
+  ppi := Self.CurrentPPI;
+ {$ENDIF FPC}
+  logBox.Font.PixelsPerInch := ppi;
+ {$IFNDEF FPC}
+  IconsDM.images.SetSize(MulDiv(16, ppi, 96), MulDiv(16, ppi, 96));
+ {$ENDIF FPC}
 end;
 
 procedure TmainFrm.filesBoxDragOver(Sender, Source: TObject; X, Y: Integer;
@@ -6581,7 +5467,7 @@ begin
     exit;
   if filesBox.SelectionCount > 0 then
     for i:=0 to filesBox.SelectionCount-1 do
-      with nodeToFile(filesbox.selections[i]) do
+      with nodeToFile(filesBox.selections[i]) do
         if isRoot() or isLocked() then exit;
   src := selectedFile;
   accept := (dst <> src.parent) and (dst <> src);
@@ -6589,9 +5475,9 @@ end;
 
 procedure TmainFrm.filesBoxDragDrop(Sender, Source: TObject; X,Y: Integer);
 var
-  dst: Ttreenode;
+  dst: TFileNode;
   i, bak: integer;
-  nodes: array of Ttreenode;
+  nodes: TFileNodeDynArray;
 begin
   if selectedFile = NIL then
     exit;
@@ -6601,23 +5487,35 @@ begin
     dst := dst.parent;
 // copy list of selected nodes
   setlength(nodes, filesBox.SelectionCount);
-for i:=0 to filesBox.SelectionCount-1 do nodes[i]:=filesbox.selections[i];
+  for i:=0 to filesBox.SelectionCount-1 do
+    nodes[i]:=filesBox.selections[i];
 // check for namesakes
-for i:=0 to length(nodes)-1 do
-  if fileSrv.existsNodeWithName(nodes[i].Text, dst) then
-    if msgDlg(MSG_SAME_NAME, MB_ICONWARNING+MB_YESNO) = IDYES then break
-    else exit;
-// move'em
-for i:=0 to length(nodes)-1 do
-  begin
-  // removing and restoring stateIndex is a workaround to a delphi bug
-  bak:=nodes[i].stateIndex;
-  nodes[i].stateIndex:=0;
-  nodes[i].moveTo(dst, naAddChild);
-  nodes[i].stateIndex:=bak;
-  end;
-filesBox.refresh();
-dst.alphaSort(FALSE);
+  for i:=0 to length(nodes)-1 do
+    if fileSrv.existsNodeWithName(nodes[i].Text, dst) then
+      if msgDlg(MSG_SAME_NAME, MB_ICONWARNING+MB_YESNO) = IDYES then
+        break
+       else
+        exit;
+  // move'em
+  for i:=0 to length(nodes)-1 do
+    begin
+    // removing and restoring stateIndex is a workaround to a delphi bug
+      bak:=nodes[i].stateIndex;
+      nodes[i].stateIndex:=0;
+      nodes[i].moveTo(dst, naAddChild);
+      nodes[i].stateIndex:=bak;
+    end;
+  filesBox.refresh();
+ {$IFDEF FPC}
+  dst.alphaSort;
+ {$ELSE ~FPC}
+  dst.alphaSort(FALSE);
+ {$ENDIF FPC}
+end;
+
+procedure TmainFrm.onRefreshConn(conn: TconnData);
+begin
+  refreshConn(conn);
 end;
 
 procedure TmainFrm.refreshConn(conn: TconnData; checkProgress: Boolean = True);
@@ -6627,9 +5525,9 @@ var
 begin
   if quitting then
     exit;
-
-  for i:=0 to connBox.items.count-1 do
-    if conn2data(i) = conn then
+  if connBox.items.count > 0 then
+   for i:=0 to connBox.items.count-1 do
+    if fileSrv.conn2data(i) = conn then
       begin
         //ToDo - To add check if we need to repaint (something changed)
         // Refresh is not working, because it's refreshes 2 times at once
@@ -6644,29 +5542,31 @@ begin
 end; // refreshConn
 
 
-function Tmainfrm.getVFS(node: Ttreenode=NIL): RawByteString;
+//function Tmainfrm.getVFS(node: TFileNode=NIL): RawByteString;
+function Tmainfrm.getFullVFS: RawByteString;
 var
   f: Tfile;
 begin
   Result := '';
-  if node = NIL then
-    f := fileSrv.rootFile
-   else
-    f := nodeToFile(node);
+//  if node = NIL then
+    f := fileSrv.rootFile;
+//   else
+//    f := nodeToFile(node);
   if f = NIL then
     exit;
   Result := f.getVFS;
 end; // getVFS
 
-function Tmainfrm.getVFSJZ(node: TTreeNode=NIL): RawByteString;
+//function Tmainfrm.getVFSJZ(node: TFileNode=NIL): RawByteString;
+function Tmainfrm.getFullVFSJZ: RawByteString;
 var
   f: Tfile;
 begin
   Result := '';
-  if node = NIL then
-    f := fileSrv.rootFile
-   else
-    f := nodeToFile(node);
+//  if node = NIL then
+    f := fileSrv.rootFile;
+//   else
+//    f := nodeToFile(node);
   if f = NIL then
     exit('');
   Result := f.getVFSZ;
@@ -6675,33 +5575,40 @@ end; // getVFSJZ
 procedure TmainFrm.Savefilesystem1Click(Sender: TObject);
 begin saveVFS() end;
 
-procedure TmainFrm.filesBoxDeletion(Sender: TObject; Node: TTreeNode);
+procedure TmainFrm.filesBoxDeletion(Sender: TObject; Node: TFileNode);
 var
   f: Tfile;
 begin
   f := node.data;
   node.data := NIL;
-  fileSrv.fileDeletion(f);
+  if Assigned(fileSrv) then
+    fileSrv.fileDeletion(f);
 end;
 
 function blockLoadSave():boolean;
-resourcestring MSG_CANT_LOAD_SAVE = 'Cannot load or save while adding files';
+resourcestring
+  MSG_CANT_LOAD_SAVE = 'Cannot load or save while adding files';
 begin
-result:=addingItemsCounter > 0;
-if not result then exit;
-msgDlg(MSG_CANT_LOAD_SAVE, MB_ICONERROR);
+  result := addingItemsCounter > 0;
+  if not result then
+    exit;
+  msgDlg(MSG_CANT_LOAD_SAVE, MB_ICONERROR);
 end; // blockLoadSave
 
 procedure TmainFrm.Loadfilesystem1Click(Sender: TObject);
-resourcestring MSG_OPEN_VFS = 'Open VFS file';
+resourcestring
+  MSG_OPEN_VFS = 'Open VFS file';
 var
   fn: string;
 begin
-if blockLoadSave() then exit;
-if not checkVfsOnQuit() then exit;
-fn:='';
-if promptForFileName(fn, 'VirtualFileSystem|*.vfs|VirtualFileSystem JSON Zipped|*.vfsjz', 'vfs', MSG_OPEN_VFS) then
-  loadVFS(fn);
+  if blockLoadSave() then
+    exit;
+  if not checkVfsOnQuit() then
+    exit;
+  fn:='';
+  if promptForFileName(fn, 'All VFS|*.vfs;*.vfsjz|VirtualFileSystem|*.vfs|VirtualFileSystem JSON Zipped|*.vfsjz', 'vfs;vfsjz', MSG_OPEN_VFS) then
+    loadVFS(fn);
+  updateCurrentCFG;
 end;
 
 procedure TmainFrm.graphBoxPaint(Sender: TObject);
@@ -6719,29 +5626,31 @@ begin
   bmp.free;
 end;
 
-procedure resendShortcut(mi:Tmenuitem; sc:Tshortcut);
+procedure resendShortcut(mi: TMenuItem; sc: TShortCut);
 var
   i: integer;
 begin
-if mi.shortcut = sc then mi.click();
-for i:=0 to mi.count-1 do resendShortcut(mi.items[i], sc); 
+  if mi.shortcut = sc then
+    mi.click();
+  for i:=0 to mi.count-1 do
+    resendShortcut(mi.items[i], sc);
 end;
 
 procedure TmainFrm.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-altPressedForMenu:=(key = 18) and (shift = [ssAlt]);
-resendShortcut(menu.items, shortcut(key,shift));
-if shift = [] then
-  case key of
-    VK_F10: popupMainMenu();
+  altPressedForMenu := (key = 18) and (shift = [ssAlt]);
+  resendShortcut(menu.items, shortcut(key,shift));
+  if shift = [] then
+   case key of
+     VK_F10: popupMainMenu();
     end;
 end;
 
 procedure TmainFrm.FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-if altPressedForMenu and (key = 18) and (shift = []) then
-  popupMainMenu();
-altPressedForMenu:=FALSE
+  if altPressedForMenu and (key = 18) and (shift = []) then
+    popupMainMenu();
+  altPressedForMenu:=FALSE
 end;
 
 procedure TmainFrm.Officialwebsite1Click(Sender: TObject);
@@ -6749,8 +5658,10 @@ begin openURL('https://www.rejetto.com/hfs/') end;
 
 procedure TmainFrm.showmaintrayiconChkClick(Sender: TObject);
 begin
-if showmaintrayiconChk.Checked then addTray()
-else tray.hide();
+  if showmaintrayiconChk.Checked then
+    addTray()
+   else
+    tray.hide();
 end;
 
 procedure TmainFrm.expandBtnClick(Sender: TObject);
@@ -6763,19 +5674,25 @@ resourcestring
 var
   s: string;
 begin
-if speedLimit < 0 then s:=''
-else s:=floatToStr(speedLimit);
-if not inputquery(MSG_SET_LIMIT, MSG_MAX_BW+#13+MSG_EMPTY_NO_LIMIT+#13, s) then
-  exit;
-try
-  s:=trim(s);
-  if s = '' then setSpeedLimit(-1)
-  else setSpeedLimit(strToFloat(s));
-  if speedLimit = 0 then
-    msgDlg(MSG_LIM0, MB_ICONWARNING);
-  // a manual set of speedlimit voids the pause command
-  Pausestreaming1.Checked:=FALSE;
-except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR) end;
+  if speedLimit < 0 then
+    s:=''
+   else
+    s:=floatToStr(speedLimit);
+  if not inputquery(MSG_SET_LIMIT, MSG_MAX_BW+#13+MSG_EMPTY_NO_LIMIT+#13, s) then
+    exit;
+  try
+    s := trim(s);
+    if s = '' then
+      setSpeedLimit(-1)
+     else
+      setSpeedLimit(strToFloat(s));
+    if speedLimit = 0 then
+      msgDlg(MSG_LIM0, MB_ICONWARNING);
+    // a manual set of speedlimit voids the pause command
+    PauseStreaming1.Checked := FALSE;
+   except
+    msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
+  end;
 end;
 
 procedure TmainFrm.Speedlimitforsingleaddress1Click(Sender: TObject);
@@ -6784,34 +5701,43 @@ resourcestring
 var
   s: string;
 begin
-if speedLimitIP <= 0 then s:=''
-else s:=floatToStr(speedLimitIP);
-if inputquery(MSG_SET_LIMIT, MSG_MAX_BW_1+#13+MSG_EMPTY_NO_LIMIT, s) then
-	try
-  	s:=trim(s);
-  	if s = '' then setSpeedLimitIP(-1)
-    else setSpeedLimitIP(strToFloat(s));
-  except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
-  end;
+  if speedLimitIP <= 0 then
+    s := ''
+   else
+    s := floatToStr(speedLimitIP);
+  if inputquery(MSG_SET_LIMIT, MSG_MAX_BW_1+#13+MSG_EMPTY_NO_LIMIT, s) then
+    try
+      s:=trim(s);
+      if s = '' then
+        setSpeedLimitIP(-1)
+       else
+        setSpeedLimitIP(strToFloat(s));
+     except
+      msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
+    end;
 end;
 
 procedure Tmainfrm.setnoDownloadTimeout(v:integer);
 begin
-if v < 0 then v:=0;
-if v <> noDownloadTimeout then lastActivityTime:=now();
-noDownloadTimeout:=v;
-noDownloadTimeout1.caption:=MSG_DL_TIMEOUT
-  +format(MSG_MENU_VAL, [if_(v=0, DISABLED, intToStr(v) )]);
+  if v < 0 then
+    v := 0;
+  if v <> noDownloadTimeout then
+    lastActivityTime:=now();
+  noDownloadTimeout:=v;
+  noDownloadTimeout1.caption := MSG_DL_TIMEOUT
+    +format(MSG_MENU_VAL, [if_(v=0, DISABLED, intToStr(v) )]);
 end;
 
 procedure Tmainfrm.setGraphRate(v:integer);
 resourcestring
   MSG_GRAPH_RATE_MENU = 'Graph refresh rate: %d (tenths of second)';
 begin
-if v < 1 then v:=1;
-if graph.rate = v then exit;
-graph.rate:=v;
-Graphrefreshrate1.caption:=format(MSG_GRAPH_RATE_MENU, [v]);
+  if v < 1 then
+    v:=1;
+  if graph.rate = v then
+    exit;
+  graph.rate:=v;
+  Graphrefreshrate1.caption:=format(MSG_GRAPH_RATE_MENU, [v]);
 // changing rate invalidates previous data
   ZeroMemory(@graph.samplesIn, sizeof(graph.samplesIn));
   ZeroMemory(@graph.samplesOut, sizeof(graph.samplesOut));
@@ -6826,14 +5752,18 @@ resourcestring
 var
   s: string;
 begin
-if maxConnections > 0 then s:=intToStr(maxConnections)
-else s:='';
-if inputquery(MSG_SET_LIMIT, MSG_MAX_CON_LONG+#13+MSG_EMPTY_NO_LIMIT, s) then
-	try setMaxConnections(strToUInt(s))
-  except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
-  end;
-if (maxConnections > 0) and (srv.conns.count > maxConnections) then
-  msgDlg(format(MSG_WARN_CONN, [srv.conns.count]), MB_ICONWARNING);
+  if maxConnections > 0 then
+    s:=intToStr(maxConnections)
+   else
+    s:='';
+  if inputquery(MSG_SET_LIMIT, MSG_MAX_CON_LONG+#13+MSG_EMPTY_NO_LIMIT, s) then
+    try
+      setMaxConnections(strToUInt(s))
+     except
+      msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
+    end;
+  if (maxConnections > 0) and (fileSrv.getConnectionsCount > maxConnections) then
+    msgDlg(format(MSG_WARN_CONN, [fileSrv.getConnectionsCount]), MB_ICONWARNING);
 end;
 
 procedure TmainFrm.maxDLs1Click(Sender: TObject);
@@ -6843,16 +5773,21 @@ var
   s: string;
   i: integer;
 begin
-if maxContempDLs > 0 then s:=intToStr(maxContempDLs)
-else s:='';
-if inputquery(MSG_SET_LIMIT, MSG_MAX_SIM_DL+#13+MSG_EMPTY_NO_LIMIT, s) then
-	try setMaxDLs(strToUInt(s))
-  except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
-  end;
-if maxContempDLs = 0 then exit;
-i:=countDownloads();
-if i > maxContempDLs then
-  msgDlg(format(MSG_WARN_ACT_DL, [i]), MB_ICONWARNING);
+  if maxContempDLs > 0 then
+    s:=intToStr(maxContempDLs)
+   else
+    s:='';
+  if inputquery(MSG_SET_LIMIT, MSG_MAX_SIM_DL+#13+MSG_EMPTY_NO_LIMIT, s) then
+    try
+      setMaxDLs(strToUInt(s))
+     except
+      msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
+    end;
+  if maxContempDLs = 0 then
+    exit;
+  i := fileSrv.countDownloads();
+  if i > maxContempDLs then
+    msgDlg(format(MSG_WARN_ACT_DL, [i]), MB_ICONWARNING);
 end;
 
 procedure TmainFrm.Maxconnectionsfromsingleaddress1Click(Sender: TObject);
@@ -6864,20 +5799,25 @@ var
   addresses: TStringDynArray;
   i: integer;
 begin
-if maxConnectionsIP > 0 then s:=intToStr(maxConnectionsIP)
-else s:='';
-if inputquery(MSG_SET_LIMIT, MSG_MAX_CON_SING_LONG+#13+MSG_EMPTY_NO_LIMIT, s) then
-	try setMaxConnectionsIP(strToUInt(s))
-  except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
-  end;
-if maxConnectionsIP = 0 then exit;
-addresses:=NIL;
-for i:=0 to srv.conns.Count-1 do
-  with conn2data(i) do
-    if countConnectionsByIP(address) > maxConnectionsIP then
+  if maxConnectionsIP > 0 then
+    s := intToStr(maxConnectionsIP)
+   else
+    s:='';
+  if inputquery(MSG_SET_LIMIT, MSG_MAX_CON_SING_LONG+#13+MSG_EMPTY_NO_LIMIT, s) then
+    try
+      setMaxConnectionsIP(strToUInt(s))
+     except
+      msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
+    end;
+  if maxConnectionsIP = 0 then
+    exit;
+  addresses:=NIL;
+  for i:=0 to fileSrv.getConnectionsCount-1 do
+   with fileSrv.conn2data(i) do
+    if countConnectionsByIP(fileSrv.htSrv, address) > maxConnectionsIP then
       addUniqueString(address, addresses);
-if assigned(addresses) then
-  msgDlg(format(MSG_ADDRESSES_EXCEED,[join(#13, addresses)]), MB_ICONWARNING);
+  if assigned(addresses) then
+    msgDlg(format(MSG_ADDRESSES_EXCEED,[join(#13, addresses)]), MB_ICONWARNING);
 end;
 
 procedure TmainFrm.MaxDLsIP1Click(Sender: TObject);
@@ -6886,24 +5826,34 @@ var
   addresses: TStringDynArray;
   i: integer;
 begin
-if maxContempDLsIP > 0 then s:=intToStr(maxContempDLsIP)
-else s:='';
-if inputquery(MSG_SET_LIMIT, MSG_MAX_SIM_DL_SING+#13+MSG_EMPTY_NO_LIMIT, s) then
-	try setMaxDLsIP(strToUInt(s))
-  except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
-  end;
-if maxContempDLsIP = 0 then exit;
-addresses:=NIL;
-for i:=0 to srv.conns.Count-1 do
-  with conn2data(i) do
-    if countDownloads(address) > maxContempDLsIP then
+  if maxContempDLsIP > 0 then
+    s:=intToStr(maxContempDLsIP)
+   else
+    s:='';
+  if inputquery(MSG_SET_LIMIT, MSG_MAX_SIM_DL_SING+#13+MSG_EMPTY_NO_LIMIT, s) then
+    try
+      setMaxDLsIP(strToUInt(s))
+     except
+      msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
+    end;
+  if maxContempDLsIP = 0 then
+    exit;
+  addresses:=NIL;
+  for i:=0 to fileSrv.getConnectionsCount-1 do
+   with fileSrv.conn2data(i) do
+    if fileSrv.countDownloads(address) > maxContempDLsIP then
       addUniqueString(address, addresses);
-if assigned(addresses) then
-  msgDlg(format(MSG_ADDRESSES_EXCEED,[join(#13, addresses)]), MB_ICONWARNING);
+  if assigned(addresses) then
+    msgDlg(format(MSG_ADDRESSES_EXCEED,[join(#13, addresses)]), MB_ICONWARNING);
 end;
 
 procedure TmainFrm.Forum1Click(Sender: TObject);
 begin openURL('http://www.rejetto.com/forum/') end;
+
+procedure TmainFrm.RDForumMnuClick(Sender: TObject);
+begin
+  openURL('https://RnQ.ru/forum/http-file-server');
+end;
 
 procedure TmainFrm.FAQ1Click(Sender: TObject);
 begin openURL('http://www.rejetto.com/sw/?faq=hfs') end;
@@ -6913,25 +5863,33 @@ begin openURL('https://www.gnu.org/licenses/gpl-3.0.html') end;
 
 procedure Tmainfrm.pasteFiles();
 begin
+ {$IFDEF FPC}
+    msgDlg('Files-past does not supported', MB_ICONERROR);
+ {$ELSE ~FPC}
 // try twice
-try addDropFiles(clipboard.GetAsHandle(CF_HDROP), filesBox.selected)
-except
-  try addDropFiles(clipboard.GetAsHandle(CF_HDROP), filesBox.selected)
-  except on e:Exception do
-    msgDlg(e.message, MB_ICONERROR);
+  try
+    addDropFiles(clipboard.GetAsHandle(CF_HDROP), filesBox.selected)
+   except
+    try
+      addDropFiles(clipboard.GetAsHandle(CF_HDROP), filesBox.selected)
+     except on e:Exception do
+      msgDlg(e.message, MB_ICONERROR);
     end
   end;
+ {$ENDIF FPC}
 end;
 
 procedure TmainFrm.Paste1Click(Sender: TObject);
-begin pasteFiles() end;
+begin
+  pasteFiles()
+end;
 
 procedure TmainFrm.Addfiles1Click(Sender: TObject);
 var
 //  dlg: TopenDialog;
   i: integer;
-  fn: String;
-  initDir: String;
+  fn: UnicodeString;
+  initDir: UnicodeString;
 
 begin
 {dlg:=TopenDialog.create(self);
@@ -6941,7 +5899,7 @@ dlg.Options:=dlg.Options+[ofAllowMultiSelect, ofFileMustExist, ofPathMustExist];
 if dlg.Execute() then
   begin
 	for i:=0 to dlg.files.count-1 do
-    addFile(Tfile.create(filesBox, dlg.files[i]), filesBox.Selected, dlg.Files.count<>1 );
+    addFile(Tfile.create(fileSrv, dlg.files[i]), filesBox.Selected, dlg.Files.count<>1 );
   lastDialogFolder:=extractFilePath(dlg.fileName);
   end;
 dlg.free;
@@ -6955,7 +5913,7 @@ dlg.free;
         var files := split(';', fn);
         if Length(Files) > 0 then
           for i:=0 to Length(Files)-1 do
-            addFile(Tfile.create(filesBox, files[i]), filesBox.Selected, Length(Files)<>1 );
+            fileSrv.addFileGUI(Tfile.create(fileSrv, files[i]), filesBox.Selected, Length(Files)<>1 );
         lastDialogFolder := extractFilePath(fn);
       end;
 end;
@@ -6990,18 +5948,21 @@ end;
 
 procedure TmainFrm.Pausestreaming1Click(Sender: TObject);
 begin
-if pausestreaming1.checked then globalLimiter.maxSpeed:=0
-else setSpeedLimit(speedLimit)
+  if pausestreaming1.checked then
+    globalLimiter.maxSpeed:=0
+   else
+    setSpeedLimit(speedLimit)
 end;
 
 procedure TmainFrm.Comment1Click(Sender: TObject);
 var
   i: integer;
 begin
-if selectedFile = NIL then exit;
-inputComment(selectedFile);
-for i:=0 to filesBox.SelectionCount-1 do
-  nodeToFile(filesBox.Selections[i]).comment:=selectedFile.comment;
+  if selectedFile = NIL then
+    exit;
+  inputComment(selectedFile);
+  for i:=0 to filesBox.SelectionCount-1 do
+    nodeToFile(filesBox.Selections[i]).comment:=selectedFile.comment;
 end;
 
 procedure TmainFrm.filesBoxCustomDrawItem(Sender: TCustomTreeView;
@@ -7028,17 +5989,17 @@ begin
   node.stateIndex := RDUtils.ifThen((f.user > '') or (assigned(a) and not onlyAnon), ICON_LOCK, -1);
 end;
 
-function Tmainfrm.fileAttributeInSelection(fa:TfileAttribute):boolean;
+function Tmainfrm.fileAttributeInSelection(fa: TfileAttribute): Boolean;
 var
   i: integer;
 begin
-for i:=0 to filesBox.SelectionCount-1 do
-  if fa in nodeTofile(filesBox.Selections[i]).flags then
-    begin
-    result:=TRUE;
-    exit;
-    end;
-result:=FALSE;
+  for i:=0 to filesBox.SelectionCount-1 do
+    if fa in nodeTofile(filesBox.Selections[i]).flags then
+      begin
+        result := TRUE;
+        exit;
+      end;
+  result := FALSE;
 end; // fileAttributeInSelection
 
 procedure TmainFrm.Setuserpass1Click(Sender: TObject);
@@ -7055,7 +6016,7 @@ pwd:=selectedFile.pwd;
 if not newuserpassFrm.prompt(user, pwd) then exit;
 for i:=0 to filesBox.SelectionCount-1 do
   begin
-  f:=filesBox.Selections[i].data;
+  f := filesBox.Selections[i].data;
   usersInVFS.drop(f.user, f.pwd);
   f.user:=user;
   f.pwd:=pwd;
@@ -7072,9 +6033,10 @@ procedure TmainFrm.BanIPaddress1Click(Sender: TObject);
 var
   cd: TconnData;
 begin
-cd:=selectedConnection();
-if cd = NIL then exit;
-banAddress(cd.address);
+  cd := selectedConnection();
+  if cd = NIL then
+    exit;
+  banAddress(fileSrv, cd.address);
 end;
 
 procedure TmainFrm.BannedIPaddresses1Click(Sender: TObject);
@@ -7086,35 +6048,38 @@ procedure Tmainfrm.recentsClick(sender:Tobject);
 var
   i: integer;
 begin
-if blockLoadSave() then exit;
-i:=strToInt((sender as Tmenuitem).Caption[3]);
-if i > length(recentFiles) then exit;
-dec(i); // convert to zero based
-if fileExists(recentFiles[i]) then
-  begin
-  if not checkVfsOnQuit() then exit;
-  loadVFS(recentFiles[i]);
-  end
-else
-  begin
-  msgDlg('The file does not exist anymore', MB_ICONERROR);
-  removeString(recentFiles, i);
-  updateRecentFilesMenu();
-  end;
+  if blockLoadSave() then
+    exit;
+  i := strToInt((sender as Tmenuitem).Caption[3]);
+  if i > length(recentFiles) then
+    exit;
+  dec(i); // convert to zero based
+  if fileExists(recentFiles[i]) then
+    begin
+      if not checkVfsOnQuit() then
+        exit;
+      loadVFS(recentFiles[i]);
+    end
+   else
+    begin
+      msgDlg('The file does not exist anymore', MB_ICONERROR);
+      removeString(recentFiles, i);
+      updateRecentFilesMenu();
+    end;
 end;
 
 procedure Tmainfrm.updateRecentFilesMenu();
 var
   i: integer;
 begin
-Loadrecentfiles1.Clear();
-for i:=0 to length(recentFiles)-1 do
-  loadrecentfiles1.Add(
-    NewItem( '[&'+intToStr(i+1)+'] '+ExtractFileName(recentFiles[i]), 0, FALSE, TRUE, recentsClick, 0, 'recent') );
-Loadrecentfiles1.visible:=Loadrecentfiles1.count>0;
+  Loadrecentfiles1.Clear();
+  for i:=0 to length(recentFiles)-1 do
+    loadrecentfiles1.Add(
+      NewItem( '[&'+intToStr(i+1)+'] '+ExtractFileName(recentFiles[i]), 0, FALSE, TRUE, recentsClick, 0, 'recent') );
+  Loadrecentfiles1.visible:=Loadrecentfiles1.count>0;
 end; // updateRecentFilesMenu
 
-procedure Tmainfrm.loadVFS(fn:string);
+procedure Tmainfrm.loadVFS(fn: String);
 resourcestring
   MSG_LOADING_VFS = 'Loading VFS';
   MSG_VFS_OLD = 'This file is old and uses different settings.'
@@ -7136,6 +6101,7 @@ resourcestring
     +#13'This file contains macros.'
     +#13'Don''t accept macros from people you don''t trust.'
     +#13#13'Trust this file?';
+  MSG_LOADING_VFS_DOTS = 'Loading VFS...';
 var
   took: Tdatetime;
   data2: RawByteString;
@@ -7155,10 +6121,10 @@ var
 begin
   if fn = '' then
     exit;
-  if ExtractFileExt(fn) = '.vfsjz' then
+  if lowerCase(ExtractFileExt(fn)) = '.vfsjz' then
     begin // JSON in Zip
       filesBox.hide(); // it seems to speed up a lot
-      progFrm.show('Loading VFS...', TRUE);
+      progFrm.show(MSG_LOADING_VFS_DOTS, TRUE);
       disableUserInteraction();
       try
         ZeroMemory(@loadingVFS, sizeof(loadingVFS));
@@ -7166,7 +6132,7 @@ begin
 
         data2 := loadfile(fn);
         loadingVfs.bakAvailable := fileExists(fn+BAK_EXT);
-        if not ansiStartsStr('PK', data2)
+        if not ansiStartsStr(RawByteString('PK'), data2)
         and not restoreBak(data2) then
           begin
             if data2 = '' then
@@ -7188,7 +6154,7 @@ begin
            else
             lastFileOpen := fn;
           VFSmodified := FALSE;
-          purgeVFSaccounts(); // remove references to non-existent users
+          fileSrv.purgeVFSaccounts(); // remove references to non-existent users
           filesBox.FullCollapse();
           var n := fileSrv.getRootNode;
           if Assigned(n) then
@@ -7228,7 +6194,7 @@ begin
    else
     begin
       filesBox.hide(); // it seems to speed up a lot
-      progFrm.show('Loading VFS...', TRUE);
+      progFrm.show(MSG_LOADING_VFS_DOTS, TRUE);
       disableUserInteraction();
       try
         ZeroMemory(@loadingVFS, sizeof(loadingVFS));
@@ -7237,15 +6203,14 @@ begin
         loadingVfs.bakAvailable:=fileExists(fn+BAK_EXT);
         if not ansiStartsStr(TLV(FK_HEAD, VFS_FILE_IDENTIFIER), data2)
         and not restoreBak(data2) then
-          begin
+         begin
           if data2 = '' then
-          msgDlg(MSG_CORRUPTED, MB_ICONERROR);
+            msgDlg(MSG_CORRUPTED, MB_ICONERROR);
           exit;
-          end;
+         end;
         try
           initVFS();
           fileSrv.setVFS(data2, NIL, onLoadVFSprogress);
-//          setVFS2_(data2);
           if loadingVFS.useBackup and restoreBak(data2) then
             begin
             initVFS();
@@ -7258,7 +6223,7 @@ begin
            else
             lastFileOpen:=fn;
           VFSmodified:=FALSE;
-          purgeVFSaccounts(); // remove references to non-existent users
+          fileSrv.purgeVFSaccounts(); // remove references to non-existent users
           filesBox.FullCollapse();
           var n := fileSrv.getRootNode;
           if Assigned(n) then
@@ -7304,27 +6269,29 @@ begin logToolbar.visible:=not easyMode and (logBox.Lines.count > 0) end;
 
 procedure Tmainfrm.popupMainMenu();
 begin
-menuBtn.Down:=TRUE;
-with menuBtn.clientToScreen(point(0,menuBtn.height)) do
-  menu.popup(x,y);
-menuBtn.Down:=FALSE;
+  menuBtn.Down:=TRUE;
+  with menuBtn.clientToScreen(point(0,menuBtn.height)) do
+    menu.popup(x,y);
+  menuBtn.Down:=FALSE;
 end;
 
 procedure TmainFrm.portBtnClick(Sender: TObject);
 var
   s: string;
 begin
-s:=port;
+  s := fileSrv.prefs.getDPrefStr('port');
   repeat
-  if not inputQuery('Port', 'Specify a port to accept connection,'#13'or leave empty to decide automatically.', s) then exit;
-  s:=trim(s);
-  if not isOnlyDigits(s) then
-    begin
-    msgDlg('Numbers only', MB_ICONERROR);
-    continue;
-    end;
-  if changePort(s) then exit;
-  sayPortBusy(s);
+    if not inputQuery('Port', 'Specify a port to accept connection,'#13'or leave empty to decide automatically.', s) then
+      exit;
+    s := trim(s);
+    if (s>'') and not isOnlyDigits(s) then
+      begin
+        msgDlg('Numbers only', MB_ICONERROR);
+        continue;
+      end;
+    if fileSrv.changePort(s) then
+      exit;
+    sayPortBusy(s);
   until FALSE;
 end;
 
@@ -7348,8 +6315,8 @@ begin selectFile(tplEditor, '', 'Programs|*.exe', [ofFileMustExist]) end;
 
 procedure TmainFrm.Changefile1Click(Sender: TObject);
 begin
-if selectFile(tplFilename, 'Change template file', 'Template file|*.tpl', [ofPathMustExist, ofCreatePrompt]) then
-  setNewTplFile(tplFilename);
+  if selectFile(tplFilename, 'Change template file', 'Template file|*.tpl', [ofPathMustExist, ofCreatePrompt]) then
+    setNewTplFile(tplFilename);
 end;
 
 procedure TmainFrm.Changeport1Click(Sender: TObject);
@@ -7399,17 +6366,17 @@ end;
 
 procedure Tmainfrm.setEasyMode(easy:boolean=TRUE);
 resourcestring
-  ARE_EXPERT = 'You are in Expert mode';
-  ARE_EASY = 'You are in Easy mode';
-  SW2EXPERT = 'Switch to Expert mode';
-  SW2EASY = 'Switch to Easy mode';
+  MSG_ARE_EXPERT = 'You are in Expert mode';
+  MSG_ARE_EASY = 'You are in Easy mode';
+  MSG_SW2EXPERT = 'Switch to Expert mode';
+  MSG_SW2EASY = 'Switch to Easy mode';
 const
   ICO :array [boolean] of integer = (ICON_EXPERT, ICON_EASY);
 begin
 easyMode:=easy;
-switchMode.caption:=ifThen(easyMode, SW2EXPERT, SW2EASY);
+switchMode.caption:=ifThen(easyMode, MSG_SW2EXPERT, MSG_SW2EASY);
 //switchMode.imageIndex:=ICO[not easyMode];  disabled because it's ugly, it uses the same icon as the next menu item (accounts)
-modeBtn.caption:=ifThen(easyMode, ARE_EASY, ARE_EXPERT);
+modeBtn.caption:=ifThen(easyMode, MSG_ARE_EASY, MSG_ARE_EXPERT);
 modeBtn.imageIndex:=ICO[easyMode];
 if not easyMode or graphInEasyMode then showGraph()
 else hideGraph();
@@ -7422,8 +6389,8 @@ end; // switchEasyMode
 
 procedure TmainFrm.Rename1Click(Sender: TObject);
 begin
-if assigned(selectedFile) then
-  filesBox.Selected.EditText()
+  if assigned(selectedFile) then
+    filesBox.Selected.EditText()
 end;
 
 procedure TmainFrm.noDownloadtimeout1Click(Sender: TObject);
@@ -7445,7 +6412,7 @@ procedure Tmainfrm.initVFS();
 begin
   uploadPaths := NIL;
   fileSrv.clearNodes;
-  fileSrv.initRootWithNode(filesBox);
+  fileSrv.initRootWithNode;
   VFSmodified := FALSE;
   lastFileOpen := '';
 end; // initVFS
@@ -7499,7 +6466,8 @@ begin
   if filesBox.SelectionCount > 0 then
     for i:=0 to filesBox.SelectionCount-1 do
       s := s+fileSrv.fullURL(nodeTofile(filesBox.Selections[i]))+CRLF;
-  setLength(s, length(s)-2);
+  if length(s) > 0 then
+    setLength(s, length(s)-2);
   setClip(s);
 end;
 
@@ -7534,12 +6502,12 @@ var
   s, addr: string;
   i: integer;
 begin
-addr:=(sender as Tmenuitem).Caption;
-delete(addr, pos('&',addr), 1);
+  addr := (sender as Tmenuitem).Caption;
+  delete(addr, pos('&',addr), 1);
 
-s:='';
-for i:=0 to filesBox.SelectionCount-1 do
-  s:=s+fileSrv.fullURL(nodeTofile(filesBox.Selections[i]), addr)+CRLF;
+  s := '';
+  for i:=0 to filesBox.SelectionCount-1 do
+    s:=s+fileSrv.fullURL(nodeTofile(filesBox.Selections[i]), addr)+CRLF;
 setLength(s, length(s)-2);
 
 setClip(s);
@@ -7551,23 +6519,28 @@ var
   s, hash: string;
   i: integer;
 begin
-if selectedFile = NIL then exit;
-s:='';
+  if selectedFile = NIL then
+    exit;
+  s := '';
+  if filesBox.SelectionCount > 0 then
 try
   for i:=0 to filesBox.SelectionCount-1 do
     begin
-    f:=filesBox.Selections[i].data;
+    f := filesBox.Selections[i].data;
 
     progFrm.show('Hashing '+f.name, TRUE);
-    progFrm.progress:=i / filesBox.SelectionCount;
+    progFrm.progress := i / filesBox.SelectionCount;
     application.ProcessMessages();
 
-    hash:=loadFingerprint(f.resource);
+    hash := loadFingerprint(f.resource);
     if (hash = '') and f.isFile() then
       begin
       progFrm.push( 1/filesBox.SelectionCount );
-      try hash:=createFingerprint(f.resource);
-      finally progFrm.pop() end;
+      try
+        hash:=createFingerprint(f.resource);
+       finally
+        progFrm.pop()
+      end;
       if saveNewFingerprintsChk.checked and (hash > '') then
         saveFileU(f.resource+'.md5', hash);
       end;
@@ -7592,25 +6565,44 @@ end;
 procedure TmainFrm.Guide1Click(Sender: TObject);
 begin openURL(HFS_GUIDE_URL) end;
 
-procedure Tmainfrm.saveVFS(fn:string='');
+procedure Tmainfrm.saveVFS(fn: String='');
+var
+  fileNameChanged: Boolean;
 begin
-if blockLoadSave() then exit;
-if fn = '' then
-  begin
+  if blockLoadSave() then
+    exit;
+  fileNameChanged := False;
+  if fn = '' then
+   begin
     fn:=lastFileOpen;
     if not promptForFileName(fn, 'VirtualFileSystem|*.vfs|VirtualFileSystem JSON Zipped|*.vfsjz', 'vfs', 'Save VFS', '', TRUE) then
       exit;
-  end;
+    fileNameChanged := True;
+   end;
   if isExtension(fn, '.vfsjz') then
     begin
-      savefileA(fn, getVFSJZ());
+      lastFileOpen := fn;
+      deleteFile(fn+BAK_EXT);
+      renameFile(fn, fn+BAK_EXT);
+      if not savefileA(fn, getFullVFSJZ()) then
+       begin
+        deleteFile(fn);
+        renameFile(fn+BAK_EXT, fn);
+        msgDlg('Error saving', MB_ICONERROR);
+        exit;
+       end;
+      if not backupSavingChk.checked then
+        deleteFile(fn+BAK_EXT);
+      VFSmodified := FALSE;
+      loadingVFS.disableAutosave := FALSE;
+      addUniqueString(fn, trustedFiles);
     end
    else
     begin
       lastFileOpen := fn;
       deleteFile(fn+BAK_EXT);
       renameFile(fn, fn+BAK_EXT);
-      if not savefileA(fn, addVFSheader(getVFS())) then
+      if not savefileA(fn, addVFSheader(getFullVFS())) then
        begin
         deleteFile(fn);
         renameFile(fn+BAK_EXT, fn);
@@ -7623,38 +6615,43 @@ if fn = '' then
       loadingVFS.disableAutosave:=FALSE;
       addUniqueString(fn, trustedFiles);
     end;
+  if fileNameChanged then
+    updateCurrentCFG;
 end; // saveVFS
 
-procedure TmainFrm.filesBoxAddition(Sender: TObject; Node: TTreeNode);
+procedure TmainFrm.filesBoxAddition(Sender: TObject; Node: TFileNode);
 begin
   VFSmodified:=TRUE;
-  if Node.Data <> NIL then
-    TFile(Node.Data).SyncNode(Node);
+//  if Node.Data <> NIL then
+//    TFile(Node.Data).SyncNode(Node);
 end;
 
 procedure TmainFrm.FormAfterMonitorDpiChanged(Sender: TObject; OldDPI,
   NewDPI: Integer);
 begin
   logBox.Font.PixelsPerInch := NewDPI;
+ {$IFNDEF FPC}
   IconsDM.images.SetSize(MulDiv(16, NewDPI, 96), MulDiv(16, NewDPI, 96));
+ {$ENDIF ~FPC}
 end;
 
 procedure TmainFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-quitting:=TRUE;
-if applicationFullyInitialized then
+  quitting:=TRUE;
+  if applicationFullyInitialized then
   begin
-  runEventScript(fileSrv, 'quit');
-  timer.enabled:=FALSE;
-  if autosaveOptionsChk.checked and not cfgLoaded then
-    saveCFG();
+    runEventScript(fileSrv, 'quit');
+    timer.enabled:=FALSE;
+    if autosaveOptionsChk.checked and not cfgLoaded then
+      saveCFG();
   end;
 // we disconnectAll() before srv.free, so we can purgeConnections()
-if assigned(srv) then srv.disconnectAll(TRUE);
-purgeConnections();
-freeAndNIL(srv);
-freeAndNIL(tray);
-freeAndNIL(tray_ico);
+  if assigned(fileSrv.htSrv) then
+    fileSrv.htSrv.disconnectAll(TRUE);
+  purgeConnections();
+  //freeAndNIL(srv);
+  freeAndNIL(tray);
+  freeAndNIL(tray_ico);
 end;
 
 procedure TmainFrm.Logfile1Click(Sender: TObject);
@@ -7673,7 +6670,7 @@ resourcestring
     +#13'  %w% -- week of the year (1..53)'
     +#13'  %user% -- username surrounded by parenthesis';
 begin
-InputQuery(MSG_LOG_FILE, MSG_LOG_FILE_LONG, logFile.filename)
+  InputQuery(MSG_LOG_FILE, MSG_LOG_FILE_LONG, logFile.filename)
 end;
 
 procedure TmainFrm.Font1Click(Sender: TObject);
@@ -7703,20 +6700,23 @@ var
   i: integer;
   s: string;
 begin
-if selectedFile = NIL then exit;
-s:=selectedFile.resource;
+  if selectedFile = NIL then
+    exit;
+  s := selectedFile.resource;
 // this is a little help for who's linking an email. We don't mess with http/ftp because even www.asd.com may be the name of a folder.
-if ansiContainsStr(s, '@')
-and not ansiStartsText('mailto:', s)
-and not ansiContainsStr(s, '://')
-and not ansiContainsStr(s, '/') then
-  s:='mailto:'+s;
-if not inputquery(MSG_SET_URL, MSG_SET_URL_LONG, s) then exit;
-for i:=0 to filesBox.SelectionCount-1 do
-  with nodeToFile(filesBox.Selections[i]) do
-    if FA_LINK in flags then
-      resource:=s;
-VFSmodified:=TRUE;
+  if ansiContainsStr(s, '@')
+   and not ansiStartsText('mailto:', s)
+   and not ansiContainsStr(s, '://')
+   and not ansiContainsStr(s, '/') then
+    s:='mailto:'+s;
+  if not inputquery(MSG_SET_URL, MSG_SET_URL_LONG, s) then
+    exit;
+  if filesBox.SelectionCount > 0 then
+    for i:=0 to filesBox.SelectionCount-1 do
+      with nodeToFile(filesBox.Selections[i]) do
+        if FA_LINK in flags then
+          resource:=s;
+  VFSmodified := TRUE;
 end;
 
 procedure TmainFrm.Resetuserpass1Click(Sender: TObject);
@@ -7724,9 +6724,10 @@ var
   i: integer;
   f: Tfile;
 begin
-for i:=0 to filesBox.SelectionCount-1 do
+  if filesBox.SelectionCount > 0 then
+    for i:=0 to filesBox.SelectionCount-1 do
   begin
-  f:=filesBox.Selections[i].data;
+  f := filesBox.Selections[i].data;
   usersInVFS.drop(f.user, f.pwd);
   f.user:='';
   f.pwd:='';
@@ -7738,11 +6739,11 @@ end;
 procedure TmainFrm.Switchtovirtual1Click(Sender: TObject);
 var
   f: Tfile;
-  under: Ttreenode;
+  under: TFileNode;
   i: integer;
   bakIcon: integer;
   someLocked: boolean;
-  nodes: TtreenodeDynArray;
+  nodes: TFileNodeDynArray;
   sysIcons: Boolean;
 begin
   if selectedFile = NIL then
@@ -7752,7 +6753,7 @@ begin
   addingItemsCounter := 0;
   sysIcons := mainfrm.useSystemIconsChk.checked;
   try
-    someLocked:=FALSE;
+    someLocked := FALSE;
     for i:=0 to length(nodes)-1 do
       if assigned(nodes[i]) then
         with nodeToFile(nodes[i]) do
@@ -7762,14 +6763,14 @@ begin
              else
               begin
                 bakIcon:=icon;
-                f:=Tfile.create(filesBox, resource);
+                f := Tfile.create(fileSrv, resource);
                 under:=node.Parent;
                 include(f.flags, FA_VIRTUAL);
                 setNilChildrenFrom(nodes, i);
                 node.Delete();
-                addFile(f, under, TRUE);
+                fileSrv.addFileGUI(f, under, TRUE);
                 f.setupImage(sysIcons, bakIcon);
-                f.node.Focused:=TRUE;
+                f.node.Focused := TRUE;
               end;
     VFSmodified:=TRUE;
     if someLocked then
@@ -7808,8 +6809,102 @@ end;
 
 procedure TmainFrm.FormCreate(Sender: TObject);
 begin
-  screen.onActiveFormChange:=wrapInputQuery;
+  screen.onActiveFormChange := wrapInputQuery;
   easyMode := TRUE;
+
+
+
+  supportDescriptionChk.OnClick := onLoadPrefsChange;
+  listfileswithsystemattributeChk.OnClick := onLoadPrefsChange;
+  listfileswithHiddenAttributeChk.OnClick := onLoadPrefsChange;
+  loadSingleCommentsChk.OnClick := onLoadPrefsChange;
+  fingerprintsChk.OnClick := onLoadPrefsChange;
+  recursiveListingChk.OnClick := onLoadPrefsChange;
+  hideProtectedItemsChk.OnClick := onLoadPrefsChange;
+  oemForIonChk.OnClick := onLoadPrefsChange;
+  deletePartialUploadsChk.OnClick := onLoadPrefsChange;
+  NumberFilesOnUploadChk.OnClick := onLoadPrefsChange;
+  useCommentAsRealmChk.OnClick := onLoadPrefsChange;
+
+  useSystemIconsChk.OnClick := onShowPrefsChange;
+  //spNoWaitSysIcons
+  httpsUrlsChk.OnClick := onShowPrefsChange;
+  foldersBeforeChk.OnClick := onShowPrefsChange;
+  linksBeforeChk.OnClick := onShowPrefsChange;
+  noPortInUrlChk.OnClick := onShowPrefsChange;
+  encodenonasciiChk.OnClick := onShowPrefsChange;
+  encodeSpacesChk.OnClick := onShowPrefsChange;
+  compressedbrowsingChk.OnClick := onShowPrefsChange;
+  sendHFSidentifierChk.OnClick := onShowPrefsChange;
+  freeLoginChk.OnClick := onShowPrefsChange;
+  stopSpidersChk.OnClick := onShowPrefsChange;
+  preventLeechingChk.OnClick := onShowPrefsChange;
+  pwdInPagesChk.OnClick := onShowPrefsChange;
+  enableNoDefaultChk.OnClick := onShowPrefsChange;
+  DMbrowserTplChk.OnClick := onShowPrefsChange;
+  recursiveListingChk.OnClick := onShowPrefsChange;
+  oemTarChk.OnClick := onShowPrefsChange;
+  noContentdispositionChk.OnClick := onShowPrefsChange;
+  preventStandbyChk.OnClick := onShowPrefsChange;
+  disableMacrosNonLocalIPChk.OnClick := onShowPrefsChange;
+
+  logBannedChk.OnClick := onLogPrefsChange;
+  logIconsChk.OnClick := onLogPrefsChange;
+  logBrowsingChk.OnClick := onLogPrefsChange;
+  logProgressChk.OnClick := onLogPrefsChange;
+  logServerstartChk.OnClick := onLogPrefsChange;
+  logServerstopChk.OnClick := onLogPrefsChange;
+  logconnectionsChk.OnClick := onLogPrefsChange;
+  logDisconnectionsChk.OnClick := onLogPrefsChange;
+  logUploadsChk.OnClick := onLogPrefsChange;
+  logFullDownloadsChk.OnClick := onLogPrefsChange;
+  logDeletionsChk.OnClick := onLogPrefsChange;
+  logOtherEventsChk.OnClick := onLogPrefsChange;
+  logBytesReceivedChk.OnClick := onLogPrefsChange;
+  logBytesSentChk.OnClick := onLogPrefsChange;
+  logOnlyServedChk.OnClick := onLogPrefsChange;
+  logRequestsChk.OnClick := onLogPrefsChange;
+  logRepliesChk.OnClick := onLogPrefsChange;
+  dumpRequestsChk.OnClick := onLogPrefsChange;
+  dumpTrafficChk.OnClick := onLogPrefsChange;
+  macrosLogChk.OnClick := onLogPrefsChange;
+
+end;
+
+procedure TmainFrm.FormDestroy(Sender: TObject);
+var
+  t: TFileServer;
+begin
+  if Assigned(fileSrv) then
+    begin
+      t := fileSrv;
+      fileSrv := NIL;
+      t.free;
+    end;
+end;
+
+procedure TmainFrm.onLoadPrefsChange(Sender: TObject);
+begin
+  if Assigned(fileSrv) then
+    fileSrv.syncLP;
+end;
+
+procedure TmainFrm.onShowPrefsChange(Sender: TObject);
+begin
+  if Assigned(fileSrv) then
+    fileSrv.syncSP;
+end;
+
+procedure TmainFrm.onLogPrefsChange(Sender: TObject);
+begin
+  if Sender is TMenuItem then
+    begin
+      if (Sender as TMenuItem).Hint > '' then
+        fileSrv.prefs.addPrefBool((Sender as TMenuItem).Hint, (Sender as TMenuItem).Checked)
+    end;
+
+  if Assigned(fileSrv) then
+    fileSrv.syncLogP;
 end;
 
 procedure TmainFrm.Loginrealm1Click(Sender: TObject);
@@ -7827,19 +6922,19 @@ begin openURL('http://www.rejetto.com/hfs/guide/intro.html') end;
 
 procedure TmainFrm.Reset1Click(Sender: TObject);
 begin
-  srvUtils.resetGraph(srv);
+  srvUtils.resetGraph(fileSrv.htSrv);
 end;
 
 procedure TmainFrm.Resetfileshits1Click(Sender: TObject);
 var
-  n: Ttreenode;
+  n: TFileNode;
 begin
-  repaintTray();
+  repaintTray(fileSrv);
   n := fileSrv.getRootNode;
 while assigned(n) do
   begin
   nodeToFile(n).DLcount:=0;
-  n:=n.getNext();
+  n := n.getNext();
   end;
 VFSmodified:=TRUE;
 autoupdatedFiles.clear();
@@ -7847,23 +6942,14 @@ end;
 
 procedure TmainFrm.persistentconnectionsChkClick(Sender: TObject);
 begin
-srv.persistentConnections:=persistentconnectionsChk.Checked;
-if not srv.persistentConnections then
-  Kickidleconnections1Click(NIL);
+  fileSrv.htSrv.persistentConnections:=persistentconnectionsChk.Checked;
+  if not fileSrv.htSrv.persistentConnections then
+    Kickidleconnections1Click(NIL);
 end;
 
 procedure TmainFrm.Kickidleconnections1Click(Sender: TObject);
-var
-  i: integer;
 begin
-i:=0;
-while i < srv.conns.count do
-  begin
-  with conn2data(i) do
-    if conn.state = HCS_IDLE then
-      disconnect('kicked idle');
-  inc(i);
-  end;
+  fileSrv.kickAllIdle('kicked idle');
 end;
 
 procedure TmainFrm.Connectionsinactivitytimeout1Click(Sender: TObject);
@@ -7953,7 +7039,7 @@ begin
   execNew(BATCH_FILE);
 end; // uninstall
 
-procedure processParams_before(var params:TStringDynArray; const allowed: String='');
+procedure processParams_before(var params: TStringDynArray; const allowed: String='');
 var
   i, n, consume: integer;
   fn: string;
@@ -8006,22 +7092,22 @@ var
   i: integer;
   dir: string;
 begin
-dir:=includeTrailingPathDelimiter(popString(params));
-popString(params); // hfs.exe
-for i:=0 to length(params)-1 do
-  if not isAbsolutePath(params[i]) then
-    params[i]:=dir+params[i];
-// note: 2 .vfs files will be treated as any file
-if (length(params) = 1) and isExtension(params[0], '.vfs') then
-  begin
-  if blockLoadSave() then exit;
-  mainfrm.loadVFS(params[0])
-  end
-else
-  { parameters are also passed by other instances via sendMessage().
-  { since this operation may require user interaction, it must be queued
-  { because those instances wouldn't quit until the dialog is closed. }
-  addArray(filesToAddQ, params);
+  dir := includeTrailingPathDelimiter(popString(params));
+  popString(params); // hfs.exe
+  for i:=0 to length(params)-1 do
+    if not isAbsolutePath(params[i]) then
+      params[i]:=dir+params[i];
+  // note: 2 .vfs files will be treated as any file
+  if (length(params) = 1) and isExtension(params[0], '.vfs') then
+    begin
+    if blockLoadSave() then exit;
+    mainfrm.loadVFS(params[0])
+    end
+  else
+    // parameters are also passed by other instances via sendMessage().
+    // since this operation may require user interaction, it must be queued
+    // because those instances wouldn't quit until the dialog is closed. }
+    addArray(filesToAddQ, params);
 end; // processParams_after
 
 procedure TmainFrm.Numberofloggeduploads1Click(Sender: TObject);
@@ -8050,50 +7136,52 @@ procedure TmainFrm.Flagasnew1Click(Sender: TObject);
 var
   i: integer;
 begin
-if selectedFile = NIL then exit;
-for i:=0 to filesBox.SelectionCount-1 do
-  nodeTofile(filesBox.Selections[i]).atime:=now();
-VFSmodified:=TRUE;
+  if selectedFile = NIL then
+    exit;
+  for i:=0 to filesBox.SelectionCount-1 do
+    nodeTofile(filesBox.Selections[i]).atime := now();
+  VFSmodified := TRUE;
 end;
 
 function removeFlagNew(f:Tfile; childrenDone:boolean; par, par2: IntPtr):TfileCallbackReturn;
 begin
-result:=[];
-VFSmodified:=TRUE;
-f.atime:=now()-succ(filesStayFlaggedForMinutes)/(24*60)
+  result := [];
+  VFSmodified := TRUE;
+  f.atime := now()-succ(filesStayFlaggedForMinutes)/(24*60)
 end; // removeFlagNew
 
 procedure TmainFrm.Resetnewflag1Click(Sender: TObject);
 var
   i: integer;
 begin
-if selectedFile = NIL then exit;
-for i:=0 to filesBox.SelectionCount-1 do
-  nodeTofile(filesBox.Selections[i]).recursiveApply(removeFlagNew);
-VFSmodified:=TRUE;
+  if selectedFile = NIL then
+    exit;
+  for i:=0 to filesBox.SelectionCount-1 do
+    nodeTofile(filesBox.Selections[i]).recursiveApply(removeFlagNew);
+  VFSmodified := TRUE;
 end;
 
 procedure TmainFrm.resetOptions1Click(Sender: TObject);
 var
   keepAccounts: Taccounts;
 begin
-(sender as Tmenuitem).enabled:=FALSE;
-restoreCfgBtn.show();
-eventScripts.fullText:='';
-backuppedCfg:=getCfg();
-keepAccounts:=accounts;
-setCfg(defaultCfg);
-accounts:=keepAccounts;
+  (sender as Tmenuitem).enabled := FALSE;
+  restoreCfgBtn.show();
+  eventScripts.fullText := '';
+  backuppedCfg := getCfg();
+  keepAccounts := accounts;
+  setCfg(defaultCfg);
+  accounts := keepAccounts;
 end;
 
-procedure Tmainfrm.setStatusBarText(s:string; lastFor:integer);
+procedure Tmainfrm.setStatusBarText(const s: String; lastFor: Integer);
 begin
-with sbar.panels[sbar.panels.count-1] do
-  begin
-  alignment:=taLeftJustify;
-  text:=s;
-  end;
-sbarTextTimeout:=now()+lastFor/SECONDS;
+  with sbar.panels[sbar.panels.count-1] do
+   begin
+    alignment := taLeftJustify;
+    text:=s;
+   end;
+  sbarTextTimeout := now()+lastFor/SECONDS;
 end;
 
 procedure TmainFrm.Donate1Click(Sender: TObject);
@@ -8104,7 +7192,7 @@ resourcestring
   MSG_DONT_LOG_MASK = 'Do not log address';
   MSG_DONT_LOG_MASK_LONG = 'Any event from the following IP address mask will be not logged.';
 begin
-inputQuery(MSG_DONT_LOG_MASK, MSG_DONT_LOG_MASK_LONG, dontLogAddressMask)
+  inputQuery(MSG_DONT_LOG_MASK, MSG_DONT_LOG_MASK_LONG, dontLogAddressMask)
 end;
 
 procedure TmainFrm.Custom1Click(Sender: TObject);
@@ -8115,14 +7203,15 @@ var
   s: string;
   a: TStringDynArray;
 begin
-s:=join(CRLF, customIPs);
-if not inputQueryLong(MSG_CUST_IP, MSG_CUST_IP_LONG, s) then exit;
-customIPs:=split(CRLF, s);
-removeStrings('', customIPs);
+  s := join(CRLF, customIPs);
+  if not inputQueryLong(MSG_CUST_IP, MSG_CUST_IP_LONG, s) then
+    exit;
+  customIPs := split(CRLF, s);
+  removeStrings('', customIPs);
 // change the address if it is not available anymore
-a:=getPossibleAddresses();
-if assigned(a) and not stringExists(defaultIP, a) then
-  setDefaultIP(a[0]);
+  a := getPossibleAddresses();
+  if assigned(a) and not stringExists(defaultIP, a) then
+    setDefaultIP(a[0]);
 end;
 
 procedure TmainFrm.Findexternaladdress1Click(Sender: TObject);
@@ -8132,14 +7221,14 @@ var
   service: string;
 begin
 // this is a manual request, try twice
-if not getExternalAddress(externalIP, @service)
-and not getExternalAddress(externalIP, @service) then
-  begin
-  msgDlg(format(MSG_NO_EXT_IP, [service]), MB_ICONERROR);
-  exit;
-  end;
-setDefaultIP(externalIP);
-msgDlg(externalIP);
+  if not utilLib.getExternalAddress(externalIP, @service, logOtherEventsChk.checked)
+   and not utilLib.getExternalAddress(externalIP, @service, logOtherEventsChk.checked) then
+    begin
+      msgDlg(format(MSG_NO_EXT_IP, [service]), MB_ICONERROR);
+      exit;
+    end;
+  setDefaultIP(externalIP);
+  msgDlg(externalIP);
 end;
 
 procedure TmainFrm.sbarDblClick(Sender: TObject);
@@ -8148,18 +7237,20 @@ resourcestring
 var
   i: integer;
 begin
-i:=whatStatusPanel(sbar,sbar.screenToClient(mouse.cursorPos).X);
-if (i = sbarIdxs.totalIn) or (i = sbarIdxs.totalOut) then
-  if msgDlg(MSG_RESET_TOT, MB_YESNO) = IDYES then
-    begin
-    outTotalOfs:=-srv.bytesSent;
-    inTotalOfs:=-srv.bytesReceived;
-    end;
-if i = sbarIdxs.banStatus then BannedIPaddresses1Click(NIL);
-if i = sbarIdxs.customTpl then Edit1Click(NIL);
-if i = sbarIdxs.oos then Minimumdiskspace1Click(NIL);
-if i = sbarIdxs.out then Speedlimit1Click(NIL);
-if i = sbarIdxs.notSaved then Savefilesystem1Click(NIL); 
+  i := whatStatusPanel(sbar,sbar.screenToClient(mouse.cursorPos).X);
+  if i <0 then
+    Exit;
+  if (i = sbarIdxs.totalIn) or (i = sbarIdxs.totalOut) then
+    if msgDlg(MSG_RESET_TOT, MB_YESNO) = IDYES then
+      begin
+       outTotalOfs:=-fileSrv.htSrv.bytesSent;
+       inTotalOfs:=-fileSrv.htSrv.bytesReceived;
+      end;
+  if i = sbarIdxs.banStatus then BannedIPaddresses1Click(NIL);
+  if i = sbarIdxs.customTpl then Edit1Click(NIL);
+  if i = sbarIdxs.oos then Minimumdiskspace1Click(NIL);
+  if i = sbarIdxs.out then Speedlimit1Click(NIL);
+  if i = sbarIdxs.notSaved then Savefilesystem1Click(NIL);
 end;
 
 procedure TmainFrm.sbarMouseDown(Sender: TObject; Button: TMouseButton;
@@ -8247,8 +7338,8 @@ end; // dynDNSinputHost
 
 procedure finalizeDynDNS();
 begin
-addUniqueString(dyndns.host, customIPs);
-setDefaultIP(dyndns.host);
+  addUniqueString(dyndns.host, customIPs);
+  setDefaultIP(dyndns.host);
 end; // finalizeDynDNS
 
 procedure TmainFrm.NoIPtemplate1Click(Sender: TObject);
@@ -8291,7 +7382,11 @@ if InputQuery(MSG_MIN_SPACE, MSG_MIN_SPACE_LONG, s) then
   end;
 end;
 
+{$IFDEF FPC}
+function pointToCharPoint(re:TRichMemo; pt:Tpoint):Tpoint;
+{$ELSE ~FPC}
 function pointToCharPoint(re:TRichEdit; pt:Tpoint):Tpoint;
+{$ENDIF FPC}
 const
   EM_EXLINEFROMCHAR = WM_USER+54;
 begin
@@ -8331,7 +7426,7 @@ if button = mbRight then
 end;
 
 procedure TmainFrm.Banthisaddress1Click(Sender: TObject);
-begin banAddress(ipPointedInLog()); end;
+begin banAddress(fileSrv, ipPointedInLog()); end;
 
 procedure TmainFrm.Address2name1Click(Sender: TObject);
 begin
@@ -8351,7 +7446,7 @@ resourcestring
     +#13
     +#13'If you need more control, enter a string with %name% in it, and this symbol will be replaced by the original filename.';
 begin
-InputQuery(MSG_REN_PART, MSG_REN_PART_LONG, renamePartialUploads)
+  InputQuery(MSG_REN_PART, MSG_REN_PART_LONG, renamePartialUploads)
 end;
 
 procedure TmainFrm.SelfTest1Click(Sender: TObject);
@@ -8373,45 +7468,27 @@ resourcestring
 
   function doTheTest(host:string; port:string=''):string;
 
-    function findRedirection():boolean;
-    var
-      http: THttpCli;
-    begin
-    result:=FALSE;
-    http:=Thttpcli.create(NIL);
-    try
-      http.url:=host;
-      http.agent:=HFS_HTTP_AGENT;
-      try http.get()
-      except // a redirection will result in an exception
-        if (http.statusCode < 300) or (http.statusCode >= 400) then exit;        
-        result:=TRUE;
-        host:=http.hostname;
-        port:=http.ctrlSocket.Port;
-        end;
-    finally http.free end
-    end;
-
   var
     t: Tdatetime;
     ms: integer;
     name: string;
   begin
-  result:='';
-  if progFrm.cancelRequested then exit;
-  { The user may be using the "port 80 redirect" service of no-ip, or a similar one.
-  { The redirection service does not support a request containing "test" as URL,
-  { considering it malformed (it requires a leading slash).
-  { Thus, we need to find the redirect here (client-side), and then test to see if
-  { the target of the redirection is a working HFS. }
-  if (port = '') and not checkAddressSyntax(host) and noPortInUrlChk.Checked then
-    name:=ifThen(findRedirection(), host);
-  if port = '' then
-    port:=srv.port;
-  if name = '' then
-    name:=host+':'+port;
-  progFrm.show('Testing '+name+' ...', TRUE);
-  if not srv.active and not startServer() then exit;
+    result:='';
+    if progFrm.cancelRequested then exit;
+  // The user may be using the "port 80 redirect" service of no-ip, or a similar one.
+  // The redirection service does not support a request containing "test" as URL,
+  // considering it malformed (it requires a leading slash).
+  // Thus, we need to find the redirect here (client-side), and then test to see if
+  // the target of the redirection is a working HFS. }
+    if (port = '') and not checkAddressSyntax(host) and noPortInUrlChk.Checked then
+      name := ifThen(findRedirection(host, port, HFS_HTTP_AGENT), host);
+    if port = '' then
+      port := fileSrv.htSrv.port;
+    if name = '' then
+      name:=host+':'+port;
+    progFrm.show('Testing '+name+' ...', TRUE);
+    if not fileSrv.httpServIsActive and not fileSrv.startServer() then
+      exit;
   // we many need to try this specific test more than once
     repeat
     t:=now();
@@ -8441,33 +7518,38 @@ var
     tries: TStringDynArray;
     s: string;
   begin
-  if externalIP = '' then
-    begin
-    progFrm.show(MSG_RET_EXT);
-    getExternalAddress(externalIP);
-    end;
-  tries:=getPossibleAddresses();
-  // ensure defaultIP is the first one
-  insertString(defaultIP, 0, tries);
-  uniqueStrings(tries);
+    if externalIP = '' then
+      begin
+      progFrm.show(MSG_RET_EXT);
+      utilLib.getExternalAddress(externalIP, NIL, logOtherEventsChk.checked);
+      end;
+    tries := getPossibleAddresses();
+    // ensure defaultIP is the first one
+    insertString(defaultIP, 0, tries);
+    uniqueStrings(tries);
 
-  best.res:='';
-  for i:=0 to length(tries)-1 do
-    begin
-    if isLocalIP(tries[i]) then continue;
+    best.res:='';
+    for i:=0 to length(tries)-1 do
+      begin
+      if isLocalIP(tries[i]) then continue;
 
-    progFrm.progress:=succ(i)/succ(length(tries));
-    s:=doTheTest(tries[i]);
-    // we want a digit
-//    if (s='') or not (s[1] in ['0'..'9']) then continue;
-    if (s='') or not (IsDigit(s[1])) then continue;
-    // we want a better one (lower)
-    if (best.res > '') and (best.res[1] <= s[1]) then continue;
-    // we consider this to be better, record it
-    best.res:=s;
-    best.host:=tries[i];
-    if successful(s) then break;
-    end;
+      progFrm.progress:=succ(i)/succ(length(tries));
+      s:=doTheTest(tries[i]);
+      // we want a digit
+     {$IFDEF FPC}
+      if (s='') or not (s[1] in ['0'..'9']) then
+        continue;
+     {$ELSE ~FPC}
+      if (s='') or not (IsDigit(s[1])) then
+        continue;
+     {$ENDIF FPC}
+      // we want a better one (lower)
+      if (best.res > '') and (best.res[1] <= s[1]) then continue;
+      // we consider this to be better, record it
+      best.res:=s;
+      best.host:=tries[i];
+      if successful(s) then break;
+      end;
   end; // tryDifferentHosts
 
   procedure tryDifferentPorts();
@@ -8477,40 +7559,43 @@ var
     bak: record
       port: string;
       active: boolean;
-      end;
+     end;
     ip, s: string;
   begin
-  ip:=defaultIP;
-  if isLocalIP(ip) then
-    ip:=externalIP;
-  if (ip='') or isLocalIP(ip) then
-    exit;
-  // build list of ports we'll test
-  tries:=toSA(['80','8123']);
-  removeString(srv.port, tries); // already tested
+    ip:=defaultIP;
+    if isLocalIP(ip) then
+      ip:=externalIP;
+    if (ip='') or isLocalIP(ip) then
+      exit;
+    // build list of ports we'll test
+    tries:=toSA(['80','8123']);
+    removeString(fileSrv.htSrv.port, tries); // already tested
 
-  bak.active:=srv.active;
-  bak.port:=port;
-  for i:=0 to length(tries)-1 do
-    begin
-    progFrm.progress:=succ(i)/succ(length(tries));
-    port:=tries[i];
-    stopServer();
-    if not startServer() then continue;
-    s:=doTheTest(ip);
-    if successful(s) then break;
-    end;
-  if successful(s) and (best.res = '') then
-    begin
-    best.res:=s;
-    best.host:=defaultIP;
-    end
-  else
-    begin
-    port:=bak.port;
-    stopServer();
-    if bak.active then startServer();
-    end;
+    bak.active := fileSrv.httpServIsActive;
+    bak.port := fileSrv.prefs.getDPrefStr('port');
+    for i:=0 to length(tries)-1 do
+      begin
+      progFrm.progress:=succ(i)/succ(length(tries));
+      fileSrv.prefs.addPrefStr('port', tries[i]);
+      stopServer(fileSrv.htSrv);
+      if not fileSrv.startServer() then
+        continue;
+      s:=doTheTest(ip);
+      if successful(s) then
+        break;
+      end;
+    if successful(s) and (best.res = '') then
+      begin
+      best.res:=s;
+      best.host:=defaultIP;
+      end
+    else
+      begin
+      fileSrv.prefs.addPrefStr('port', bak.port);
+      stopServer(fileSrv.htSrv);
+      if bak.active then
+        fileSrv.startServer();
+      end;
   end; // tryDifferentPorts
 
 resourcestring
@@ -8526,34 +7611,35 @@ resourcestring
 var
   originalPort, s: string;
 begin
-if msgDlg(MSG_SELF_BEFORE, MB_ICONWARNING+MB_OKCANCEL) <> IDOK then exit;
-
-originalPort:=port;
-
-if not srv.active and not startServer() then
-  begin
-  port:='';
-  if not startServer() then
-    begin
-    msgDlg(MSG_SELF_CANT_ON, MB_ICONERROR);
+  if msgDlg(MSG_SELF_BEFORE, MB_ICONWARNING+MB_OKCANCEL) <> IDOK then
     exit;
-    end;
-  end;
 
-if listenOn = '127.0.0.1' then
+  originalPort := fileSrv.prefs.getDPrefStr('port');
+
+  if not fileSrv.httpServIsActive and not fileSrv.startServer() then
   begin
-  msgDlg(MSG_SELF_CANT_LIST, MB_ICONERROR);
-  exit;
+    fileSrv.prefs.addPrefStr('port', '');
+    if not fileSrv.startServer() then
+      begin
+      msgDlg(MSG_SELF_CANT_ON, MB_ICONERROR);
+      exit;
+      end;
   end;
 
-if httpsUrlsChk.checked then
-  msgDlg(MSG_SELF_CANT_S, MB_ICONWARNING);
+  if fileSrv.prefs.getDPrefStr('listen-on') = '127.0.0.1' then
+    begin
+      msgDlg(MSG_SELF_CANT_LIST, MB_ICONERROR);
+      exit;
+    end;
 
-disableUserInteraction();
-progFrm.show(MSG_SELF_ING);
-selfTesting:=TRUE;
+  if httpsUrlsChk.checked then
+    msgDlg(MSG_SELF_CANT_S, MB_ICONWARNING);
+
+  disableUserInteraction();
+  progFrm.show(MSG_SELF_ING);
+  selfTesting := TRUE;
 try
-  best.res:='';
+  best.res := '';
   progFrm.push(0.5);
   tryDifferentHosts();
   progFrm.pop();
@@ -8563,14 +7649,15 @@ try
     tryDifferentPorts();
   progFrm.pop();
 
-  s:=best.res;
+  s := best.res;
   if successful(s) then
     begin
     progFrm.progress:=1;
-    if (originalPort = '') or (originalPort = port) then
+    var lPort := fileSrv.prefs.getDPrefStr('port');
+    if (originalPort = '') or (originalPort = lPort) then
       msgDlg(MSG_SELF_OK)
     else
-      msgDlg(format(MSG_SELF_OK_PORT, [originalPort, port]));
+      msgDlg(format(MSG_SELF_OK_PORT, [originalPort, lPort]));
     if best.host <> defaultIP then setDefaultIP(best.host);
     exit;
     end
@@ -8594,12 +7681,12 @@ try
     except s:=MSG_SELF_NO_INET end
   else
     begin
-    case s[1] of
-      '3': s:=MSG_SELF_3;
-      '6': s:=format(MSG_SELF_6, [first(port,'80')]);
-      '7': s:=MSG_SELF_7;
-      end;
-    s:=MSG_SELF_NO_ANSWER+#13#13+s;
+      case s[1] of
+        '3': s := MSG_SELF_3;
+        '6': s := format(MSG_SELF_6, [first(fileSrv.prefs.getDPrefStr('port'), '80')]);
+        '7': s := MSG_SELF_7;
+        end;
+      s:=MSG_SELF_NO_ANSWER+#13#13+s;
     end;
   msgDlg(s, MB_ICONERROR);
 
@@ -8616,7 +7703,7 @@ resourcestring
   MSG_OPEN_BROW_LONG = '"Suggest" the browser to open directly the specified files.'
     +#13'Other files should pop up a save dialog.';
 begin
-InputQuery(MSG_OPEN_BROW, MSG_OPEN_BROW_LONG, openInBrowser)
+  InputQuery(MSG_OPEN_BROW, MSG_OPEN_BROW_LONG, openInBrowser)
 end;
 
 procedure TmainFrm.noPortInUrlChkClick(Sender: TObject);
@@ -8624,10 +7711,16 @@ resourcestring
   MSG_HIDE_PORT = 'You should not use this option unless you really know its meaning.'
     +#13'Continue?';
 begin
-if noPortInUrlChk.Checked and (msgDlg(MSG_HIDE_PORT, MB_YESNO) = ID_YES) then
-  mainfrm.updateUrlBox()
-else
-  noPortInUrlChk.Checked:=FALSE;
+  if noPortInUrlChk.Checked and (msgDlg(MSG_HIDE_PORT, MB_YESNO)
+   {$IFDEF FPC}
+    = IDYES)
+   {$ELSE ~FPC}
+    = ID_YES)
+   {$ENDIF FPC}
+  then
+    mainfrm.updateUrlBox()
+   else
+    noPortInUrlChk.Checked:=FALSE;
 end;
 
 function getTplEditor():string;
@@ -8641,12 +7734,12 @@ end;
 
 procedure TmainFrm.Edit1Click(Sender: TObject);
 begin
-if not fileExists(tplFilename) then
-  begin
-  tplFilename:=TPL_FILE;
-  saveFileU(tplFilename, defaultTpl.fullTextS);
-  end;
-exec(getTplEditor(), '"'+tplFilename+'"');
+  if not fileExists(tplFilename) then
+   begin
+    tplFilename := TPL_FILE;
+    saveFileU(tplFilename, fileSrv.defTpl.fullTextS);
+   end;
+  exec(getTplEditor(), '"'+tplFilename+'"');
 end;
 
 procedure TmainFrm.Editeventscripts1Click(Sender: TObject);
@@ -8665,7 +7758,7 @@ procedure TmainFrm.Editresource1Click(Sender: TObject);
 resourcestring
   MSG_EDIT_RES = 'Edit resource';
 var
-  oldRes, oldName, res: string;
+  oldRes, oldName, res: UnicodeString;
   done, nameSync: boolean;
 begin
   if (selectedFile = NIL) or (FA_VIRTUAL in selectedFile.flags) then
@@ -8692,8 +7785,9 @@ resourcestring
   MSG_TPL_USE_MACROS = 'The current template is using macros.'
     +#13'Do you want to cancel this action?';
 begin
-  if anyMacroMarkerIn(fileSrv.tpl.fullTextS) and not enableMacrosChk.Checked then
-    enableMacrosChk.Checked:=msgDlg(MSG_TPL_USE_MACROS, MB_ICONWARNING+MB_YESNO) = MRYES;
+  if not enableMacrosChk.Checked and fileSrv.tpl.anyMacroMarkerIn then
+    enableMacrosChk.Checked := msgDlg(MSG_TPL_USE_MACROS, MB_ICONWARNING+MB_YESNO) = MRYES;
+  onShowPrefsChange(Sender);
 end;
 
 procedure TmainFrm.modeBtnClick(Sender: TObject);
@@ -8716,7 +7810,7 @@ resourcestring
   REMOVE_SHELL = 'Remove from shell context menu';
   S_OFF = 'Switch OFF';
   S_ON = 'Switch ON';
-  LOG = 'Log';
+  MSG_LOG = 'Log';
 
   procedure showSetting(mi:Tmenuitem; v:integer; unit_:string); overload;
   begin mi.caption:=getTill('...', mi.caption, TRUE)+if_(v>0, format('       (%d %s)', [v, unit_])) end;
@@ -8731,23 +7825,23 @@ begin
     for i:=1 to Fingerprints1.Count-1 do
       Fingerprints1.items[i].Enabled:=fingerprintsChk.checked;
 
-  logmenu.items.caption:=LOG;
+  logmenu.items.caption:= MSG_LOG;
   if menu.items.find(logmenu.items.caption) = NIL then
     menu.items.insert(7, logmenu.items);
 
-  SwitchON1.imageIndex:=if_(srv.active, 11, 4);
-  SwitchON1.caption:=if_(srv.active, S_OFF, S_ON);
+  SwitchON1.imageIndex:=if_(fileSrv.httpServIsActive, 11, 4);
+  SwitchON1.caption:=if_(fileSrv.httpServIsActive, S_OFF, S_ON);
 
-stopSpidersChk.Enabled:=not fileExistsByURL('/robots.txt');
-Showbandwidthgraph1.visible:=not graphBox.visible;
-if bakShellMenuText='' then
-  bakShellMenuText:=Shellcontextmenu1.Caption;
-Shellcontextmenu1.Caption:=if_(isIntegratedInShell(), REMOVE_SHELL, bakShellMenuText);
-showSetting(mainFrm.Connectionsinactivitytimeout1, connectionsInactivityTimeout, 'seconds');
-showSetting(mainFrm.Minimumdiskspace1, minDiskSpace, 'MB');
-showSetting(mainFrm.Flagfilesaddedrecently1, filesStayFlaggedForMinutes, 'minutes');
-Restore1.visible:=trayed;
-Restoredefault1.Enabled:=tplIsCustomized;
+  stopSpidersChk.Enabled := not fileSrv.fileExistsByURL('/robots.txt');
+  Showbandwidthgraph1.visible := not graphBox.visible;
+  if bakShellMenuText='' then
+    bakShellMenuText:=Shellcontextmenu1.Caption;
+  Shellcontextmenu1.Caption:=if_(isIntegratedInShell(), REMOVE_SHELL, bakShellMenuText);
+  showSetting(mainFrm.Connectionsinactivitytimeout1, connectionsInactivityTimeout, 'seconds');
+  showSetting(mainFrm.Minimumdiskspace1, minDiskSpace, 'MB');
+  showSetting(mainFrm.Flagfilesaddedrecently1, filesStayFlaggedForMinutes, 'minutes');
+  Restore1.visible:=trayed;
+  Restoredefault1.Enabled:=tplIsCustomized;
 Numberofcurrentconnections1.Checked:= trayShows = TS_connections;
 Numberofloggedhits1.checked:= trayShows= TS_hits;
 Numberofloggeddownloads1.checked:= trayShows= TS_downloads;
@@ -8768,8 +7862,11 @@ Extension1.Checked:= defSorting='ext';
 Renamepartialuploads1.Enabled:=not deletePartialUploadsChk.checked;
 Seelastserverresponse1.visible:= dyndns.lastResult>'';
 Disable1.visible:= dyndns.url>'';
-try RunHFSwhenWindowsstarts1.checked:= paramStr(0) = readShellLink(startupFilename)
-except RunHFSwhenWindowsstarts1.checked:= FALSE end;
+try
+  RunHFSwhenWindowsstarts1.checked := existsShellLink(startupFilename) and (paramStr(0) = readShellLink(startupFilename))
+ except
+  RunHFSwhenWindowsstarts1.checked:= FALSE
+end;
 // point out where the options will automatically be saved
 tofile1.Default:= saveMode=SM_FILE;
 toregistrycurrentuser1.default:= saveMode=SM_USER;
@@ -8860,9 +7957,9 @@ result[0]:=monoLib.initialPath;
 for i:=0 to i do result[i+1]:=paramStr(i);
 end; // paramsAsArray
 
-function Tmainfrm.finalInit():boolean;
+function Tmainfrm.finalInit(): boolean;
 
-  function getBrowserPath():string;
+  function getBrowserPath(): string;
   var
     i: integer;
   begin
@@ -8906,7 +8003,7 @@ function Tmainfrm.finalInit():boolean;
     and (msgDlg(MSG_RE_NOIP, MB_OKCANCEL+MB_ICONWARNING) = MROK) then
         NoIPtemplate1Click(NIL);
     if (tplS > '') and assigned(fileSrv.tpl) then
-      setTplText(tplS);
+      setTplText(fileSrv, tplS);
     if lastUpdateCheck = 0 then
       lastUpdateCheck:=getMtime(lastUpdateCheckFN);
   end; // loadAndApplycfg
@@ -8927,7 +8024,7 @@ function Tmainfrm.finalInit():boolean;
         with items[i] do
          if caption = labl then
            begin
-            width := strToIntDef(s, width);
+            width := MAX(strToIntDef(s, width), ColumnHeaderWidth);
             break;
            end;
       end;
@@ -8944,54 +8041,83 @@ begin
   result := FALSE;
 
 { it would be nice, but this is screwing our layouts. so for now we'll just stay with the main window.
-for i:=0 to application.componentCount-1 do
-  if application.components[i] is Tform then
-    fixFontFor(application.components[i] as Tform);
+  for i:=0 to application.componentCount-1 do
+    if application.components[i] is Tform then
+      fixFontFor(application.components[i] as Tform);
 }
-fixFontFor(mainFrm);
-sbar.canvas.font.assign(sbar.font); // this is just a workaround, i don't exactly understand the need of it.
+  fixFontFor(mainFrm);
+  sbar.canvas.font.assign(sbar.font); // this is just a workaround, i don't exactly understand the need of it.
 
 // some windows versions do not support multiline tray tips
-if winVersion < WV_2000 then trayNL:='  ';
+  if winVersion < WV_2000 then
+    trayNL:='  ';
 
-trayMsg:=MSG_TRAY_DEF;
+  trayMsg := MSG_TRAY_DEF;
 
-startingImagesCount:= IconsDM.images.count;
-srv:=ThttpSrv.create();
-srv.autoFreeDisconnectedClients:=FALSE;
-srv.limiters.add(globalLimiter);
-srv.onEvent:=httpEvent;
-tray_ico:=Ticon.create();
-tray:=TmyTrayicon.create(self.Handle);
-DragAcceptFiles(handle, true);
-caption:=format('HFS ~ HTTP File Server %s%sBuild %s',
-  [srvConst.VERSION, stringOfChar(' ',80), VERSION_BUILD]);
-application.Title:=format('HFS %s (%s)', [srvConst.VERSION, VERSION_BUILD]);
-setSpeedLimit(-1);
-setSpeedLimitIP(-1);
-setGraphRate(10);
-setMaxConnections(0);
-setMaxConnectionsIP(0);
-setMaxDLs(0);
-setMaxDLsIP(0);
-setMaxIPs(0);
-setMaxIPsDLing(0);
-setnoDownloadTimeout(0);
-setAutosave(autosaveVFS, 0);
-setAutoFingerprint(0);
-setLogToolbar(FALSE);
+  autoDownloadLibs := utilLib.httpsCanWork;
+  startingImagesCount:= IconsDM.images.count;
+  tray_ico:=Ticon.create();
+  tray:=TmyTrayicon.create(self.Handle);
+  DragAcceptFiles(handle, true);
+  caption:=format('HFS ~ HTTP File Server %s%sBuild %s',
+    [srvConst.VERSION, stringOfChar(' ',80), VERSION_BUILD]);
+  application.Title:=format('HFS %s (%s)', [srvConst.VERSION, VERSION_BUILD]);
+  setSpeedLimit(-1);
+  setSpeedLimitIP(-1);
+  setGraphRate(10);
+  setMaxConnections(0);
+  setMaxConnectionsIP(0);
+  setMaxDLs(0);
+  setMaxDLsIP(0);
+  setMaxIPs(0);
+  setMaxIPsDLing(0);
+  setnoDownloadTimeout(0);
+  setAutosave(autosaveVFS, 0);
+  setAutoFingerprint(0);
+  setLogToolbar(FALSE);
 
-autosaveVFS.minimum:=5;
-autosaveVFS.menu:=autosaveevery1;
+  autosaveVFS.minimum:=5;
+  autosaveVFS.menu:=autosaveevery1;
 
-params:=paramsAsArray();
-processParams_before(params, 'i');
+  params:=paramsAsArray();
+  processParams_before(params, 'i');
+/////////////////////////////////////////////// Here creatinng main server part //////////////////////////////////////////////
+  fileSrv := TFileServer.Create(Self.filesBox, scriptLib.tryApplyMacrosAndSymbols,
+                                getSP, getLP,
+                                onAddingItemOnServer,
+                                setStatusBarText);
+  fileSrv.onIPsEverChanged := onIPsEverChanged;
+  fileSrv.OnSetupDownloadIcon := setupDownloadIcon;
+  fileSrv.OnFlash := flash;
+  fileSrv.OnStatusChanged := onServerStatusChanged;
+  fileSrv.OnRefreshConn := onRefreshConn;
+  fileSrv.OnInitConnData := OnInitConnData;
+  fileSrv.OnRemoveConnData := OnRemoveConnData;
+  fileSrv.onUpdateTray := onUpdateTray;
+  fileSrv.OnBeforeAddFile := OnBeforeAddFile;
+  fileSrv.OnAfterAddFile := OnAfterAddFile;
+  fileSrv.setAdd2LogFunc(utilLib.add2Log);
+  fileSrv.registerMacroFunc('set item', 2, setItemMacro);
+  fileSrv.registerMacroFunc('delete item', 1, deleteItemMacro);
+  fileSrv.registerMacroFunc('notify', 0, notifyMacro);
+  fileSrv.registerMacroFunc('save vfs', 0, saveVFSMacro);
+  fileSrv.registerMacroFunc('save cfg', 0, saveCFGMacro);
+  fileSrv.registerMacroFunc('vfs select', 0, VFSSelectMacro);
+  fileSrv.registerMacroFunc('set cfg', 1, setCFGMacro);
+  fileSrv.registerMacroFunc('get ini', 1, getINIMacro);
+  fileSrv.registerMacroFunc('set ini', 1, setINIMacro);
+  fileSrv.registerMacroFunc('dialog', 1, dialogMacro);
+  fileSrv.registerMacroFunc('exec', 1, execMacro);
+  fileSrv.registerMacroFunc('clipboard', 0, clipboardMacro);
+  fileSrv.registerMacroFunc('focus', 0, focusMacro);
+  fileSrv.registerMacroFunc('play', 1, playMacro);
+  fileSrv.registerMacroFunc('md5 file', 1, createFileFingerPrintMacro);
+  fileSrv.registerMacroFunc('set speed limit for address', 1, speedLimitPerAddressMacro);
 
-fileSrv := TFileServer.Create(scriptLib.tryApplyMacrosAndSymbols, getSP, getLP,
-                              onAddingItemOnServer);
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 initVFS();
-setFilesBoxExtras(winVersion <> WV_VISTA);
+setFilesBoxExtras(winVersion IN [WV_SEVEN, WV_HIGHER]);
 
 defaultCfg:=xtpl(getCfg(), ['active=no', 'active=yes']);
 
@@ -8999,7 +8125,7 @@ loadEvents();
 cfgLoaded:=FALSE;
 // if SHIFT is pressed skip configuration loading
 if not holdingKey(VK_SHIFT) then
-  cfgLoaded:=loadAndApplyCFG()
+  cfgLoaded := loadAndApplyCFG()
 else
   setStatusBarText(MSG_CLEAN_START);
 
@@ -9012,7 +8138,7 @@ and only1instanceChk.checked and not mono.master then
   end;
 
 if not cfgLoaded then
-  setTplText();
+  setTplText(fileSrv);
   
 processParams_before(params);
 
@@ -9021,9 +8147,9 @@ if not quitASAP then
 
   if not cfgLoaded then
     begin
-    startServer();
+    fileSrv.startServer();
     if not isIntegratedInShell() then
-      with TshellExtFrm.create(mainfrm) do
+      with TshellExtFrm.create(Self) do
         try
           case showModal() of
             mrYes:
@@ -9039,7 +8165,7 @@ if not quitASAP then
         finally free end;
     end;
 
-  if findExtOnStartupChk.checked and getExternalAddress(externalIP) then
+  if findExtOnStartupChk.checked and utilLib.getExternalAddress(externalIP, NIL, logOtherEventsChk.checked) then
     setDefaultIP(externalIP);
 
   end;
@@ -9104,14 +8230,14 @@ strToConnColumns(serializedConnColumns);
 if startminimizedChk.checked then application.Minimize();
 if findExtOnStartupChk.checked and (externalIP = '') then
   setStatusBarText(MSG_EXT_ADDR_FAIL, 30);
-updatePortBtn();
+updatePortBtn(fileSrv);
 fixAddToHFS();
 filesBox.setFocus();
 //loadEvents();
 formResize(NIL); // recalculate to solve graphical glitches
 
 if not tplIsCustomized then
-  runTplImport();
+  runTplImport(fileSrv);
 
 runEventScript(fileSrv, 'start');
 {** trying to move loadEvents() before loadCfg()
@@ -9133,32 +8259,34 @@ begin
   msgDlg(expertModeNeededMsg(easyMode) +#13+MSG_DONT_LOG_HINT );
 end;
 
-procedure TmainFrm.progFrmHttpGetUpdate(sender:Tobject; buffer:pointer; len:integer);
+function TmainFrm.progFrmHttpProgress(p: real): Boolean;
 begin
-with sender as ThttpCli do
-  begin
-  progFrm.progress:=safeDiv(0.0+RcvdCount, contentLength);
-  if progFrm.cancelRequested then abort();
-  end;
-end; // progFrmHttpGetUpdate
+  progFrm.progress := p;
+  Result := not progFrm.cancelRequested;
+end;
 
-procedure TmainFrm.statusBarHttpGetUpdate(sender:Tobject; buffer:pointer; len:integer);
-resourcestring MSG_DL_PERC = 'Downloading %d%%';
+function TmainFrm.statusBarHttpProgress(p: real): Boolean;
+resourcestring
+  MSG_DL_PERC = 'Downloading %d%%';
 begin
-with sender as ThttpCli do
-  setStatusBarText( format(MSG_DL_PERC, [safeDiv(RcvdCount*100, contentLength)]) );
-end; // statusBarHttpGetUpdate
+  setStatusBarText( format(MSG_DL_PERC, [TRUNC(p * 100)]) );
+  Result := True;
+end;
 
 procedure TmainFrm.Properties1Click(Sender: TObject);
 begin
-if selectedFile = NIL then exit;
+  if selectedFile = NIL then
+    exit;
 
-filepropFrm:=TfilepropFrm.Create(mainFrm);
-try
-  if filepropFrm.showModal() = mrCancel then exit;
-finally freeAndNIL(filepropFrm) end;
-VFSmodified:=TRUE;
-filesBox.invalidate();
+  filepropFrm := TfilepropFrm.Create(mainFrm);
+  try
+    if filepropFrm.showModal() = mrCancel then
+      exit;
+   finally
+    freeAndNIL(filepropFrm)
+  end;
+  VFSmodified := TRUE;
+  filesBox.invalidate();
 end;
 
 function purgeFilesCB(f: Tfile; childrenDone: boolean; par, par2: IntPtr): TfileCallbackReturn;
@@ -9228,7 +8356,7 @@ if inputquery(MSG_SET_LIMIT, MSG_MAX_SIM_ADDR+#13+MSG_EMPTY_NO_LIMIT, s) then
   except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
   end;
 if maxIPs = 0 then exit;
-i:=countIPs();
+i:=countIPs(fileSrv.htSrv);
 if i > maxIPs then
   msgDlg(format(MSG_NUM_ADDR, [i]), MB_ICONWARNING);
 end;
@@ -9240,16 +8368,21 @@ var
   s: string;
   i: integer;
 begin
-if maxIPsDLing > 0 then s:=intToStr(maxIPsDLing)
-else s:='';
-if inputquery(MSG_SET_LIMIT, MSG_MAX_SIM_ADDR_DL+#13+MSG_EMPTY_NO_LIMIT, s) then
-	try setMaxIPsDLing(strToUInt(s))
-  except msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
-  end;
-if maxIPsDLing = 0 then exit;
-i:=countIPs(TRUE);
-if i > maxIPsDLing then
-  msgDlg(format(MSG_NUM_ADDR_DL, [i]), MB_ICONWARNING);
+  if maxIPsDLing > 0 then
+    s:=intToStr(maxIPsDLing)
+   else
+    s:='';
+  if inputquery(MSG_SET_LIMIT, MSG_MAX_SIM_ADDR_DL+#13+MSG_EMPTY_NO_LIMIT, s) then
+   try
+     setMaxIPsDLing(strToUInt(s))
+    except
+     msgDlg(MSG_INVALID_VALUE, MB_ICONERROR)
+   end;
+  if maxIPsDLing = 0 then
+    exit;
+  i := fileSrv.countIPs(TRUE);
+  if i > maxIPsDLing then
+    msgDlg(format(MSG_NUM_ADDR_DL, [i]), MB_ICONWARNING);
 end;
 
 procedure TmainFrm.Maxlinesonscreen1Click(Sender: TObject);
@@ -9280,21 +8413,23 @@ resourcestring
     +#13'Example:'
     +#13'   %h %l %u %t "%r" %>s %b';
 begin
-InputQuery(MSG_APACHE_LOG_FMT, MSG_APACHE_LOG_FMT_LONG, logFile.apacheFormat)
+  InputQuery(MSG_APACHE_LOG_FMT, MSG_APACHE_LOG_FMT_LONG, logFile.apacheFormat);
 end;
 
 procedure TmainFrm.Bindroottorealfolder1Click(Sender: TObject);
 var
   f: Tfile;
-  res: string;
+  res: UnicodeString;
 begin
-f:=selectedFile;
-if (f = NIL) or not f.isVirtualFolder() or not f.isRoot() then exit;
-res:=exePath;
-if not selectFolder('', res) then exit;
-f.setResource(res);
-exclude(f.flags, FA_VIRTUAL);
-VFSmodified:=TRUE;
+  f:=selectedFile;
+  if (f = NIL) or not f.isVirtualFolder() or not f.isRoot() then
+    exit;
+  res := exePath;
+  if not selectFolder('', res) then
+    exit;
+  f.setResource(res);
+  exclude(f.flags, FA_VIRTUAL);
+  VFSmodified:=TRUE;
 end;
 
 procedure TmainFrm.Unbindroot1Click(Sender: TObject);
@@ -9311,13 +8446,13 @@ VFSmodified:=TRUE;
 end;
 
 procedure TmainFrm.SwitchON1Click(Sender: TObject);
-begin toggleServer() end;
+begin toggleServer(fileSrv) end;
 
 procedure TmainFrm.Switchtorealfolder1Click(Sender: TObject);
 var
   i: integer;
   someLocked: boolean;
-  list: TtreeNodeDynArray;
+  list: TFileNodeDynArray;
 begin
 if selectedFile = NIL then exit;
 someLocked:=FALSE;
@@ -9369,37 +8504,38 @@ var
   current, defV, v, k: string;
   diff: string;
 begin
-default:=TStringList.create();
-default.text:=defaultCfg;
-current:=getCfg();
-diff:='# '+srvConst.VERSION+' (build '+VERSION_BUILD+')'+CRLF;
+  default := TStringList.create();
+  default.text := defaultCfg;
+  current := getCfg();
+  diff := '# '+srvConst.VERSION+' (build '+VERSION_BUILD+')'+CRLF;
 
-while current > '' do
+  while current > '' do
   begin
-  v:=chopLine(current);
-  k:=chop('=', v);
-  if ansiEndsStr('-width', k) or ansiEndsStr('-height', k)
-  or stringExists(k, ['active','window','graph-visible','graph-size','ip', 'accounts',
-    'dynamic-dns-user', 'dynamic-dns-host', 'ips-ever', 'ips-ever-connected',
-    'icon-masks-user-images', 'last-external-address', 'last-dialog-folder'])
-  then continue;
-  
-  defV:=default.values[k];
-  if defV = v then continue;
-  if k = 'dynamic-dns-updater' then
-    begin // remove login data
-    v:=decodeB64utf8(v);
-    chop('//',v);
-    v:=chop('/',v);
-    if ansiContainsStr(v, '@') then chop('@',v);
-    v:='...'+v+'...';
-    end;
-  diff:=diff+k+'='+v+CRLF+'# default: '+defV+CRLF+CRLF;
-  end;
-default.free;
+    v := chopLine(current);
+    k := chop('=', v);
+    if ansiEndsStr('-width', k) or ansiEndsStr('-height', k)
+     or stringExists(k, ['active','window','graph-visible','graph-size','ip', 'accounts',
+      'dynamic-dns-user', 'dynamic-dns-host', 'ips-ever', 'ips-ever-connected',
+      'icon-masks-user-images', 'last-external-address', 'last-dialog-folder'])
+    then continue;
 
-diffFrm.memoBox.text:=diff;
-diffFrm.showModal();
+    defV := default.values[k];
+    if defV = v then
+      continue;
+    if k = 'dynamic-dns-updater' then
+     begin // remove login data
+      v:=decodeB64utf8(v);
+      chop('//',v);
+      v:=chop('/',v);
+      if ansiContainsStr(v, '@') then chop('@',v);
+      v:='...'+v+'...';
+     end;
+    diff := diff+k+'='+v+CRLF+'# default: '+defV+CRLF+CRLF;
+  end;
+  default.free;
+
+  diffFrm.memoBox.text := diff;
+  diffFrm.showModal();
 end;
 
 procedure TmainFrm.useISOdateChkClick(Sender: TObject);
@@ -9443,15 +8579,16 @@ begin addFolderDefault:='real' end;
 procedure TmainFrm.Addicons1Click(Sender: TObject);
 resourcestring MSG_ICONS_ADDED = '%d new icons added';
 var
-  files: TStringDynArray;
+  files: TUnicodeStringDynArray;
   i, n: integer;
 begin
-if not selectFiles('', files) then exit;
-n:= IconsDM.images.Count;
-for i:=0 to length(files)-1 do
-  IconsDM.getImageIndexForFile(files[i]);
-n:= IconsDM.images.Count-n;
-msgDlg(format(MSG_ICONS_ADDED,[n]));
+  if not selectFiles('', files) then
+    exit;
+  n := IconsDM.images.Count;
+  for i:=0 to length(files)-1 do
+    IconsDM.getImageIndexForFile(files[i]);
+  n := IconsDM.images.Count-n;
+  msgDlg(format(MSG_ICONS_ADDED,[n]));
 end;
 
 procedure TmainFrm.Iconmasks1Click(Sender: TObject);
@@ -9459,29 +8596,45 @@ begin
   showOptions(optionsFrm.iconsPage, mainfrm.modalOptionsChk.checked);
 end;
 
+procedure Tmainfrm.ipmenuclick(sender:Tobject);
+var
+  ip: string;
+begin
+  ip := (sender as Tmenuitem).caption;
+  delete(ip, pos('&',ip), 1);
+  setDefaultIP(ip);
+  searchbetteripChk.checked:=FALSE;
+  setClip(urlBox.text);
+end; // ipmenuclick
+
 procedure TmainFrm.Anyaddress1Click(Sender: TObject);
 begin
-listenOn:='';
-restartServer();
+  fileSrv.changeListenAddr('');
+end;
+
+procedure TmainFrm.AnyAddressV4Click(Sender: TObject);
+begin
+  fileSrv.changeListenAddr('*');
 end;
 
 procedure TmainFrm.AnyAddressV6Click(Sender: TObject);
 begin
-listenOn:='[*]';
-restartServer();
+  fileSrv.changeListenAddr('[*]');
 end;
 
-procedure Tmainfrm.acceptOnMenuclick(sender:Tobject);
+procedure Tmainfrm.acceptOnMenuclick(sender: TObject);
+var
+  listenOn: String;
 begin
-listenOn:=(sender as Tmenuitem).caption;
-delete(listenOn, pos('&',listenOn), 1);
-restartServer();
+  listenOn := (sender as Tmenuitem).caption;
+  delete(listenOn, pos('&',listenOn), 1);
+  fileSrv.changeListenAddr(listenOn);
 end; // acceptOnMenuclick
 
 procedure TmainFrm.filesBoxEndDrag(Sender, Target: TObject; X, Y: Integer);
 begin
-scrollFilesBox:=-1;
-filesBox.Refresh();
+  scrollFilesBox:=-1;
+  filesBox.Refresh();
 end;
 
 procedure TmainFrm.filesBoxEnter(Sender: TObject);
@@ -9493,8 +8646,8 @@ begin setFilesBoxExtras(filesBox.MouseInClient) end;
 procedure TmainFrm.Disable1Click(Sender: TObject);
 resourcestring MSG_DDNS_DISABLED = 'Dynamic DNS updater disabled';
 begin
-dyndns.url:='';
-msgDlg(MSG_DDNS_DISABLED);
+  dyndns.url := '';
+  msgDlg(MSG_DDNS_DISABLED);
 end;
 
 procedure TmainFrm.saveNewFingerprintsChkClick(Sender: TObject);
@@ -9502,8 +8655,8 @@ resourcestring
   MSG_MD5_WARN = 'This option creates an .md5 file for every new calculated fingerprint.'
     +#13'Use with care to get not your disk invaded by these files.';
 begin
-if saveNewFingerprintsChk.Checked then
-  msgDlg(MSG_MD5_WARN, MB_ICONWARNING);
+  if saveNewFingerprintsChk.Checked then
+    msgDlg(MSG_MD5_WARN, MB_ICONWARNING);
 end;
 
 procedure TmainFrm.Createfingerprintonaddition1Click(Sender: TObject);
@@ -9548,32 +8701,32 @@ procedure TmainFrm.Hits1Click(Sender: TObject);
 begin defSorting:='hits' end;
 
 procedure TmainFrm.Resettotals1Click(Sender: TObject);
-begin resetTotals() end;
+begin resetTotals(fileSrv) end;
 
 procedure TmainFrm.copyBtnClick(Sender: TObject);
 begin setClip(urlBox.text) end;
 
-function TmainFrm.copySelection():TtreeNodeDynArray;
+function TmainFrm.copySelection(): TFileNodeDynArray;
 var
   i: integer;
 begin
-setlength(result, filesBox.SelectionCount);
-for i:=0 to filesBox.SelectionCount-1 do
-  result[i] := filesbox.selections[i];
+  setlength(result, filesBox.SelectionCount);
+  for i:=0 to filesBox.SelectionCount-1 do
+    result[i] := filesBox.selections[i];
 end; // copySelection
 
 function TmainFrm.SetSelectedFile(f: TFile): Boolean;
 var
-  n: TTreeNode;
+  n: TFileNode;
 begin
   n := f.node;
   Result := n <> NIL;
   filesBox.Selected := n;
 end;
 
-function TmainFrm.SetSelectedFile(f: TFile; node: TTreeNode): Boolean;
+function TmainFrm.SetSelectedFile(f: TFile; node: TFileNode): Boolean;
 var
-  n: TTreeNode;
+  n: TFileNode;
 begin
   n := node;
   Result := n <> NIL;
@@ -9593,7 +8746,11 @@ with sender as Tmenuitem do
 h:=getSystemMetrics(SM_CYMENU);
 end;
 
-procedure TmainFrm.menuDraw(sender:Tobject; cnv: Tcanvas; r:Trect; selected:boolean);
+{$IFDEF FPC}
+procedure TmainFrm.menuDraw(sender: Tobject; cnv: Tcanvas; r: Trect; ds: TOwnerDrawState);
+{$ELSE ~FPC}
+procedure TmainFrm.menuDraw(sender: Tobject; cnv: Tcanvas; r: Trect; selected: Boolean);
+{$ENDIF FPC}
 var
   mi: Tmenuitem;
   s: string;
@@ -9601,46 +8758,48 @@ var
   iw: Integer;
 begin
   iw := IconsDM.images.width;
-mi:=sender as Tmenuitem;
-if mi.IsLine() then
-  begin
-  i:=(r.Bottom+r.top) div 2;
-  cnv.Pen.Color:=clBtnHighlight;
-  cnv.MoveTo(r.Left, i);
-  cnv.lineTo(r.right, i);
-  cnv.Pen.Color:=clBtnShadow;
-  cnv.MoveTo(r.Left, i-1);
-  cnv.lineTo(r.right, i-1);
+  mi := sender as Tmenuitem;
+  if mi.IsLine() then
+    begin
+      i := (r.Bottom+r.top) div 2;
+      cnv.Pen.Color:=clBtnHighlight;
+      cnv.MoveTo(r.Left, i);
+      cnv.lineTo(r.right, i);
+      cnv.Pen.Color:=clBtnShadow;
+      cnv.MoveTo(r.Left, i-1);
+      cnv.lineTo(r.right, i-1);
 
-  if mi.hint = '' then exit;
-  s:=' '+mi.hint+' ';
-  inc(r.Top, cnv.TextHeight(s) div 5);
-  cnv.font.color:=clBtnHighlight;
-  drawText(cnv.handle, pchar(s), -1, r, DT_VCENTER or DT_CENTER);
-  setBkMode(cnv.handle, TRANSPARENT);
-  cnv.font.color:=clBtnShadow;
-  dec(r.Left);
-  dec(r.top);
-  drawText(cnv.handle, pchar(s), -1, r, DT_VCENTER or DT_CENTER);
-  exit;
-  end;
-cnv.fillRect(r);
-inc(r.left, iw*2);
-inc(r.top,2);
-drawText(cnv.handle, pchar(mi.caption), -1, r, DT_LEFT or DT_VCENTER);
-dec(r.left, iw*2);
+      if mi.hint = '' then
+        exit;
+      s := ' '+mi.hint+' ';
+      inc(r.Top, cnv.TextHeight(s) div 5);
+      cnv.font.color:=clBtnHighlight;
+      drawText(cnv.handle, pchar(s), -1, r, DT_VCENTER or DT_CENTER);
+      setBkMode(cnv.handle, TRANSPARENT);
+      cnv.font.color:=clBtnShadow;
+      dec(r.Left);
+      dec(r.top);
+      drawText(cnv.handle, pchar(s), -1, r, DT_VCENTER or DT_CENTER);
+      exit;
+    end;
+  cnv.fillRect(r);
+  inc(r.left, iw*2);
+  inc(r.top,2);
+  drawText(cnv.handle, pchar(mi.caption), -1, r, DT_LEFT or DT_VCENTER);
+  dec(r.left, iw*2);
 
-if mi.ImageIndex >= 0 then
-  IconsDM.images.draw(cnv, r.left+1, r.top, mi.ImageIndex);
-if mi.Checked then
-  begin
-  cnv.font.Name:='WingDings';
-  with cnv.Font do size:=size+2;
-  cnv.TextOut(r.Left+ iw, r.Top, #$0252); // check mark
-  end;
+  if mi.ImageIndex >= 0 then
+    IconsDM.images.draw(cnv, r.left+1, r.top, mi.ImageIndex);
+  if mi.Checked then
+    begin
+    cnv.font.Name:='WingDings';
+    with cnv.Font do
+      size:=size+2;
+    cnv.TextOut(r.Left+ iw, r.Top, #$0252); // check mark
+    end;
 end;
 
-procedure TmainFrm.wrapInputQuery(sender:Tobject);
+procedure TmainFrm.wrapInputQuery(sender: Tobject);
 var
   Form: TCustomForm;
   Prompt: TLabel;
@@ -9649,15 +8808,19 @@ var
   I, J, ButtonTop: Integer;
   coef: real;
 begin
-Form := Screen.ActiveCustomForm;
-if (Form=NIL) or (Form.ClassName<>'TInputQueryForm') then
-  Exit;
+  Form := Screen.ActiveCustomForm;
+  if (Form=NIL) or (Form.ClassName<>'TInputQueryForm') then
+    Exit;
 
   Edit := NIL;
   Prompt := NIL;
 //  Ctrl := NIL;
   ButtonTop := 0;
+ {$IFDEF FPC}
+  coef := self.PixelsPerInch / 96;
+ {$ELSE ~FPC}
   coef := self.CurrentPPI / 96;
+ {$ENDIF FPC}
 
 for I := 0 to Form.ControlCount-1 do
   begin
@@ -9669,7 +8832,7 @@ for I := 0 to Form.ControlCount-1 do
   end;
 if Assigned(Edit) then
   begin
-    Edit.SetBounds(Prompt.Left, Prompt.Top + Prompt.Height + trunc(5 * coef), max(200, Prompt.Width), Edit.Height);
+    Edit.SetBounds(Prompt.Left, Prompt.Top + Prompt.Height + trunc(5 * coef), max(round(200*coef), Prompt.Width), Edit.Height);
     Form.ClientWidth := (Edit.Left * 2) + Edit.Width;
     ButtonTop := Edit.Top + Edit.Height + trunc(coef * 15);
   end;
@@ -9687,22 +8850,6 @@ for I := 0 to Form.ControlCount-1 do
   end;
 end;
 
-
-
-function TFileHlp.getShownRealm():string;
-var
-  f: Tfile;
-begin
-f:=self;
-  repeat
-  result:=f.realm;
-  if result > '' then exit;
-  f:=f.parent;
-  until f = NIL;
-if mainfrm.useCommentAsRealmChk.checked then
-  result:= getDynamicComment(mainfrm.getLP);
-end; // getShownRealm
-
 constructor TConnDataGui.Create;
 begin
   tray := NIL;
@@ -9717,11 +8864,12 @@ begin
     FreeAndNil(tray_ico);
 end;
 
+{
 constructor TConnDataHlp.createWithGui(conn: ThttpConn);
 begin
   Self.create(conn, TConnDataGui.Create);
 end;
-
+}
 function TConnDataHlp.getTray(): TmyTrayicon;
 begin
   Result := TConnDataGui(Self.guiData).tray;
@@ -9731,6 +8879,26 @@ function TConnDataHlp.getIcon(): TIcon;
 begin
   Result := TConnDataGui(Self.guiData).tray_ico;
 end;
+
+function TConnDataHlp.getIcoParams: TIconParams;
+begin
+  Result := TConnDataGui(Self.guiData).tp;
+end;
+
+procedure TConnDataHlp.setIcoParams(p: TIconParams);
+begin
+  TConnDataGui(Self.guiData).tp := p;
+end;
+
+procedure TConnDataHlp.setIcon(p: TIconParams);
+begin
+  if setTrayIcon(TConnDataGui(Self.guiData).tray_ico, TConnDataGui(Self.guiData).tp, p) then
+  begin
+    TConnDataGui(Self.guiData).tp := p;
+    TConnDataGui(Self.guiData).tray.setIcon(TConnDataGui(Self.guiData).tray_ico);
+  end;
+end;
+
 
 procedure TConnDataHlp.clearGuiData;
 begin
@@ -9764,49 +8932,46 @@ if savefileA(tmpPath+'test.tmp','') then
   deleteFile(tmpPath+'test.tmp')
  else
   tmpPath:=getTempDir();
-lastUpdateCheckFN:=tmpPath+'HFS last update check.tmp';
+lastUpdateCheckFN := tmpPath+'HFS last update check.tmp';
 setCurrentDir(exePath); // sometimes people mess with the working directory, so we force it to the exe path
-defaultTpl:=Ttpl.create(getRes('defaultTpl'));
 //tpl_help := UnUTF(getRes('tplHlp'));
-defSorting:='name';
-dmBrowserTpl:=Ttpl.create(getRes('dmBrowserTpl'));
-filelistTpl:=Ttpl.create(getRes('filelistTpl'));
-globalLimiter:=TspeedLimiter.create();
-ip2obj:=THashedStringList.create();
-etags:=THashedStringList.create();
-sessions:=Tsessions.create();
+defSorting := 'name';
+dmBrowserTpl := Ttpl.create(getResText('dmBrowserTpl'));
+filelistTpl  := Ttpl.create(getResText('filelistTpl'));
+noMacrosTpl  := Ttpl.create(getResText('noMacrosTpl'));
+ip2obj := THashedStringList.create();
+etags := THashedStringList.create();
 ipsEverConnected:=THashedStringList.create();
 ipsEverConnected.sorted:=TRUE;
 ipsEverConnected.duplicates:=dupIgnore;
 ipsEverConnected.delimiter:=';';
-logMaxLines:=2000;
-trayShows:= TS_downloads;
-flashOn:='download';
+logMaxLines := 2000;
+trayShows := TS_downloads;
+flashOn := 'download';
 forwardedMask:='::1;127.0.0.1';
-runningOnRemovable:=DRIVE_REMOVABLE = GetDriveType(PChar(exePath[1]+':\'));
-etags.values['exe']:= MD5PassHS(dateToHTTPr(getMtimeUTC(paramStr(0))));
+runningOnRemovable := DRIVE_REMOVABLE = GetDriveType(PChar(exePath[1]+':\'));
+etags.values['exe'] := MD5PassHS(dateToHTTPr(getMtimeUTC(paramStr(0))));
 toAddFingerPrint := TStringList.Create;
 
 
-dll:=GetModuleHandle('kernel32.dll');
+dll := GetModuleHandle('kernel32.dll');
 if dll <> HINSTANCE_ERROR then
   setThreadExecutionState:=getprocaddress(dll, 'SetThreadExecutionState');
 
-toDelete:=Tlist.create();
-usersInVFS:=TusersInVFS.create();
+toDelete := Tlist.create();
+usersInVFS := TusersInVFS.create();
 
-openInBrowser:='*.htm;*.html;*.jpg;*.jpeg;*.gif;*.png;*.txt;*.swf;*.svg;*.webp';
+openInBrowser := '*.htm;*.html;*.jpg;*.jpeg;*.gif;*.png;*.txt;*.swf;*.svg;*.webp';
 
 saveMode:=SM_USER;
-lastDialogFolder:=getCurrentDir();
-autoupdatedFiles:=TstringToIntHash.create();
-iconsCache:=TiconsCache.create();
-dyndns.active:=TRUE;
-connectionsInactivityTimeout:=60; // 1 minute
-startupFilename:=getShellFolder('Startup')+'\HFS.lnk';
-tempScriptFilename:=getTempDir()+'hfs script.tmp';
+lastDialogFolder := getCurrentDir();
+autoupdatedFiles := TstringToIntHash.create();
+dyndns.active := TRUE;
+connectionsInactivityTimeout := 60; // 1 minute
+startupFilename := getShellFolder('Startup')+'\HFS.lnk';
+tempScriptFilename := getTempDir()+'hfs script.tmp';
 
-logfile.apacheZoneString:=if_(GMToffset < 0, '-','+')
+logfile.apacheZoneString := if_(GMToffset < 0, '-','+')
   +format('%.2d%.2d', [abs(GMToffset div 60), abs(GMToffset mod 60)]);
 
 
@@ -9814,13 +8979,9 @@ FINALIZATION
 
 progFrm.free;
 toDelete.free;
-defaultTpl.Free;
 filelistTpl.free;
 autoupdatedFiles.free;
-iconsCache.free;
 usersInVFS.free;
-if Assigned(globalLimiter) then
-  FreeAndNil(globalLimiter);
 ip2obj.free;
 ipsEverConnected.free;
 etags.free;

@@ -54,6 +54,8 @@ resourcestrings:
 Текущий шаблон использует макрос.\rВы хотите отменить это действие?
 [Remove from shell context menu]
 Удалится из контекстного меню оболочки
+[Uninstall HFS]
+Деинсталировать HFS
 [Switch OFF]
 ВЫКЛЮЧИТЬ
 [Switch ON]

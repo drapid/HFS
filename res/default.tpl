@@ -55,6 +55,9 @@ def 3.0
 	{.$list panel.}
 	</div>
 </body>
+<script>
+document.querySelector("main") || music();
+</script>
 </html>
 
 [list panel]
@@ -418,9 +421,135 @@ z-index:1; /* without this .item-menu will be over*/ }
 #upload-results { max-height: calc(100vh - 11em); overflow: auto;}
 #upload-panel>button { margin: auto; display: block; margin-top:.8em;} /* center it*/
 
+[nomacros_style.css|public|no log|cache]
+.l{display:inline-block;width:60%}
+.t{float:right;color:gray}
+#files{width:90%;margin-left:auto;margin-right:auto}
+@media (min-width:1280px){#files{width:84%;margin-left:auto;margin-right:auto}}
+@media (max-width:800px){#files{width:100%;margin-left:auto;margin-right:auto}.t{float:right;color:#AAA}}
+.d{background:transparent;border:none;color:#900;font-size:10pt;cursor:pointer}
+.list{float:left;overflow:hidden;background:#fff;border-style:solid;border-width:2px;border-radius:8px;border-color:gray;max-height:90px;width:100%}
+.play{padding:0 5px;font-size:7pt;background:#C8F2D0}
+.table_title{color:#333;font-style:italic;font-family:serif;text-align:center;font-smoothing:antialiased;font-size:13pt}
+
+button { background-color: #bcd; color: #444; padding: .5em 1em; border: transparent; text-decoration: none; border-radius: .3em; vertical-align: middle; cursor:pointer; }
+body { font-family:tahoma, verdana, arial, helvetica, sans; transition:background-color 1s ease; color:#777; }
+a { text-decoration:none; color:#357; border:1px solid transparent; padding:0 0.1em; }
+#folder-path { float:left; margin-bottom: 0.2em; }
+#folder-path button { padding: .4em .6em; border-radius:.7em; }
+#folder-path button:first-child { padding: .2em .4em;} #folder-path i.fa { font-size:135% }
+button i.fa { font-size:110% }
+.item { margin-bottom:.3em; padding:.3em; border-top:1px solid #ddd;  }
+.item:hover { background:#f8f8f8; }
+.item-props { float:right; font-size:90%; margin-left:12px; margin-top:.2em; }
+.item-link { float:left; word-break:break-word; /* fix long names without spaces on mobile */ }
+.item img { vertical-align: text-bottom; margin:0 0.2em; }
+.item .fa-lock { margin-right: 0.2em; }
+.item .clearer { clear:both }
+.comment { color:#666; padding:.1em 1.8em .2em; border-radius: 1em; margin-top: 0.1em;
+	background-color:rgba(0,0,0,.04); /* dynamically darker, as also hover is darker */  }
+.comment>i:first-child { margin-right:0.5em; margin-left:-1.4em; }
+.item-size { margin-left:.3em }
+.selector { float:left; width: 1.2em; height:1.2em; margin-right: .5em; filter:grayscale(1); }
+.item-menu { padding:0.1em 0.3em; border-radius:0.6em; position: relative; top: -0.1em;}
+.dialog-content h1 { margin:0; }
+.dialog-content .buttons { margin-top:1.5em }
+.dialog-content .buttons button { margin:.5em auto; min-width: 9em; display:block; }
+.ask .buttons { margin-top:1em }
+.ask .buttons button { display:initial; min-width: 6em; }
+.dialog-content.error { background: #fcc; }
+.dialog-content.error h2 { text-align:center }
+.dialog-content.error button { background-color: #f77; color: white; }
+#wrapper { max-width:60em; margin:auto; } /* not too wide or it will be harder to follow rows */
+#serverinfo { font-size:80%; text-align:center; margin: 1.5em 0 0.5em; }
+#selection-panel { text-align:center; }
+#selection-panel label { margin-right:0.8em }
+#selection-panel button { vertical-align:baseline; }
+#selection-panel .buttons { white-space:nowrap }
+
+.item-menu { display:none }
+.can-comment .item-menu,
+.can-rename .item-menu,
+.can-delete .item-menu { display:inline-block; display:initial; }
+
+@keyframes spin { 100% { -webkit-transform: rotate(360deg); transform:rotate(360deg); } }
+
+#folder-stats { font-size:90%; padding:.1em .3em; margin:.5em; float:right; }
+#files,#nothing { clear:both }
+#nothing { padding:1em }
+
+.dialog-overlay { background:rgba(0,0,0,.75); position:fixed; top:0; left:0; width:100%; height:100%; z-index:100; }
+.dialog-content { position: absolute; top: 50%; left: 50%;
+	transform: translate(-50%, -50%);
+	-webkit-transform: translate(-50%, -50%);
+	-moz-transform: translate(-50%, -50%);
+	-ms-transform: translate(-50%, -50%);
+	-o-transform: translate(-50%, -50%);
+	background:#fff; border-radius: 1em; padding: 1em; text-align:center; min-width: 10em;
+}
+.dialog-content input { border: 1px solid #888; } /* without this the border on chrome83 is not consistent */
+.ask input { border:1px solid rgba(0,0,0,0.5); padding: .2em; margin-top:1em; }
+.ask textarea { margin:1em 0; width:25em; height:8em; }
+.ask .close { float: right; font-size: 1.2em; color: red; position: relative; top: -0.4em; right: -0.3em; }
+
+#additional-panels input { border:0; color: #555; padding: .1em .3em .2em; border-radius: 0.4em; }
+
+.additional-panel { position:relative; max-height: calc(100vh - 5em); text-align:left; margin: 0.5em 1em; padding: 0.5em 1em; border-radius: 1em; background-color:#667; border: 2px solid #aaa; color:#fff; line-height: 1.5em; display:inline-block;  }
+.additional-panel .close { position: absolute; right: -0.8em; top: -0.2em; color: #aaa; font-size: 130%; }
+
+body.dark-theme { background:#222; color:#aaa; }
+body.dark-theme #menu-panel { background:#345 }
+body.dark-theme #title-bar { color:#bbb }
+body.dark-theme a { color:#79b }
+body.dark-theme .item { border-color:#444; }
+body.dark-theme .item:hover { background:#111; }
+body.dark-theme button { background:#89a; }
+body.dark-theme .item .comment { background-color:#444; color:#888; }
+body.dark-theme #foldercomment { background-color:#333; color:#999; }
+body.dark-theme .dialog-overlay { background:rgba(100,100,100,.5) }
+body.dark-theme .dialog-content { background:#222; color:#888; }
+body.dark-theme input,
+body.dark-theme textarea,
+body.dark-theme select,
+body.dark-theme #additional-panels input
+{ background: #111; color: #aaa; }
+body.dark-theme .list { background:#444; color:#888; }
+body.dark-theme .table_title { color:#888; }
+#msgs { display:none; }
+#msgs li:first-child { font-weight:bold; }
+
+#menu-panel { position:fixed; top:0; left:0; width: 100%; background:#678; text-align:center;
+position: -webkit-sticky; position: -moz-sticky; position: -ms-sticky; position: -o-sticky; position: sticky; margin-bottom:0.3em;
+z-index:1; /* without this .item-menu will be over*/ }
+#menu-panel button span { margin-left:.8em }
+#user-panel button { padding:0.3em 0.6em; font-size:smaller; margin-left:1em; }
+#user-panel span { position: relative; top: 0.1em; }
+#menu-bar { padding:0.2em 0 }
+
+@media (min-width: 50em) {
+#toggleTs { display: none }
+}
+@media (max-width: 50em) {
+#menu-panel button { padding: .4em .6em; }
+.additional-panel button span,
+#menu-bar button span { display:none } /* icons only */
+#menu-bar i { font-size:120%; } /* bigger icons */
+#menu-bar button { width: 3em; max-width:10.7vw; padding: .4em 0; }
+.hideTs .item-ts { display:none }
+}
+
+#upload-panel { font-size: 88%;}
+#upload-progress { margin-top:.5em; display:none; }
+#upload-progress progress { width:10em; position:relative; top:.1em; }
+#progress-text { position: absolute; color: #000; font-size: 80%; margin-left:.5em; z-index:1; }
+#upload-results a { color:#b0c2d4; }
+#upload-results>* { display:block; word-break: break-all; }
+#upload-results>span { margin-left:.15em; } /* better alignment */
+#upload-results { max-height: calc(100vh - 11em); overflow: auto;}
+#upload-panel>button { margin: auto; display: block; margin-top:.8em;} /* center it*/
 
 [file=folder=link|private]
-<div class='item item-type-%item-type% {.if|{.get|can access.}||cannot-access.} {.if|{.get|can archive item.}|can-archive.}'>
+<div class='item item-type-%item-type% {.if|{.get|can access.}||cannot-access.} {.if|{.get|can archive item.}|can-archive.} {.if|{.get|has thumbnail.}|has-thumbnail.}'>
 	<div class="item-link">
 		<a href="%item-url%">
 			<img src="%item-icon%" />
@@ -1371,7 +1500,769 @@ $domReady(()=>{
     selectionChanged()
 })//$domReady
 
+function music(){ //C DJ BSD2License
+  var e=1,n=new Audio,o=[[]],c=0,r=[];
+  document.querySelectorAll("a[href]").forEach(function(t,e){
+     var n;[".mp3",".ogg",".m4a",".wma",".aac","flac",".Mp3",".MP3",".OGG",".M4A",".WMA",".AAC","FLAC"].indexOf(t.getAttribute("href").slice(-4))+1&&(o[0].push(t.getAttribute("href")),t.addEventListener("click",function(e){e.preventDefault(),i(t.getAttribute("href"))}),(n=document.querySelector('input[value="'+t.getAttribute("href")+'"]'))&&(n.checked=!0))}),"?shuffle"==location.search&&(e=!e),e&&(o[0]=o[0].sort(function(e,t){return.5-Math.random()}));var t,u=document.querySelector("#actions")||document.querySelector("#menu-bar")||document.querySelector("body"),a=document.createElement("button");function i(e){e.match(/m3u8?$/)?fetch(e).then(function(e){e.text().then(function(e){i(e.match(/^(?!#)(?!\s).*$/gm).map(encodeURI)[0])})}):(n.src=e,n.play(),document.title=decodeURI(e))}a.textContent="\u25BA",a.setAttribute("class","play"),a.onclick=function(){n.paused?(n.src||(n.src=(e?o[0]:t)[0]),n.play()):n.pause()},a.oncontextmenu=function(e){e.preventDefault(),n.onended()},o[0].length&&!document.querySelector("button.play")&&u.appendChild(a),n.onended=function(){var e=n.getAttribute("src");do{e=o[c][o[c].indexOf(e)+1];var t=document.querySelector('input[value="'+e+'"]')}while(t&&!t.checked);e?i(e):c?(c--,n.src=r[c],n.onended()):i(o[0][0])},n.onpause=function(){document.querySelector("button.play").textContent="\u25BA"},n.onplay=function(){document.querySelector("button.play").textContent="\u2759 \u2759"},o[0].length&&(window.onbeforeunload=function(e){localStorage.last=n.getAttribute("src")+"#t="+n.currentTime},t=localStorage.last.split("#t="),n.preload="none",n.src=(e?o[0]:t)[0],(t=1e3*location.search.slice(1))&&setTimeout(function(){document.querySelector("button.play").click()},t)),n.onerror=function(){n.onended()},"mediaSession"in navigator&&navigator.mediaSession.setActionHandler("nexttrack",function(){n.onended()})}
+
+
 [sha256.js|public]
 // from https://github.com/AndersLindman/SHA256
 SHA256={K:[1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298],Uint8Array:function(r){return new("undefined"!=typeof Uint8Array?Uint8Array:Array)(r)},Int32Array:function(r){return new("undefined"!=typeof Int32Array?Int32Array:Array)(r)},setArray:function(r,n){if("undefined"!=typeof Uint8Array)r.set(n);else{for(var t=0;t<n.length;t++)r[t]=n[t];for(t=n.length;t<r.length;t++)r[t]=0}},digest:function(r){var n=1779033703,t=3144134277,e=1013904242,a=2773480762,i=1359893119,o=2600822924,A=528734635,f=1541459225,y=SHA256.K;if("string"==typeof r){var v=unescape(encodeURIComponent(r));r=SHA256.Uint8Array(v.length);for(var g=0;g<v.length;g++)r[g]=255&v.charCodeAt(g)}var u=r.length,h=64*Math.floor((u+72)/64),l=h/4,s=8*u,d=SHA256.Uint8Array(h);SHA256.setArray(d,r),d[u]=128,d[h-4]=s>>>24,d[h-3]=s>>>16&255,d[h-2]=s>>>8&255,d[h-1]=255&s;var S=SHA256.Int32Array(l),H=0;for(g=0;g<S.length;g++){var c=d[H]<<24;c|=d[H+1]<<16,c|=d[H+2]<<8,c|=d[H+3],S[g]=c,H+=4}for(var U=SHA256.Int32Array(64),p=0;p<l;p+=16){for(g=0;g<16;g++)U[g]=S[p+g];for(g=16;g<64;g++){var I=U[g-15],w=I>>>7|I<<25;w^=I>>>18|I<<14,w^=I>>>3;var C=(I=U[g-2])>>>17|I<<15;C^=I>>>19|I<<13,C^=I>>>10,U[g]=U[g-16]+w+U[g-7]+C&4294967295}for(var K=n,b=t,m=e,M=a,R=i,j=o,k=A,q=f,g=0;g<64;g++){C=R>>>6|R<<26,C^=R>>>11|R<<21;var x=q+(C^=R>>>25|R<<7)+(R&j^~R&k)+y[g]+U[g]&4294967295,w=K>>>2|K<<30;w^=K>>>13|K<<19;var z=K&b^K&m^b&m,q=k,k=j,j=R,R=M+x&4294967295,M=m,m=b,b=K,K=x+((w^=K>>>22|K<<10)+z&4294967295)&4294967295}n=n+K&4294967295,t=t+b&4294967295,e=e+m&4294967295,a=a+M&4294967295,i=i+R&4294967295,o=o+j&4294967295,A=A+k&4294967295,f=f+q&4294967295}var B=SHA256.Uint8Array(32);for(g=0;g<4;g++)B[g]=n>>>8*(3-g)&255,B[g+4]=t>>>8*(3-g)&255,B[g+8]=e>>>8*(3-g)&255,B[g+12]=a>>>8*(3-g)&255,B[g+16]=i>>>8*(3-g)&255,B[g+20]=o>>>8*(3-g)&255,B[g+24]=A>>>8*(3-g)&255,B[g+28]=f>>>8*(3-g)&255;return B},hash:function(r){var n=SHA256.digest(r),t="";for(i=0;i<n.length;i++){var e="0"+n[i].toString(16);t+=2<e.length?e.substring(1):e}return t}};
 
+[nomacros_lib.js|public|no log|cache]
+
+function wantArray(x) {
+	return Array.isArray(x) ? x : [x]
+}
+
+function $create(tag, opts={}){
+    let v = tag.split('.')
+	tag = v.shift()
+    let e = document.createElement(tag)
+	if (v.length)
+		e.setAttribute('class', v.join(' '))
+	if (Array.isArray(opts) || opts instanceof Element)
+		opts = { h:opts }
+	if (v=opts.s)
+	    e.style = v
+    if (v=opts.t)
+        e.textContent = v
+    if (v=opts.h)
+		if (typeof v==='string')
+			e.innerHTML = v
+		else
+		    wantArray(v).forEach(x=> e.append(x))
+	Object.assign(e, opts.a)
+	if (v=opts.on)
+		$on(e, v)
+	if (v=opts.click)
+		$on(e, { click:v })
+	if (v=opts.app)
+	    $sel(v).append(e)
+    return e
+}
+
+function $msel(sel, root, opts={}) {
+	if (typeof root==='function')
+		opts=root, root=0
+	if (!root)
+		root = document
+	sel = sel.replace(/:input\b/g, 'input,textarea,select,button')
+	if (opts.single)
+	    return root.querySelector(sel)
+	let ret = [...root.querySelectorAll(sel)]
+	if (typeof opts==='function')
+		opts.f = opts
+	if (opts.f)
+		ret = ret.filter(opts.f)
+	return ret
+}
+
+function $sel(sel, root){
+    if (sel && sel instanceof Element)
+        return sel
+    return $msel(sel, root, { single:true })
+}
+
+function $on(root, evs, sel) {
+	if (!root)
+		root = document
+	if (typeof root==='string')
+	    root = $msel(root)
+	for (let k in evs)
+	    wantArray(root).forEach(r=> r.addEventListener(k, function(ev){
+			if (sel && !(ev.delTarget = ev.target.closest(sel)))
+				return
+			if (false === evs[k].call(this,ev)) {
+				ev.stopPropagation()
+				ev.preventDefault()
+			}
+		}))
+}
+
+function $click(sel, cb, del) {
+    if (typeof sel==='string') {
+        let a = sel.split('/')
+        if (a.length > 1)
+            sel=a[0], del=a[1]
+    }
+    return $on(sel, { click:cb }, del)
+}
+
+function $toggle(id, state) {
+	let r = typeof id==='string' ? document.getElementById(id) : id
+	if (!r)
+		return
+	if (state===undefined)
+	    state = r.style.display==='none'
+	r.style.display = state ? '' : 'none'
+	return r
+}
+
+function $xclass(el, cls, st) {
+    let l = el.classList
+    if (st===undefined ? l.contains(cls) : !st)
+        return l.remove(cls), false
+    l.add(cls)
+    return true
+}
+
+function $post(url, data, opts) {
+    return fetch(url, Object.assign({ method:'POST', cache:'no-cache', body:new URLSearchParams(data) }, opts))
+        .then(r=> r.text())
+}
+
+function $button(lab, click) {
+	let m = lab.split('@@')
+	if (m.length > 1)
+		lab = '<i class="fa fa-'+m[0]+'"></i> '+m[1]
+	return $create('button', { h:lab, click })
+}
+
+function $form(form, field) {
+    if (typeof form==='string')
+        form = $sel(form)
+    if (!form.elements)
+        form = $sel('form', form)
+	if (field)
+		return form.elements.namedItem(field).value
+	let ret = {}
+	for (let e of form.elements)
+		if (e.name && (e.type !== 'radio' || e.checked)) {
+			let v = e.value
+			if (field === false)
+				v = v.trim()
+			ret[e.name] = v
+		}
+	return ret
+}
+
+function $domReady(cb) {
+	document.readyState !== 'loading' ? cb() : document.addEventListener('DOMContentLoaded', cb)
+}
+
+// options: cb(function), closable(false)
+function dialog(content, options) {
+	options = options||{}
+	var cb = typeof options==='function' ? options : options.cb
+	var active = document.activeElement
+    var ret = $create('div.dialog-content', {
+		h:content,
+		on:{
+			click(ev){ ev.stopImmediatePropagation() },
+			keydown(ev){ ev.keyCode===27 && close2() }
+		}
+	})
+	ret.close = ()=> {
+        ret.closest('.dialog-overlay').remove()
+		active.focus()
+        cb && cb()
+    }
+	function close2(){
+		if (options.closable !== false)
+			ret.close()
+	}
+
+	$create('div.dialog-overlay', { h:ret, click:close2, app:'body' })
+	setTimeout(()=>
+		$sel(':input:not(:disabled)', ret).focus())
+    return ret
+}//dialog
+
+// options: cb(function), buttons(jq|false)
+function showMsg(content, options) {
+	options = options||{}
+	var cb = typeof options==='function' ? options : options.cb
+	var bs = options.buttons
+	if (~content.indexOf('<'))
+		content = content.replace(/\n/g, '<br>')
+    var ret = dialog($create('div', { s:'display:inline-block; text-Align:left' , h:content }), cb)
+	//.css('text-align', 'center')
+	if (bs!==false)
+		$create('div.buttons', {
+			app: ret,
+			h: bs || $button("Ok", ()=> ret.close())
+		})
+	return ret
+}//showMsg
+
+function showError(msg, cb) {
+	if (!msg)
+		return
+	let ret = showMsg("<h2>Error</h2>"+msg, cb)
+	ret.classList.add('error')
+    return ret
+}
+
+// from https://github.com/AndersLindman/SHA256
+SHA256={K:[1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298],Uint8Array:function(r){return new("undefined"!=typeof Uint8Array?Uint8Array:Array)(r)},Int32Array:function(r){return new("undefined"!=typeof Int32Array?Int32Array:Array)(r)},setArray:function(r,n){if("undefined"!=typeof Uint8Array)r.set(n);else{for(var t=0;t<n.length;t++)r[t]=n[t];for(t=n.length;t<r.length;t++)r[t]=0}},digest:function(r){var n=1779033703,t=3144134277,e=1013904242,a=2773480762,i=1359893119,o=2600822924,A=528734635,f=1541459225,y=SHA256.K;if("string"==typeof r){var v=unescape(encodeURIComponent(r));r=SHA256.Uint8Array(v.length);for(var g=0;g<v.length;g++)r[g]=255&v.charCodeAt(g)}var u=r.length,h=64*Math.floor((u+72)/64),l=h/4,s=8*u,d=SHA256.Uint8Array(h);SHA256.setArray(d,r),d[u]=128,d[h-4]=s>>>24,d[h-3]=s>>>16&255,d[h-2]=s>>>8&255,d[h-1]=255&s;var S=SHA256.Int32Array(l),H=0;for(g=0;g<S.length;g++){var c=d[H]<<24;c|=d[H+1]<<16,c|=d[H+2]<<8,c|=d[H+3],S[g]=c,H+=4}for(var U=SHA256.Int32Array(64),p=0;p<l;p+=16){for(g=0;g<16;g++)U[g]=S[p+g];for(g=16;g<64;g++){var I=U[g-15],w=I>>>7|I<<25;w^=I>>>18|I<<14,w^=I>>>3;var C=(I=U[g-2])>>>17|I<<15;C^=I>>>19|I<<13,C^=I>>>10,U[g]=U[g-16]+w+U[g-7]+C&4294967295}for(var K=n,b=t,m=e,M=a,R=i,j=o,k=A,q=f,g=0;g<64;g++){C=R>>>6|R<<26,C^=R>>>11|R<<21;var x=q+(C^=R>>>25|R<<7)+(R&j^~R&k)+y[g]+U[g]&4294967295,w=K>>>2|K<<30;w^=K>>>13|K<<19;var z=K&b^K&m^b&m,q=k,k=j,j=R,R=M+x&4294967295,M=m,m=b,b=K,K=x+((w^=K>>>22|K<<10)+z&4294967295)&4294967295}n=n+K&4294967295,t=t+b&4294967295,e=e+m&4294967295,a=a+M&4294967295,i=i+R&4294967295,o=o+j&4294967295,A=A+k&4294967295,f=f+q&4294967295}var B=SHA256.Uint8Array(32);for(g=0;g<4;g++)B[g]=n>>>8*(3-g)&255,B[g+4]=t>>>8*(3-g)&255,B[g+8]=e>>>8*(3-g)&255,B[g+12]=a>>>8*(3-g)&255,B[g+16]=i>>>8*(3-g)&255,B[g+20]=o>>>8*(3-g)&255,B[g+24]=A>>>8*(3-g)&255,B[g+28]=f>>>8*(3-g)&255;return B},hash:function(r){var n=SHA256.digest(r),t="";for(i=0;i<n.length;i++){var e="0"+n[i].toString(16);t+=2<e.length?e.substring(1):e}return t}};
+
+
+function sha256(s) { return SHA256.hash(s) }
+
+function showLogin(options) {
+	if (!HFS.sid) // the session was just deleted
+		return location.reload() // but it's necessary for login
+	let warning = `<div style='border-bottom:1px solid #888; margin-bottom:1em; padding-bottom:1em;'>
+		The current account (${HFS.user}) has no access to this resource.
+		<br>Please enter different credentials.
+	</div>`
+	let d = dialog($create('form', {
+		s:'line-height:1.9em',
+		// the following works because HFS.user is always a string
+		h: (HFS.user && warning)+`
+			Username
+			<br><input name=usr />
+			<br>Password
+			<br><input name=pwd type=password />
+			<br><br><button type=submit>Login</button>
+		`,
+		on:{
+			submit(){
+				var v = $form(d, false)
+				var data = {
+					user: v.usr,
+					passwordSHA256: sha256(sha256(v.pwd)+HFS.sid)  // hash must be lowercase. Double-hashing is causing case sensitiv
+				}
+				$post("?mode=login", data).then(res=>{
+					if (res !== 'ok')
+						return showError(res)
+					d.close()
+					showLoading()
+					location.reload()
+				}, ajaxError);
+				return false
+			}
+		}
+	}), options)
+} // showLogin
+
+function showLoading(show){
+	if (showLoading.last)
+		showLoading.last.close()
+	if (show===false)
+		return
+	let ret = showLoading.last = showMsg('<i class="fa fa-refresh" style="animation:spin 6s linear infinite;position: absolute;top: calc(50% - .5em);left: calc(50% - 0.5em); font-size: 12em; font-size:min(50vw, 50vh); color: #fff;" />',{ buttons:false })
+	ret.style.background = 'none'
+	return ret
+}
+
+
+function ajax(method, data, cb) {
+    if (!data)
+        data = {};
+    data.token = HFS.sid; // avoid CSRF attacks
+    showLoading()
+    // calling this section 'under' the current folder will affect permissions commands like 
+    return $post("?mode=section&id=ajax."+method, data).then(res=>{
+        if (cb)
+            showLoading(false)
+        ;(cb||getStdAjaxCB())(res)
+    }, ajaxError);
+}//ajax
+
+function changePwd() {
+	if (!HFS.canChangePwd)
+		return showError("Sorry, you lack permissions for this action")
+	ask(`Warning: the password will be sent unencrypted to the server. For better security change the password from HFS window.
+		<hr><i class="fa fa-key"></i> Enter new password`,
+		'password',
+		s=>
+			s && ajax('changepwd', {'new':s}, getStdAjaxCB(function(){
+				showLoading(false)
+				showMsg("Password changed")
+			}))
+	)
+}//changePwd
+
+function selectionChanged() { $sel('#selected-counter').textContent = getSelectedItems().length }
+
+function getItemName(el) {
+    if (!el)
+        return false
+    var a = el.closest('a') || $sel('.item-link a', el.closest('.item'))
+    // take the url, and ignore any #anchor part
+    var s = a.href || a.value
+    s = s.split('#')[0]
+    // remove protocol and hostname
+    var i = s.indexOf('://');
+    if (i > 0)
+        s = s.slice(s.indexOf('/',i+3));
+    // current folder is specified. Remove it.
+    if (s.indexOf(HFS.folder) == 0)
+        s = s.slice(HFS.folder.length);
+    // folders have a trailing slash that's not truly part of the name
+    if (s.slice(-1) == '/')
+        s = s.slice(0,-1);
+    // it is encoded
+    s = (decodeURIComponent || unescape)(s);
+    return s;
+} // getItemName
+
+function submit(data, url) {
+    var f = $create('form', { app:'body', a:{method:'post', action:url||'' }, s:'display:none' })
+    for (var k in data)
+		wantArray(data[k]).forEach(v2=>
+			$create('input', { app:f, a:{type:'hidden', name:k, value:v2 } }))
+    f.submit()
+}//submit
+
+RegExp.escape = function(text) {
+    if (!arguments.callee.sRE) {
+        var specials = '/.*+?|()[]{}\\'.split('');
+        arguments.callee.sRE = new RegExp('(\\' + specials.join('|\\') + ')', 'g');
+    }
+    return text.replace(arguments.callee.sRE, '\\$1');
+}//escape
+
+
+/*  cb: function(value, dialog)
+	options: type:string(text,textarea,number), value:any, keypress:function
+*/
+function ask(msg, options, cb) {
+    // 2 parameters means "options" is missing
+    if (arguments.length == 2) {
+        cb = options;
+        options = {};
+    }
+	if (typeof options==='string')
+		options = { type:options }
+    msg += '<br />';
+    var v = options.type
+    var buttons = `<div class=buttons>
+		<button>Ok</button>
+		<button class="cancel">Cancel</button>
+	</div>`
+	if (v == 'textarea')
+		msg += '<textarea name="txt">'+options.value+'</textarea>';
+	else if (v)
+		msg += '<input name="txt" type="'+v+'" value="'+(options.value||'')+'" />';
+    msg += buttons
+	var ret = dialog( $create('form.ask', { h:msg, on:{
+		submit(ev){
+		    if (ev.submitter.classList.contains('cancel')
+			|| false !== cb(options.type ? $sel(':input', ret).value.trim() : ev.target, ev.target.closest('form'))) {
+                ret.close()
+                return false
+            }
+		}
+	} }) )
+
+    let i = $sel(':input', ret)
+	if (i) {
+		i.focus() // autofocus attribute seems to work only first time :(
+		if (i.select) i.select() // buttons don't
+	}
+
+	return ret
+}//ask
+
+// this is a factory for ajax request handlers
+function getStdAjaxCB(what2do) {
+    return function(res){
+        res = res.trim()
+        if (res === "ok")
+			return (typeof what2do==='function') ? what2do() : location.reload()
+		showLoading(false)
+		showError(res)
+    }
+}//getStdAjaxCB
+
+function getSelectedItems() {
+    return $msel('#files .selector:checked')
+}
+
+function getSelectedItemsName() {
+    return getSelectedItems().map(getItemName)
+}//getSelectedItemsName
+
+function deleteFiles(files) {
+	ask("Are you sure?", ()=>{
+		submit({ action:'delete', selection:files })
+		showLoading()
+	})
+}//deleteFiles
+
+function moveFiles(files) {
+	ask("Enter the destination folder", 'text', function(dst) {
+		return ajax('move', { dst, files: files.join(':') }, function(res) {
+			var a = res.split(';')
+			a.pop()
+			if (!a.length)
+				return showMsg($.trim(res))
+			var failed = 0;
+			var ok = 0;
+			var msg = '';
+			a.forEach(s=> {
+				s = s.trim()
+				if (!s.length) {
+					ok++
+					return
+				}
+				failed++;
+				msg += s+'\n'
+			})
+			if (failed)
+				msg = "We met the following problems:\n"+msg
+			msg = (ok ? ok+' files were moved.\n' : "No file was moved.\n")+msg
+			if (ok)
+				showMsg(msg, reload)
+			else
+				showError(msg)
+		})
+	})
+}//moveFiles
+
+function reload() { location = '.' }
+
+function selectionMask() {
+    ask("Please enter the file mask to select", {type:'text', value:'*'}, s=>{
+        if (!s) return;
+        var re = s.match('^/([^/]+)/([a-zA-Z]*)');
+        if (re)
+            re = new RegExp(re[1], re[2]);
+        else {
+            var n = s.match(/^(\\*)/)[0].length;
+            s = s.substring(n);
+            var invert = !!(n % 2); // a leading "\" will invert the logic
+            s = RegExp.escape(s).replace(/[?]/g,".");;
+            if (s.match(/\\\*/)) {
+                s = s.replace(/\\\*/g,".*");
+                s = "^ *"+s+" *$"; // in this case var the user decide exactly how it is placed in the string
+            }
+            re = new RegExp(s, "i");
+        }
+        $msel( "#files .selector", e=>
+			(invert ^ re.test(getItemName(e))) && (e.checked=true))
+        selectionChanged()
+    });
+}//selectionMask
+
+function showAccount() {
+	dialog(`<div style="line-height:3em">
+			<h1>Account panel</h1>
+			<span>User: ${HFS.user}</span>
+			<br><button onclick="changePwd()"><i class="fa fa-key"></i> Change password</button>
+			<br><button onclick="logout()"><i class="fa fa-logout"></i> Logout</button>
+        </div>`)
+} // showAccount
+
+function logout(){
+	showLoading()
+	$post('?mode=logout').then(()=> location.reload(), ajaxError);
+}
+
+function setCookie(name,value,days) {
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime()+(days*24*60*60*1000));
+        var expires = "; expires="+date.toGMTString();
+    }
+    else var expires = "";
+    document.cookie = name+"="+value+expires+"; path=/";
+} // setCookie
+
+function delCookie(name) { setCookie(name,'', -1) }
+
+function getCookie(name) {
+	var a = document.cookie.match(new RegExp('(?:^| )' + name + '=([^;]+)'))
+	return a && a[1]
+} // getCookie
+
+// quando in modalità selezione, viene mostrato una checkbox per ogni item, e viene anche mostrato un pannello per all/none/invert
+var multiSelection = false
+function toggleSelection() {
+    $toggle('selection-panel')
+	if (multiSelection = !multiSelection) {
+		let base = $create('input.selector', { a:{type:'checkbox'} })
+		$msel('.item-selectable .item-link a', e=> // having the checkbox inside the A element will put it on the same line of A even with long A, otherwise A will start on a new line.
+			e.append(base.cloneNode()) )
+	}
+	else
+		$msel('#files .selector', x=> x.remove())
+}//toggleSelection
+
+function upload(){
+	$create('input', {
+		a:{ type:'file', name:'file', multiple:true },
+		on: { change(ev){
+			var files = ev.target.files
+			if (!files.length) return
+			$toggle('upload-panel')
+			uploadQ.add(done=>
+				sendFiles(files, done))
+		} }
+  	}).click()
+} //upload
+
+uploadQ = newQ(n=>
+    $sel('#upload-q').textContent = Math.max(0, n-1) ) // we don't consider the one we are working
+
+function newQ(onChange){
+    var a = []
+	var ret = {
+		add(job) {
+			a.push(job)
+			change()
+			if (a.length!==1) return
+			job(function consume(){
+				a.shift() // trash it
+				if (a.length)
+					a[0](consume) // next
+				change()
+			})
+		}
+	}
+
+    function change(){ onChange && onChange(a.length) }
+
+	return ret
+}//newQ
+
+function changeSort(){
+	let u = urlParams // shortcut
+    dialog([
+        $create('h3', { t:'Sort by' }),
+        $create('div.buttons', objToArr(sortOptions, (label,code)=>
+            $button( (u.sort===code ? 'sort-alt-'+(u.rev?'down':'up')+'@@' : '')+label, ()=>{
+				u.rev = (u.sort===code && !u.rev) ? 1 : undefined
+				u.sort = code||undefined
+				location.search = encodeURL(urlParams)
+			})
+		))
+	])
+}//changeSort
+
+function objToArr(o, cb){
+    var ret = []
+	for (var k in o) {
+	    var v = o[k]
+		ret.push(cb(v,k))
+	}
+	return ret
+}
+
+function sendFiles(files, done) {
+    var formData = new FormData()
+    for (var i = 0; i < files.length; i++)
+        formData.append('file', files[i])
+
+	var xhr = new XMLHttpRequest();
+	xhr.open('POST', '');
+	xhr.send(formData);
+	xhr.onload = data=> {
+		try {
+			data = JSON.parse(data)
+			data.forEach(r=> {
+				let e = $sel('#upload-'+(r.err ? 'ko' : 'ok'))
+				e.textContent = +e.textContent +1
+				$toggle(e.parentNode, true) // only for 'ko'
+				e = r.err ? $create('span', { a:{title:r.err}, h:'<i class="fa fa-ban"></i> '+ r.name })
+					: $create('a', {
+						a: { href:r.url, title:"Size: '+r.size+'&#013;Speed: '+r.speed+'B/s" },
+						h: '<i class="fa fa-'+(r.err ? 'ban' : 'check-circled')+'"></i> '+r.name
+					})
+				$sel('#upload-results').appendChild(e)
+			})
+		}
+		catch(e){
+			console.error(e)
+			showError('Invalid server reply')
+		}
+		done()
+	}
+	xhr.onerror = done
+
+	var e = $sel('#upload-progress')
+	var prog = $sel('progress', e)
+	prog.value = 0
+	$toggle(e)
+	var last = 0
+	var now = 0
+	xhr.onprogress = ev=>
+		prog.value = (now = ev.loaded) / ev.total
+	var h = setInterval(()=>{
+		$sel('#progress-text').textContent = smartSize(now)+'B @ '+smartSize(now-last)+'/s'
+		last = now
+	},1000)
+	xhr.onload = ev=> {
+		$toggle(e)
+		clearInterval(h)
+	}
+}//sendFiles
+
+function smartSize(n, options) {
+    options = options||{}
+	var orders = ['','K','M','G','T','P']
+	var order = options.order||1024
+	var max = options.maxOrder||orders.length-1
+	var i = 0
+	while (n >= order && i<max) {
+		n /= order
+		++i
+	}
+	if (options.decimals===undefined)
+		options.decimals = n<5 ? 1 : 0
+	return round(n, options.decimals)
+		+orders[i]
+}//smartSize
+
+function round(v, digits) {
+	return !digits ? Math.round(v) : Math.round(v*Math.pow(10,digits)) / Math.pow(10,digits)
+}//round
+
+function log(){
+	console.log.apply(console,arguments)
+	return arguments[arguments.length-1]
+}
+
+function toggleTs(){
+    let k = 'hideTs'
+    let now = $xclass($sel('#files'), k)
+    localStorage.setItem('ts', Number(!now));
+}
+
+function decodeURL(urlData) {
+	var ret = {}
+    for (let x of urlData.split('&')) {
+        if (!x) continue
+        x = x.split("=").map(decodeURIComponent)
+		ret[x[0]] = x.length===1 || x[1]
+    }
+	return ret
+}//decodeURL
+
+function encodeURL(obj) {
+    var ret = []
+	for (var k in obj) {
+	    var v = obj[k]
+		if (v===undefined) continue
+		k = encodeURIComponent(k)
+	    if (v !== true)
+	        k += '='+encodeURIComponent(v)
+		ret.push(k)
+	}
+	return ret.join('&')
+}//encodeURL
+
+function ajaxError(x){
+	showError(x.status || 'communication error')
+}
+
+urlParams = decodeURL(location.search.substring(1))
+sortOptions = {
+	n: "Name",
+	e: "Extension",
+	s: "Size",
+	t: "Timestamp",
+	d: "Hits",
+	'': 'Default'
+}
+
+function $icon(name, title, opts) {
+    if (typeof opts==='function')
+        opts = { click:opts }
+	return $create('i.fa.fa-'+name, Object.assign({ title },opts))
+}
+
+function mustSelect() {
+    return getSelectedItems().length
+        || showError(`You need to select some files first`)
+        && 0
+}
+
+$domReady(()=>{
+	if (!$sel('#menu-panel')) // this is an error page
+		return
+    $msel('.trash-me', x=> x.remove()) // this was hiding things for those w/o js capabilities
+    if (Number(localStorage['ts']))
+        toggleTs()
+
+    $click('/.item-menu', ev=>{
+        var it = ev.target.closest('.item')
+        var acc = it.matches('.can-access')
+        var name = getItemName(ev.target)
+        dialog([
+            $create('h3', { t:name }),
+            $sel('.item-ts', it).cloneNode(true),
+            $create('div.buttons', [
+                it.closest('.can-delete')
+				&& $button('trash@@Delete', ()=> deleteFiles([name])),
+                it.closest('.can-rename')
+				&& $button('edit@@Rename', renameItem),
+                it.closest('.can-comment')
+				&& $button('quote-left@@Comment', setComment),
+                it.closest('.can-move')
+				&& $button('truck@@Move', ()=> moveFiles([name]) )
+            ])
+        ]).classList.add('item-menu-dialog')
+
+        function setComment() {
+            let e = $sel('.comment-text',it)
+            let value = e && e.textContent || '';
+            ask(this.innerHTML, { type: 'textarea', value }, s=>{
+                if (s !== value)
+                    ajax('comment', { text: s, files: name })
+            })
+        }//setComment
+
+        function renameItem() {
+            ask(this.innerHTML+ ' '+name, { type: 'text', value: name }, to=>
+                ajax("rename", { from: name, to }))
+        }
+    })
+
+	$click('/.selector', ev=>{
+		setTimeout(()=>{ // we are keeping the checkbox inside an A tag for layout reasons, and firefox72 is triggering the link when the checkbox is clicked. So we reprogram the behaviour.
+			ev.target.checked ^= 1
+			selectionChanged()
+		})
+		return false
+	})
+
+	$click('#select-invert', ev=>{
+        $msel('#files .selector', x=> x.checked=!x.checked)
+        selectionChanged()
+    })
+
+    $click('#select-mask', selectionMask)
+    $click('#move-selection',()=>
+        mustSelect() && moveFiles(getSelectedItemsName()) )
+	$toggle('move-selection', $sel('.can-delete'))
+    $click('#delete-selection', ()=>
+        mustSelect() && deleteFiles(getSelectedItemsName()) )
+    $toggle('delete-selection', $sel('.can-delete'))
+    $click('#archive', ()=>
+        mustSelect() && ask("Downloading many files as archive can be a lengthy operation, and the result is a TAR file. Continue?", ()=>
+            submit({ selection: getSelectedItemsName() }, "?mode=archive") ))
+
+    $msel('#files .cannot-access .item-link img', x=>
+		x.insertAdjacentElement('afterend', $icon('lock', "No access") ))
+	$msel('#files.can-delete .item:not(.cannot-access), #files .item.can-archive', x=>
+		$xclass(x,'item-selectable',1))
+    if (! $sel('.item-selectable'))
+        $toggle('#multiselection', false)
+
+    $msel('.additional-panel.closeable', x=>
+		x.prepend( $icon('times-circle close', 'close', ev=>{
+            let e = ev.target.closest('.closeable')
+            $toggle(e, false)
+            e.dispatchEvent(new CustomEvent('closed'))
+        })) )
+
+    $on('#upload-panel', { closed(){
+        $sel('#upload-ok').textContent = 0
+		$sel('#upload-ko').textContent = 0
+        $sel('#upload-results').textContent = ''
+    } })
+
+	$sel('#sort span').textContent = sortOptions[urlParams.sort]||'Sort'
+
+    selectionChanged()
+})//$domReady
+
+function music(){ //C DJ BSD2License
+  var e=1,n=new Audio,o=[[]],c=0,r=[];
+  document.querySelectorAll("a[href]").forEach(function(t,e){
+     var n;[".mp3",".ogg",".m4a",".wma",".aac","flac",".Mp3",".MP3",".OGG",".M4A",".WMA",".AAC","FLAC"].indexOf(t.getAttribute("href").slice(-4))+1&&(o[0].push(t.getAttribute("href")),t.addEventListener("click",function(e){e.preventDefault(),i(t.getAttribute("href"))}),(n=document.querySelector('input[value="'+t.getAttribute("href")+'"]'))&&(n.checked=!0))}),"?shuffle"==location.search&&(e=!e),e&&(o[0]=o[0].sort(function(e,t){return.5-Math.random()}));var t,u=document.querySelector("#actions")||document.querySelector("#menu-bar")||document.querySelector("body"),a=document.createElement("button");function i(e){e.match(/m3u8?$/)?fetch(e).then(function(e){e.text().then(function(e){i(e.match(/^(?!#)(?!\s).*$/gm).map(encodeURI)[0])})}):(n.src=e,n.play(),document.title=decodeURI(e))}a.textContent="\u25BA",a.setAttribute("class","play"),a.onclick=function(){n.paused?(n.src||(n.src=(e?o[0]:t)[0]),n.play()):n.pause()},a.oncontextmenu=function(e){e.preventDefault(),n.onended()},o[0].length&&!document.querySelector("button.play")&&u.appendChild(a),n.onended=function(){var e=n.getAttribute("src");do{e=o[c][o[c].indexOf(e)+1];var t=document.querySelector('input[value="'+e+'"]')}while(t&&!t.checked);e?i(e):c?(c--,n.src=r[c],n.onended()):i(o[0][0])},n.onpause=function(){document.querySelector("button.play").textContent="\u25BA"},n.onplay=function(){document.querySelector("button.play").textContent="\u2759 \u2759"},o[0].length&&(window.onbeforeunload=function(e){localStorage.last=n.getAttribute("src")+"#t="+n.currentTime},t=localStorage.last.split("#t="),n.preload="none",n.src=(e?o[0]:t)[0],(t=1e3*location.search.slice(1))&&setTimeout(function(){document.querySelector("button.play").click()},t)),n.onerror=function(){n.onended()},"mediaSession"in navigator&&navigator.mediaSession.setActionHandler("nexttrack",function(){n.onended()})}

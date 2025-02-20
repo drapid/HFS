@@ -23,7 +23,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ExtCtrls, utilLib;
+  Dialogs, StdCtrls, ExtCtrls, Vcl.Mask;
 
 type
   TnewuserpassFrm = class(TForm)
@@ -47,6 +47,9 @@ var
 implementation
 
 {$R *.dfm}
+
+uses
+  parserLib, utillib;
 
 procedure TnewuserpassFrm.okBtnClick(Sender: TObject);
 var

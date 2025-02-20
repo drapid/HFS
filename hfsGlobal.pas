@@ -4,11 +4,7 @@ unit hfsGlobal;
 interface
 uses
   System.UITypes,
- {$IFDEF FMX}
-  FMX.Graphics,
- {$ELSE ~FMX}
   Graphics,
- {$ENDIF FMX}
   Types, SysUtils, srvConst;
 
 const
@@ -22,23 +18,13 @@ const
   TPL_FILE = 'hfs.tpl';
   IPS_FILE = 'hfs.ips.txt';
   VFS_TEMP_FILE = '~temp.vfs';
-  HFS_HTTP_AGENT = 'HFS/'+VERSION;
   EVENTSCRIPTS_FILE = 'hfs.events';
-  MACROS_LOG_FILE = 'macros-log.html';
   PREVIOUS_VERSION = 'hfs.old.exe';
-  PROTECTED_FILES_MASK = 'hfs.*;*.htm*;descript.ion;*.comment;*.md5;*.corrupted;*.lnk';
-  G_VAR_PREFIX = '#';
-  DOWNLOAD_MIN_REFRESH_TIME :Tdatetime = 1/(5*SECONDS); // 5 Hz
-  BYTES_GROUPING_THRESHOLD :Tdatetime = 1/SECONDS; // group bytes in log
   IPS_THRESHOLD = 50;  // used to avoid an external file for few IPs (ipsEverConnected list)
   STATUSBAR_REFRESH = 10; // tenth of second
   MAX_RECENT_FILES = 5;
   MANY_ITEMS_THRESHOLD = 1000;
-  STARTING_SNDBUF = 32000;
-  YESNO :array [boolean] of string=('no','yes');
-  DEFAULT_MIME = 'application/octet-stream';
-  IP_SERVICES_URL = 'http://hfsservice.rejetto.com/ipservices.php';
-  SELF_TEST_URL = 'http://hfstest.rejetto.com/';
+  YESNO: array [boolean] of string=('no','yes');
 //  LIBS_DOWNLOAD_URL = 'http://rejetto.com/hfs/';
   LIBS_DOWNLOAD_URL = 'http://libs.rnq.ru/';
   HFS_GUIDE_URL = 'http://www.rejetto.com/hfs/guide/';
@@ -46,7 +32,6 @@ const
   ALWAYS_ON_WEB_SERVER = 'google.com';
   ADDRESS_COLOR = TColors.Green;
   BG_ERROR = $BBBBFF;
-  ENCODED_TABLE_HEADER = 'this is an encoded table'+CRLF;
   TRAY_ICON_SIZE = 32;
 
   // messages

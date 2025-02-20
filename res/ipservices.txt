@@ -1,2 +1,5 @@
 http://hfsservice.rejetto.com/ip.php|!
 http://checkip.dyndns.org|:
+http://checkip.amazonaws.com|
+http://whatismyip.akamai.com|
+http://bot.whatismyipaddress.com|

@@ -32,22 +32,23 @@ type
     msgPnl: Tpanel;
     cancelBtn: TbitBtn;
     btnPnl: Tpanel;
-    stack: array of record ofs,length:real end;
+    stack: array of record ofs,length: real end;
     partialLength: real;
     canceled: boolean;
-    function getPos():real;
-    procedure setPos(x:real);
-    function getGlobalPos():real;
-    procedure setGlobalPos(x:real);
+    function getPos(): real;
+    procedure setPos(x: real);
+    function getGlobalPos(): real;
+    procedure setGlobalPos(x: real);
     function getCaption():string;
-    procedure setCaption(x:string);
-    function getVisible():boolean;
+    procedure setCaption(const x: String);
+    function getVisible(): boolean;
     procedure onCancel(Sender: TObject);
     procedure onResize(Sender: TObject);
+    procedure setSize;
   public
     preventBackward: boolean;
     constructor create;
-    procedure show(caption_:string=''; cancel:boolean=FALSE);
+    procedure show(const caption_: String=''; cancel:boolean=FALSE);
     procedure hide();
     property progress:real read getPos write setPos;
     property globalPosition:real read getGlobalPos write setGlobalPos;
@@ -72,16 +73,25 @@ var
 begin
   frm:=Tform.create(Application.MainForm);
   frm.Position:=poScreenCenter;
-
+ {$IFDEF FPC}
+  if frm.PixelsPerInch = 96 then
+    coef := 1
+   else
+    coef := frm.PixelsPerInch / 96;
+ {$ELSE ~FPC}
+{
   if frm.currentPPI = 96 then
     coef := 1
    else
     coef := frm.currentPPI / 96;
+}
+  coef := frm.ScaleFactor;
+ {$ENDIF FPC}
 
   frm.Width := trunc(coef * 220);
   frm.BorderStyle:=bsNone;
   frm.BorderWidth:= trunc(coef * 15);
-  frm.Height:= trunc(25 * frm.CurrentPPI / 96)+frm.BorderWidth*2;
+  frm.Height:= trunc(25 * coef)+frm.BorderWidth*2;
   frm.OnResize:=onResize;
   //frm.FormStyle:=fsStayOnTop;
 
@@ -107,10 +117,10 @@ begin
   cancelBtn:=TbitBtn.create(frm);
   cancelBtn.parent:=btnPnl;
   cancelBtn.Kind:=bkCancel;
-  cancelBtn.top:=trunc(coef * 10);
+  cancelBtn.top := trunc(coef * 10);
   cancelBtn.OnClick:=onCancel;
 
-  btnPnl.Height:=cancelBtn.Height+cancelBtn.top*2;
+  btnPnl.Height := cancelBtn.Height+cancelBtn.top*2;
   btnPnl.Hide();
 
   partialLength:=1;
@@ -119,13 +129,14 @@ begin
 end; // constructor
 
 function TprogressForm.getVisible():boolean;
-begin result:=frm.Visible end;
+begin result := frm.Visible end;
 
 procedure TprogressForm.showCancel();
 begin
-if btnPnl.visible then exit;
-frm.Height:=frm.Height+btnPnl.Height;
-btnPnl.show();
+  if btnPnl.visible then
+    exit;
+  frm.Height := frm.Height+btnPnl.Height;
+  btnPnl.show();
 end; // showCancel
 
 procedure TprogressForm.hideCancel();
@@ -135,34 +146,48 @@ frm.Height:=frm.Height-btnPnl.Height;
 btnPnl.hide();
 end; // hideCancel
 
-procedure TprogressForm.show(caption_: string; cancel:boolean);
+procedure TprogressForm.show(const caption_: String; cancel:boolean);
 begin
-canceled:=FALSE;
-if not frm.visible then reset();
-if caption_ > '' then caption:=caption_;
-if cancel then showCancel();
-frm.Show();
+  canceled := FALSE;
+  if not frm.visible then
+    reset();
+  if caption_ > '' then
+    caption := caption_;
+  if cancel then
+    showCancel();
+  setSize;
+  frm.Show();
 end; // show
 
 procedure TprogressForm.hide();
 begin
-frm.hide();
-hideCancel();
+  frm.hide();
+  hideCancel();
 end;
 
-function TprogressForm.getCaption():string;
-begin result:=msgPnl.caption end;
+function TprogressForm.getCaption(): String;
+begin result := msgPnl.caption end;
 
-procedure TprogressForm.setCaption(x:string);
+procedure TprogressForm.setCaption(const x: String);
 var
   coef: Real;
 begin
-if frm.currentPPI = 96 then
-  coef := 1
- else
-  coef := frm.currentPPI / 96;
-msgPnl.caption:=x;
-frm.Width:=max(trunc(200 * coef),
+ {$IFDEF FPC}
+  if frm.PixelsPerInch = 96 then
+    coef := 1
+   else
+    coef := frm.PixelsPerInch / 96;
+ {$ELSE ~FPC}
+{
+  if frm.currentPPI = 96 then
+    coef := 1
+   else
+    coef := frm.currentPPI / 96;
+}
+  coef := frm.ScaleFactor;
+ {$ENDIF FPC}
+  msgPnl.caption := x;
+  frm.Width:=max(trunc(200 * coef),
   frm.Canvas.TextWidth(x)+(msgPnl.BorderWidth+frm.BorderWidth)*2+trunc(coef * 20) );
 end;
 
@@ -210,6 +235,55 @@ begin canceled:=TRUE end;
 
 procedure TprogressForm.onResize(Sender: TObject);
 begin cancelBtn.left:=(frm.width-cancelBtn.width) div 2-frm.borderWidth end;
+
+procedure TprogressForm.setSize;
+var
+  coef: Real;
+begin
+ {$IFDEF FPC}
+  if frm.PixelsPerInch = 96 then
+    coef := 1
+   else
+    coef := frm.PixelsPerInch / 96;
+ {$ELSE ~FPC}
+{
+  if frm.currentPPI = 96 then
+    coef := 1
+   else
+    coef := frm.currentPPI / 96;
+}
+  coef := frm.ScaleFactor;
+ {$ENDIF FPC}
+
+  frm.DisableAlign;
+  try
+
+    frm.Width := trunc(coef * 220);
+    frm.BorderWidth:= trunc(coef * 15);
+    frm.Height:= trunc(25 * coef)+frm.BorderWidth*2;
+
+    msgPnl.height:= trunc(coef * 20);
+
+    prog.BorderWidth := trunc(coef * 3);
+
+    cancelBtn.top := trunc(coef * 10);
+
+ {$IFDEF FPC}
+    cancelBtn.ScaleBy(frm.PixelsPerInch, 96);
+ {$ELSE ~FPC}
+    cancelBtn.ScaleForPPI(frm.currentPPI);
+ {$ENDIF FPC}
+
+    btnPnl.Height:=cancelBtn.Height+cancelBtn.top*2;
+
+    frm.Height := frm.Height+msgPnl.Height;
+    if btnPnl.Visible then
+      frm.Height := frm.Height + btnPnl.Height;
+   finally
+    frm.EnableAlign;
+  end;
+
+end;
 
 procedure TprogressForm.reset();
 begin prog.position:=0 end;

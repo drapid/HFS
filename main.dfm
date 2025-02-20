@@ -3,7 +3,7 @@ object mainFrm: TmainFrm
   Top = 219
   Caption = 'HFS ~ HTTP File Server'
   ClientHeight = 422
-  ClientWidth = 893
+  ClientWidth = 896
   Color = clBtnFace
   Constraints.MinHeight = 260
   Constraints.MinWidth = 390
@@ -18,6 +18,7 @@ object mainFrm: TmainFrm
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
   OnKeyUp = FormKeyUp
   OnResize = FormResize
@@ -26,7 +27,7 @@ object mainFrm: TmainFrm
   object graphSplitter: TSplitter
     Left = 0
     Top = 78
-    Width = 893
+    Width = 896
     Height = 5
     Cursor = crVSplit
     Align = alTop
@@ -41,7 +42,7 @@ object mainFrm: TmainFrm
   object graphBox: TPaintBox
     Left = 0
     Top = 48
-    Width = 893
+    Width = 896
     Height = 30
     Hint = 'Pink = Out'#13#10'Yellow = In'
     Align = alTop
@@ -55,7 +56,7 @@ object mainFrm: TmainFrm
   object topToolbar: TToolBar
     Left = 0
     Top = 0
-    Width = 893
+    Width = 896
     Height = 24
     AutoSize = True
     ButtonWidth = 150
@@ -83,8 +84,17 @@ object mainFrm: TmainFrm
       ShowHint = True
       OnClick = menuBtnClick
     end
-    object portBtn: TToolButton
+    object Sep1TBtn: TToolButton
       Left = 61
+      Top = 0
+      Width = 9
+      Caption = 'Sep1'
+      ImageIndex = 15
+      ImageName = '15'
+      Style = tbsSeparator
+    end
+    object portBtn: TToolButton
+      Left = 70
       Top = 0
       AutoSize = True
       Caption = 'Port: any'
@@ -92,20 +102,11 @@ object mainFrm: TmainFrm
       ImageName = '38'
       OnClick = portBtnClick
     end
-    object ToolButton4: TToolButton
-      Left = 142
-      Top = 0
-      Width = 9
-      Caption = 'ToolButton4'
-      ImageIndex = 15
-      ImageName = '15'
-      Style = tbsSeparator
-    end
-    object ToolButton2: TToolButton
+    object Sep2TBtn: TToolButton
       Left = 151
       Top = 0
       Width = 8
-      Caption = 'ToolButton2'
+      Caption = 'Sep2'
       ImageIndex = 16
       ImageName = '16'
       Style = tbsSeparator
@@ -122,11 +123,11 @@ object mainFrm: TmainFrm
       ShowHint = True
       OnClick = modeBtnClick
     end
-    object ToolButton1: TToolButton
+    object Sep3TBtn: TToolButton
       Left = 309
       Top = 0
       Width = 9
-      Caption = 'ToolButton1'
+      Caption = 'Sep3'
       ImageIndex = 13
       ImageName = '13'
       Style = tbsSeparator
@@ -176,7 +177,7 @@ object mainFrm: TmainFrm
   object urlToolbar: TToolBar
     Left = 0
     Top = 24
-    Width = 893
+    Width = 896
     Height = 24
     AutoSize = True
     ButtonWidth = 122
@@ -222,7 +223,7 @@ object mainFrm: TmainFrm
   object centralPnl: TPanel
     Left = 0
     Top = 83
-    Width = 893
+    Width = 896
     Height = 339
     Align = alClient
     BevelOuter = bvNone
@@ -247,7 +248,7 @@ object mainFrm: TmainFrm
     object splitH: TSplitter
       Left = 0
       Top = 228
-      Width = 893
+      Width = 896
       Height = 5
       Cursor = crVSplit
       Align = alBottom
@@ -261,7 +262,7 @@ object mainFrm: TmainFrm
     object logPnl: TPanel
       Left = 316
       Top = 0
-      Width = 577
+      Width = 580
       Height = 228
       Align = alClient
       BevelOuter = bvNone
@@ -269,7 +270,7 @@ object mainFrm: TmainFrm
       object logBox: TRichEdit
         Left = 0
         Top = 23
-        Width = 577
+        Width = 580
         Height = 205
         Align = alClient
         Font.Charset = RUSSIAN_CHARSET
@@ -290,7 +291,7 @@ object mainFrm: TmainFrm
       object logTitle: TPanel
         Left = 0
         Top = 0
-        Width = 577
+        Width = 580
         Height = 23
         Align = alTop
         BevelOuter = bvNone
@@ -298,7 +299,7 @@ object mainFrm: TmainFrm
         object titlePnl: TPanel
           Left = 0
           Top = 0
-          Width = 317
+          Width = 320
           Height = 23
           Align = alClient
           BevelOuter = bvNone
@@ -306,7 +307,7 @@ object mainFrm: TmainFrm
           TabOrder = 0
         end
         object logToolbar: TPanel
-          Left = 317
+          Left = 320
           Top = 0
           Width = 260
           Height = 23
@@ -425,7 +426,7 @@ object mainFrm: TmainFrm
                 Hint = 'Wildcards allowed'
                 Anchors = [akTop, akRight]
                 EditLabel.Width = 37
-                EditLabel.Height = 14
+                EditLabel.Height = 22
                 EditLabel.Caption = 'Search'
                 LabelPosition = lpLeft
                 ParentShowHint = False
@@ -515,7 +516,7 @@ object mainFrm: TmainFrm
     object connPnl: TPanel
       Left = 0
       Top = 233
-      Width = 893
+      Width = 896
       Height = 106
       Align = alBottom
       BevelOuter = bvNone
@@ -523,7 +524,7 @@ object mainFrm: TmainFrm
       object sbar: TStatusBar
         Left = 0
         Top = 87
-        Width = 893
+        Width = 896
         Height = 19
         Panels = <
           item
@@ -535,33 +536,35 @@ object mainFrm: TmainFrm
       object connBox: TListView
         Left = 0
         Top = 0
-        Width = 893
+        Width = 896
         Height = 87
         Align = alClient
         Columns = <
           item
             Caption = 'IP address'
             ImageIndex = 0
-            Width = 206
+            Width = 180
           end
           item
             Alignment = taCenter
             Caption = 'File'
             ImageIndex = 7
-            Width = 206
+            Width = 216
           end
           item
             Alignment = taCenter
             Caption = 'Status'
-            Width = 206
+            Width = 130
           end
           item
             Alignment = taCenter
             Caption = 'Speed'
+            Width = 100
           end
           item
             Alignment = taCenter
             Caption = 'Time left'
+            Width = 70
           end
           item
             Alignment = taCenter
@@ -734,6 +737,7 @@ object mainFrm: TmainFrm
     Images = IconsDM.images
     OnPopup = menuPopup
     Left = 40
+    Top = 24
     object SelfTest1: TMenuItem
       Caption = 'Self Test'
       ImageIndex = 34
@@ -930,6 +934,10 @@ object mainFrm: TmainFrm
         Caption = 'Enable macros'
         Checked = True
         OnClick = enableMacrosChkClick
+      end
+      object disableMacrosNonLocalIPChk: TMenuItem
+        Caption = 'Disable macros for non-local IP'
+        Checked = True
       end
     end
     object Upload2: TMenuItem
@@ -1337,9 +1345,16 @@ object mainFrm: TmainFrm
         Caption = 'Any address'
         OnClick = Anyaddress1Click
       end
+      object AnyAddressV4: TMenuItem
+        Caption = 'Any IPv4 address'
+        OnClick = AnyAddressV4Click
+      end
       object AnyAddressV6: TMenuItem
         Caption = 'Any IPv6 address'
         OnClick = AnyAddressV6Click
+      end
+      object AddrDelim: TMenuItem
+        Caption = '-'
       end
     end
     object DynamicDNSupdater1: TMenuItem
@@ -1414,6 +1429,7 @@ object mainFrm: TmainFrm
       object macrosLogChk: TMenuItem
         AutoCheck = True
         Caption = 'Enable macros.log'
+        Hint = 'log-macros'
       end
       object Runscript1: TMenuItem
         Caption = 'Run script...'
@@ -1426,6 +1442,10 @@ object mainFrm: TmainFrm
       object noContentdispositionChk: TMenuItem
         AutoCheck = True
         Caption = 'No Content-disposition'
+      end
+      object addProgramToFirewllExceptionMnu: TMenuItem
+        Caption = 'Add program to firewll exception'
+        OnClick = addProgramToFirewllExceptionMnuClick
       end
     end
     object Updates1: TMenuItem
@@ -1574,6 +1594,10 @@ object mainFrm: TmainFrm
         Caption = 'Forum'
         OnClick = Forum1Click
       end
+      object RDForumMnu: TMenuItem
+        Caption = 'Rapid D'#39's forum'
+        OnClick = RDForumMnuClick
+      end
       object License1: TMenuItem
         Caption = 'License'
         OnClick = License1Click
@@ -1694,23 +1718,28 @@ object mainFrm: TmainFrm
         AutoCheck = True
         Caption = 'Browsing'
         Checked = True
+        Hint = 'log-browsing'
       end
       object LogiconsChk: TMenuItem
         AutoCheck = True
         Caption = 'Icons'
+        Hint = 'log-icons'
       end
       object logProgressChk: TMenuItem
         AutoCheck = True
         Caption = 'Progress'
+        Hint = 'log-progress'
       end
       object logBannedChk: TMenuItem
         AutoCheck = True
         Caption = 'Banned'
+        Hint = 'log-banned'
       end
       object logOnlyServedChk: TMenuItem
         AutoCheck = True
         Caption = 'Only served requests'
         Checked = True
+        Hint = 'log-only-served'
       end
       object N5: TMenuItem
         Caption = '-'
@@ -1719,7 +1748,7 @@ object mainFrm: TmainFrm
         AutoCheck = True
         Caption = 'Other events'
         Checked = True
-        Hint = 'Like dynamic dns updating...'
+        Hint = 'log-others'
       end
       object N16: TMenuItem
         AutoCheck = True
@@ -1728,53 +1757,65 @@ object mainFrm: TmainFrm
       object logconnectionsChk: TMenuItem
         AutoCheck = True
         Caption = 'Connections'
+        Hint = 'log-connections'
       end
       object logDisconnectionsChk: TMenuItem
         AutoCheck = True
         Caption = 'Disconnections'
+        Hint = 'log-disconnections'
       end
       object logRequestsChk: TMenuItem
         AutoCheck = True
         Caption = 'Requests'
+        Hint = 'log-requests'
       end
       object DumprequestsChk: TMenuItem
         AutoCheck = True
         Caption = 'Requests dump'
+        Hint = 'log-dump-request'
       end
       object logRepliesChk: TMenuItem
         AutoCheck = True
         Caption = 'Replies'
+        Hint = 'log-replies'
       end
       object logFulldownloadsChk: TMenuItem
         AutoCheck = True
         Caption = 'Full downloads'
         Checked = True
+        Hint = 'log-full-downloads'
       end
       object logUploadsChk: TMenuItem
         AutoCheck = True
         Caption = 'Uploads'
         Checked = True
+        Hint = 'log-uploads'
       end
       object logDeletionsChk: TMenuItem
         AutoCheck = True
         Caption = 'Deletions'
         Checked = True
+        Hint = 'log-deletions'
       end
-      object logBytesreceivedChk: TMenuItem
+      object logBytesReceivedChk: TMenuItem
         AutoCheck = True
         Caption = 'Bytes received'
+        Hint = 'log-bytes-received'
       end
-      object logBytessentChk: TMenuItem
+      object logBytesSentChk: TMenuItem
         AutoCheck = True
         Caption = 'Bytes sent'
+        Hint = 'log-bytes-sent'
       end
       object logServerstartChk: TMenuItem
         AutoCheck = True
         Caption = 'Server start'
+        Hint = 'log-server-start'
       end
       object logServerstopChk: TMenuItem
         AutoCheck = True
         Caption = 'Server stop'
+        Hint = 'log-server-stop'
       end
     end
     object logOnVideoChk: TMenuItem

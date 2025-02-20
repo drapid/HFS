@@ -1,10 +1,14 @@
 1 24 "WindowsXP.manifest"
 defaultTpl TEXT default.tpl
-dmBrowserTpl TEXT dmBrowser.tpl
+// dmBrowserTpl TEXT dmBrowser.tpl
+// defaultTpl ZTEXT default.tpl.gz
+dmBrowserTpl ZTEXT dmBrowser.tpl.gz
 filelistTpl TEXT filelist.tpl
+noMacrosTpl TEXT NoMacros.tpl
 alias TEXT alias.txt
 IPservices TEXT ipservices.txt
 // jquery TEXT jquery.min.js
 jquery ZTEXT jquery.min.js.gz
-numbers IMAGE numbers.png
+//numbers IMAGE numbers.png
+numbers32 IMAGE numbers32.png
 RDpubkey TEXT RapidD.public

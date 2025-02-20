@@ -22,7 +22,7 @@ object optionsFrm: ToptionsFrm
     Top = 0
     Width = 805
     Height = 414
-    ActivePage = accountsPage
+    ActivePage = ReverseProxyPage
     Align = alClient
     Images = IconsDM.images
     MultiLine = True
@@ -144,13 +144,13 @@ object optionsFrm: ToptionsFrm
       object accountpropGrp: TGroupBox
         Left = 163
         Top = 26
-        Width = 619
+        Width = 611
         Height = 317
         Anchors = [akLeft, akTop, akRight, akBottom]
         Caption = 'Account properties'
         TabOrder = 7
         DesignSize = (
-          619
+          611
           317)
         object Label3: TLabel
           Left = 11
@@ -262,7 +262,7 @@ object optionsFrm: ToptionsFrm
         object notesBox: TMemo
           Left = 345
           Top = 39
-          Width = 271
+          Width = 263
           Height = 269
           Anchors = [akLeft, akTop, akRight, akBottom]
           ParentShowHint = False
@@ -271,7 +271,7 @@ object optionsFrm: ToptionsFrm
           TabOrder = 8
         end
         object notesWrapChk: TCheckBox
-          Left = 502
+          Left = 494
           Top = 21
           Width = 91
           Height = 17
@@ -603,7 +603,6 @@ object optionsFrm: ToptionsFrm
         Anchors = [akLeft, akTop, akBottom]
         TabOrder = 0
         OnChange = iconMasksBoxChange
-        ExplicitHeight = 246
       end
       object iconsBox: TComboBox
         Left = 272
@@ -615,6 +614,49 @@ object optionsFrm: ToptionsFrm
         OnChange = iconsBoxChange
         OnDrawItem = iconsBoxDrawItem
         OnDropDown = iconsBoxDropDown
+      end
+    end
+    object ThumbsPage: TTabSheet
+      Caption = 'Thumbnails'
+      ImageIndex = -1
+      DesignSize = (
+        797
+        385)
+      object ThumbsShowForLEdit: TLabeledEdit
+        Left = 16
+        Top = 32
+        Width = 761
+        Height = 21
+        Anchors = [akLeft, akTop, akRight]
+        EditLabel.Width = 181
+        EditLabel.Height = 13
+        EditLabel.Caption = 'Select extensions to get thumbnails for'
+        TabOrder = 0
+        Text = ''
+        TextHint = 'Extensions'
+      end
+    end
+    object ReverseProxyPage: TTabSheet
+      Caption = 'Reverse Proxy'
+      ImageIndex = 7
+      ImageName = '7'
+      object reverseProxyDescLbl: TLabel
+        Left = 24
+        Top = 120
+        Width = 105
+        Height = 13
+        Caption = 'Use ";" as a separater'
+      end
+      object reverseProxyEdt: TLabeledEdit
+        Left = 24
+        Top = 32
+        Width = 745
+        Height = 21
+        EditLabel.Width = 79
+        EditLabel.Height = 13
+        EditLabel.Caption = 'Reverse proxyes'
+        TabOrder = 0
+        Text = ''
       end
     end
   end
@@ -630,7 +672,7 @@ object optionsFrm: ToptionsFrm
       805
       35)
     object okBtn: TButton
-      Left = 561
+      Left = 553
       Top = 6
       Width = 75
       Height = 25
@@ -640,7 +682,7 @@ object optionsFrm: ToptionsFrm
       OnClick = okBtnClick
     end
     object applyBtn: TButton
-      Left = 725
+      Left = 717
       Top = 6
       Width = 75
       Height = 25
@@ -650,7 +692,7 @@ object optionsFrm: ToptionsFrm
       OnClick = applyBtnClick
     end
     object cancelBtn: TButton
-      Left = 643
+      Left = 635
       Top = 6
       Width = 75
       Height = 25

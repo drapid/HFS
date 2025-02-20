@@ -24,26 +24,24 @@ unit srvClassesLib;
 interface
 
 uses
- {$IFDEF FMX}
-  System.UITypes, FMX.Types,
- {$ELSE ~FMX}
   windows,
   Forms,
- {$ENDIF FMX}
-  Graphics, iniFiles, types, strUtils, sysUtils, classes,
+  Graphics,
+  Contnrs,
+  iniFiles, types, strUtils, sysUtils, classes,
+  ComCtrls,
   {$IFNDEF USE_MORMOT_COLLECTIONS}
   Generics.Collections,
   {$ELSE USE_MORMOT_COLLECTIONS}
   mormot.core.collections,
   {$ENDIF USE_MORMOT_COLLECTIONS}
-  OverbyteIcsWSocket, OverbyteIcshttpProt,
   hslib, srvConst;
 
 type
   {$IFNDEF USE_MORMOT_COLLECTIONS}
   Tip2av = Tdictionary<string, Tdatetime>;
   {$ELSE USE_MORMOT_COLLECTIONS}
-  Tip2av = IKeyValue<string, Tdatetime>;
+  Tip2av = IKeyValue<string, TDateTime>;
   {$ENDIF USE_MORMOT_COLLECTIONS}
 
   TantiDos = class
@@ -54,16 +52,17 @@ type
     class constructor Create;
   protected
     accepted: boolean;
-    Paddress: string;
+    Paddress: String;
   public
-    constructor create;
+    constructor Create;
     destructor Destroy; override;
-    function accept(conn:ThttpConn; address:string=''):boolean;
+    function accept(conn: ThttpConn; address: String=''): Boolean;
   {$IFDEF USE_MORMOT_COLLECTIONS}
     function RemoveOld(const aKey; var aValue;
         aIndex, aCount: integer; aOpaque: pointer): boolean;
   {$ENDIF USE_MORMOT_COLLECTIONS}
    end;
+
   PcachedIcon = ^TcachedIcon;
   TcachedIcon = record
     data: string;
@@ -74,11 +73,11 @@ type
   TiconsCache = class
     n: integer;
     icons: array of TcachedIcon;
-    function get(data:string):PcachedIcon;
-    procedure put(data:string; idx:integer; time:Tdatetime);
+    function get(const data: String): PcachedIcon;
+    procedure put(const data: String; idx: Integer; time: Tdatetime);
     procedure clear();
-    procedure purge(olderThan:Tdatetime);
-    function idxOf(const data: string):integer;
+    procedure purge(olderThan: Tdatetime);
+    function idxOf(const data: String): Integer;
     end;
 
   TusersInVFS = class
@@ -87,19 +86,19 @@ type
     pwds: array of TstringDynArray;
   public
     procedure reset();
-    procedure track(usr, pwd:string); overload;
-    procedure drop(usr, pwd:string); overload;
-    function match(usr, pwd:string):boolean; overload;
+    procedure track(usr, pwd: String); overload;
+    procedure drop(const usr, pwd: String); overload;
+    function match(const usr, pwd: String): Boolean; overload;
     function empty():boolean;
     end;
 
-  Thasher = class(TstringList)
-    procedure loadFrom(path:string);
-    function getHashFor(fn:string):string;
+  Thasher = class(TStringList)
+    procedure loadFrom(path: String);
+    function getHashFor(fn: String): String;
     end;
 
   {$IFNDEF USE_MORMOT_COLLECTIONS}
-  Tstr2str = Tdictionary<string, String>;
+  Tstr2str = Tdictionary<String, String>;
   {$ELSE USE_MORMOT_COLLECTIONS}
   Tstr2str = IKeyValue<string, String>;
   {$ENDIF USE_MORMOT_COLLECTIONS}
@@ -114,7 +113,8 @@ type
 
   PtplSection = ^TtplSection;
   TtplSection = record
-    name, txt: string;
+    name: string;
+    txt: UnicodeString;
     nolog, public, noList, cache: boolean;
     ts: Tdatetime;
     end;
@@ -128,7 +128,7 @@ type
   Ttpl = class
   protected
 //    src: RawByteString;
-    srcU: String;
+    srcU: UnicodeString;
 //    lastExt,   // cache for getTxtByExt()
 //    last: record section:string; idx:integer; end; // cache for getIdx()
     fileExts: TStringDynArray;
@@ -136,10 +136,10 @@ type
 //    fUTF8: boolean;
     fOver: Ttpl;
     sections2: Tstr2section;
-    function  getTxt(const section: String): String;
+    function  getTxt(const section: String): UnicodeString;
     function  newSection(const section: String): PtplSection;
-    procedure fromString(const txt: String);
-    function  toS: String;
+    procedure fromString(const txt: UnicodeString);
+    function  toS: UnicodeString;
     procedure fromRaw(const txt: RawByteString);
     function  toRaw: RawByteString;
     procedure setOver(v:Ttpl);
@@ -150,33 +150,37 @@ type
   {$ENDIF USE_MORMOT_COLLECTIONS}
   public
     onChange: TNotifyEvent;
-    constructor create(const txt: RawByteString=''; over:Ttpl=NIL); OverLoad;
-    constructor create(const txt: String; over:Ttpl=NIL); OverLoad;
+    constructor create(const txt: RawByteString=''; over: Ttpl=NIL); OverLoad;
+    constructor create(const txt: String; over: Ttpl=NIL); OverLoad;
+   {$IFDEF FPC}
+    constructor create(const txt: UnicodeString; over: Ttpl=NIL); OverLoad;
+   {$ENDIF FPC}
     destructor Destroy; override;
-    property txt[const section: String]:string read getTxt; default;
+    property txt[const section: String]: UnicodeString read getTxt; default;
     property fullText: RawByteString read toRaw write fromRaw;
-    property fullTextS: String read toS write fromString;
+    property fullTextS: UnicodeString read toS write fromString;
 //    property utf8:boolean read fUTF8;
     property over:Ttpl read fOver write setOver;
-    function sectionExist(section:string):boolean;
-    function getTxtByExt(fileExt:string):string;
-    function getSection(section:string; inherit:boolean=TRUE):PtplSection;
-    function getSections():TStringDynArray;
-    procedure appendString(txt: String);
-    function getStrByID(const id:string):string;
-    function me():Ttpl;
-    end; // Ttpl
+    function sectionExist(section: String): Boolean;
+    function getTxtByExt(const fileExt: String): UnicodeString;
+    function getSection(section: String; inherit: Boolean=TRUE): PtplSection;
+    function getSections(): TStringDynArray;
+    procedure appendString(txt: UnicodeString);
+    function getStrByID(const id: String): String;
+    function me(): Ttpl;
+    function anyMacroMarkerIn: Boolean;
+   end; // Ttpl
 
   TcachedTplObj = class
     ts: Tdatetime;
     tpl: Ttpl;
-    end;
+   end;
 
   TcachedTpls = class(THashedStringList)
   public
-    function getTplFor(fn: String):Ttpl;
+    function getTplFor(fn: String): Ttpl;
     destructor Destroy; override;
-    end; // TcachedTpls
+   end; // TcachedTpls
 
   Ttlv = class
   protected
@@ -190,18 +194,19 @@ type
     procedure parse(const data: RawByteString);
 //    function pop(var value:string): integer; OverLoad
     function pop(var value: RawByteString): integer;
-    function down():boolean;
-    function up():boolean;
-    function getTotal():integer;
-    function getCursor():integer;
-    function getPerc():real;
-    function isOver():boolean;
+    function down(): Boolean;
+    function up(): Boolean;
+    function getTotal(): Integer;
+    function getCursor(): Integer;
+    function getPerc(): Real;
+    function isOver(): Boolean;
     function getTheRest(): RawByteString;
     end;
 
   TSessionId = String;
 
   Tsession = class
+    fSrv: ThttpSrv;
     vars: THashedStringList;
     ttl: Double;
     created, expires: Tdatetime;
@@ -212,7 +217,7 @@ type
     class function getNewSID(): TSessionId;
   public
     id: TSessionId;
-    constructor create(const sid: TSessionId='');
+    constructor create(srv: ThttpSrv; const sid: TSessionId='');
     destructor Destroy; override;
     procedure init;
     procedure keepAlive();
@@ -221,12 +226,13 @@ type
    end;
 
   {$IFNDEF USE_MORMOT_COLLECTIONS}
-  TSessId2Sess = TDictionary<TSessionId,Tsession>;
+  TSessId2Sess = TDictionary<TSessionId, Tsession>;
   {$ELSE USE_MORMOT_COLLECTIONS}
   TSessId2Sess = IKeyValue<TSessionId, Tsession>;
   {$ENDIF USE_MORMOT_COLLECTIONS}
 
   Tsessions = class
+   fSrv: ThttpSrv;
    fS2: TSessId2Sess;
   private
   {$IFDEF USE_MORMOT_COLLECTIONS}
@@ -234,7 +240,7 @@ type
                aIndex, aCount: integer; aOpaque: pointer): boolean;
   {$ENDIF USE_MORMOT_COLLECTIONS}
   public
-    constructor create;
+    constructor create(srv: ThttpSrv);
     destructor Destroy; override;
     procedure  clearSession(sId: TSessionId);
     procedure  destroySession(sId: TSessionId);
@@ -247,6 +253,59 @@ type
     property   ss[sId: TSessionId]: Tsession read getSession; default;
   end;
 
+  TParameter = record
+    k: String;
+    v: String;
+    full: UnicodeString;
+  end;
+
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+//  TParsVal = Tdictionary<string, Tdatetime>;
+  TParsVal = TDictionary<String, String>;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  TParsVal = IKeyValue<String, String>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+
+  TPars2 = class
+   private
+    fD2: TParsVal;
+    fA: array of TParameter;
+    fCount: Integer;
+   public
+    function  parEx(const name: string; doTrim: boolean=TRUE): string; overload;
+    function  tryParToInt(const name: string; var val: Integer): Boolean;
+    function  parExI(idx: integer; const name: string=''; doTrim: boolean=TRUE): string; overload;
+    function  parExNE(idx: integer; const name: string=''; doTrim: boolean=TRUE): UnicodeString; overload;
+    function  parExNE(const name: string; doTrim: boolean=TRUE):string; overload; // No Exception
+    function  parExist(const names: array of string): Boolean; OverLoad;
+    function  parExist(const name: string): Boolean; OverLoad;
+    function  parExistVal(const name: String; var val: String; doTrim: boolean=TRUE): boolean;
+   public
+    constructor create;
+    destructor  Destroy; OverRide;
+    procedure Add(const s: String);
+    procedure Delete(idx: Integer);
+    function  get(idx: Integer): UnicodeString;
+    function  getNames(idx: Integer): String;
+    procedure setItem(idx: Integer; const s: UnicodeString);
+    procedure clear;
+    function  TryGetValue(const k: String; var v: String): Boolean;
+    function  ContainsKey(const k: String): Boolean;
+    function  toArray: TStringDynArray;
+    property  count: Integer read fCount;
+    property  Items[Index: Integer]: UnicodeString read Get write setItem; default;
+    property  names[Index: Integer]: String read GetNames;
+    property  d2: TParsVal read fD2;
+  end;
+
+  TperIp = class // for every different address, we have an object of this class. These objects are never freed until hfs is closed.
+    fSrv: ThttpSrv;
+   public
+    limiter: TspeedLimiter;
+    customizedLimiter: boolean;
+    constructor create(srv: ThttpSrv);
+    destructor Destroy; override;
+   end;
 
   TuploadResult = record
     fn, reason: String;
@@ -263,9 +322,9 @@ type
     address: String;   // this is address shown in the log, and it is not necessarily the same as the socket address
     time: Tdatetime;  // connection start time
     requestTime: Tdatetime; // last request start time
-    { cache User-Agent because often retrieved by connBox.
-    { this value is filled after the http request is complete (HE_REQUESTED),
-    { or before, during the request as we get a file (HE_POST_FILE). }
+    // cache User-Agent because often retrieved by connBox.
+    // this value is filled after the http request is complete (HE_REQUESTED),
+    // or before, during the request as we get a file (HE_POST_FILE).
     agent: string;
     conn: ThttpConn;
     limiter: TspeedLimiter;
@@ -300,41 +359,85 @@ type
     uploadResults: array of TuploadResult;
     lastActivityTime: Tdatetime;
     lastFN: String;
-    function goodPassword(const pwd: String; s: String; func: ThashFunc): Boolean;
-    function passwordValidation(const pwd: String): Boolean;
+    isLocalAddress: Boolean;
+    function  goodPassword(const pwd: String; s: String; func: ThashFunc): Boolean;
+    function  passwordValidation(const pwd: String): Boolean;
     procedure setSessionVar(const k, v: String);
     procedure logout();
     procedure disconnect(const reason: string);
-    function allowRecur: Boolean;
-    function getFilesSelection(): TStringDynArray;
-
+    function  allowRecur: Boolean;
+    function  getFilesSelection(): TStringDynArray;
+    function  getLastRequested: String;
+    function  isReplyFinished: Boolean;
+    function  isDownloading: boolean;
+    function  isSendingFile: Boolean;
+    function  isReceivingFile: Boolean;
+    function  getFileName(): String;
   end;
 
+  TFileTree = TTreeView;
+  TFileNode = TTreeNode;
+  TFileNodeDynArray = array of TFileNode;
+
+  TFileEvent = procedure(f: TObject);
+  TFileEventR = procedure(var s: RawByteString; f: TObject);
+
+  IServerTree = interface
+//    function  getMainTree: TFileTree;
+    procedure DoImageChanged(Sender: TObject; n: TFileNode = NIL);
+    procedure ChangedName(Sender: TObject; Name: String);
+    function  findNode(f: TObject): TFileNode;
+    procedure DeleteChildren(f: TObject);
+    procedure DeleteNode(f: TObject);
+    procedure ForAllSubNodes(Sender: TObject; proc: TProc<TObject>);
+    function  getParentNode(f: TObject): TFileNode;
+    function  getFirstChild(f: TObject): TFileNode;
+    function  getNextSibling(f: TObject): TFileNode;
+    function  nodeToFile(n: TFileNode): TObject;
+    function  nodeIsLocked(n: TFileNode): Boolean;
+    function  nodeText(n: TFileNode): String;
+    procedure setStatusBarText(const s: String; lastFor: Integer = 5);
+//    property MainTree: TFileTree read getMainTree;
+  end;
+
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  TMacroTableVal = TDictionary<String, UnicodeString>;
+  TMacroTableValPair = TPair<String, UnicodeString>;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  TMacroTableVal = IKeyValue<String, UnicodeString>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+
+
+  TAdd2LogEvent = procedure(lines: String; cd: TconnDataMain=NIL; clr: Tcolor= Graphics.clDefault; doSync: Boolean = True);
+
   function conn2dataMain(p: Tobject): TconnDataMain; inline; overload;
-  function conn2dataMain(i: integer): TconnDataMain; inline; overload;
-  function isDownloading(data: TconnDataMain): Boolean;
-  function isSendingFile(data: TconnDataMain): Boolean;
-  function isReceivingFile(data: TconnDataMain): Boolean;
+  function conn2dataMain(srv: ThttpSrv; i: integer): TconnDataMain; inline; overload;
   function getETA(data: TconnDataMain): String;
-  function countIPs(onlyDownloading: boolean=FALSE; usersInsteadOfIps: boolean=FALSE): integer;
-  function countConnectionsByIP(const ip: String): Integer;
+  function countIPs(srv: ThttpSrv; onlyDownloading: boolean=FALSE; usersInsteadOfIps: boolean=FALSE): integer;
+  function countConnectionsByIP(srv: ThttpSrv; const ip: String): Integer;
   function getGraphPic(cd: TconnDataMain; w, h: Integer): RawByteString;
+  function objByIP(srv: ThttpSrv; const ip: String): TperIp;
+  function newMacroTableVal: TMacroTableVal;
 
 
 implementation
 
 uses
   Math,
-  dateUtils, ansiStrings,
+  dateUtils,
+  {$IFNDEF FPC}
+  ansiStrings,
+  {$ENDIF ~FPC}
   RDFileUtil, RDUtils,
   IconsLib,
+  HSUtils,
+  parserLib,
   srvUtils, srvVars;
 
 
 class constructor TantiDos.Create;
 
 begin
-
   ip2availability2 := NIL;
   folderConcurrents := 0;
 end;
@@ -343,6 +446,7 @@ end;
 constructor TantiDos.create();
 begin
   accepted := FALSE;
+  Paddress := '';
 end;
 
 function TantiDos.accept(conn: ThttpConn; address: String=''): Boolean;
@@ -379,7 +483,10 @@ begin
     end;
   inc(folderConcurrents);
   Paddress := address;
-  ip2availability2[address] := now()+1/HOURS;
+  if ip2availability2.ContainsKey(address) then
+    ip2availability2[address] := now()+1/HOURS
+   else
+    ip2availability2.Add(address, now()+1/HOURS);
   accepted := TRUE;
   Result := TRUE;
 end;
@@ -400,7 +507,7 @@ end;
 destructor TantiDos.Destroy;
 var
   {$IFNDEF USE_MORMOT_COLLECTIONS}
-  pair: Tpair<string,Tdatetime>;
+  pair: Tpair<String, Tdatetime>;
   {$ENDIF ~USE_MORMOT_COLLECTIONS}
   t: Tdatetime;
 begin
@@ -429,8 +536,14 @@ destructor TcachedTpls.Destroy;
 var
   i: integer;
 begin
-for i:=0 to count-1 do
-  objects[i].free;
+  if not Assigned(Self) then
+    Exit;
+ if count > 0 then
+   for i:= count-1 to 0 do
+     begin
+       objects[i].free;
+       objects[i] := NIL;
+     end;
 end;
 
 function TcachedTpls.getTplFor(fn: String): Ttpl;
@@ -445,7 +558,7 @@ begin
     o := objects[i] as TcachedTplObj
    else
     begin
-      o:=TcachedTplObj.create();
+      o := TcachedTplObj.create();
       if addObject(fn, o) > 100 then
         delete(0);
     end;
@@ -484,7 +597,7 @@ if i >= length(pwds) then setLength(pwds, i+1);
 addString(pwd, pwds[i]);
 end; // track
 
-procedure TusersInVFS.drop(usr, pwd: string);
+procedure TusersInVFS.drop(const usr, pwd: string);
 var
   i, j: integer;
 begin
@@ -504,7 +617,7 @@ while i+1 < length(pwds) do
 setLength(pwds, i);
 end; // drop
 
-function TusersInVFS.match(usr, pwd:string):boolean;
+function TusersInVFS.match(const usr, pwd: String): Boolean;
 var
   i: integer;
 begin
@@ -535,17 +648,17 @@ e:=n-1;
 result:=b;
 end; // idxOf
 
-function TiconsCache.get(data: String): PcachedIcon;
+function TiconsCache.get(const data: String): PcachedIcon;
 var
   i: integer;
 begin
-result:=NIL;
-i:=idxOf(data);
-if (i >= 0) and (i < n) and (icons[i].data = data) then
-  result:=@icons[i];
+  result := NIL;
+  i := idxOf(data);
+  if (i >= 0) and (i < n) and (icons[i].data = data) then
+    result := @icons[i];
 end; // get
 
-procedure TiconsCache.put(data: String; idx: Integer; time: Tdatetime);
+procedure TiconsCache.put(const data: String; idx: Integer; time: Tdatetime);
 var
   i, w: integer;
 begin
@@ -660,19 +773,19 @@ begin
   {$ELSE USE_MORMOT_COLLECTIONS}
   sections2 := Collections.NewKeyValue<String, PtplSection>;
   {$ENDIF USE_MORMOT_COLLECTIONS}
-  fullText:=txt;
-  self.over:=over;
+  fullText := txt;
+  self.over := over;
 end;
 
-constructor Ttpl.create(const txt: String; over:Ttpl=NIL);
+constructor Ttpl.create(const txt: String; over: Ttpl=NIL);
 begin
   {$IFNDEF USE_MORMOT_COLLECTIONS}
   sections2 := Tstr2section.Create();
   {$ELSE USE_MORMOT_COLLECTIONS}
   sections2 := Collections.NewKeyValue<String, PtplSection>;
   {$ENDIF USE_MORMOT_COLLECTIONS}
-  fullTextS:=txt;
-  self.over:=over;
+  fullTextS := txt;
+  self.over := over;
 end;
 
 destructor Ttpl.destroy;
@@ -681,11 +794,11 @@ begin
   inherited;
 end; // destroy
 
-function Ttpl.getStrByID(const id:string):string;
+function Ttpl.getStrByID(const id: String): String;
 begin
 if strTable = NIL then
   begin
-  strTable:=THashedStringList.create;
+  strTable := THashedStringList.create;
   strTable.text:=txt['special:strings'];
   end;
 result:=strTable.values[id];
@@ -693,7 +806,7 @@ if (result = '') and assigned(over) then
   result:=over.getStrByID(id)
 end; // getStrByID
 
-function Ttpl.newSection(const section: String):PtplSection;
+function Ttpl.newSection(const section: String): PtplSection;
 begin
   new(result);
   sections2.Add(section, result);
@@ -717,7 +830,7 @@ if inherit and assigned(over) and (result = NIL) then
   result:=over.getSection(section);
 end; // getSection
 
-function Ttpl.getTxt(const section: String): String;
+function Ttpl.getTxt(const section: String): UnicodeString;
 var
   p: PTplSection;
 begin
@@ -728,7 +841,7 @@ begin
     result := ''
 end; // getTxt
 
-function Ttpl.getTxtByExt(fileExt:string):string;
+function Ttpl.getTxtByExt(const fileExt: String): UnicodeString;
 begin
   result := getTxt('file'+fileExt)
 end;
@@ -768,7 +881,7 @@ begin
   appendString(s);
 end; // fromString
 
-procedure Ttpl.fromString(const txt: String);
+procedure Ttpl.fromString(const txt: UnicodeString);
 begin
   clear;
 
@@ -780,24 +893,24 @@ begin
   Result := utf8Encode(srcU);
 end;
 
-function Ttpl.toS: String;
+function Ttpl.toS: UnicodeString;
 begin
   Result := srcU;
 end;
 
-procedure Ttpl.appendString(txt: String);
+procedure Ttpl.appendString(txt: UnicodeString);
 var
   ptxt, bos: PChar;
-  cur_section, next_section: string;
+  cur_section, next_section: UnicodeString;
 
-  function pred(p:pchar):pchar; inline;
+  function pred(p: PChar): PChar; inline;
   begin
   result:=p;
   if p <> NIL then
     dec(result);
   end;
 
-  function succ(p:pchar):pchar; inline;
+  function succ(p: PChar): PChar; inline;
   begin
   result:=p;
   if p <> NIL then
@@ -807,14 +920,15 @@ var
   procedure findNextSection();
   begin
   // find start
-  bos:=ptxt;
+    bos := ptxt;
     repeat
-    if bos^ <> '[' then bos:= ansiStrPos(bos, #10'[');
-    if bos = NIL then exit;
-    if bos^ = #10 then inc(bos);
-    if getSectionAt(bos, next_section) then
-      exit;
-    inc(bos);
+      if bos^ <> '[' then
+        bos := ansiStrPos(bos, #10'[');
+      if bos = NIL then exit;
+      if bos^ = #10 then inc(bos);
+      if getSectionAt(bos, next_section) then
+        exit;
+      inc(bos);
     until false;
   end; // findNextSection
 
@@ -822,9 +936,9 @@ var
   var
     base: TtplSection;
 
-    function parseFlagsAndAcceptSection(flags:TStringDynArray):boolean;
+    function parseFlagsAndAcceptSection(flags: TUnicodeStringDynArray): Boolean;
     var
-      f, k, v, s: string;
+      f, k, v, s: UnicodeString;
       i: integer;
     begin
     for f in flags do
@@ -861,66 +975,66 @@ var
     result:=TRUE;
     end;
   var
-    ss: TStringDynArray;
-    s: string;
-    till: pchar;
+    ss: TUnicodeStringDynArray;
+    s: UnicodeString;
+    till: PChar;
     append, prepend, add: boolean;
     sect, from: PtplSection;
   begin
-  till:=pred(bos);
-  if till = NIL then
-    till:=pred(strEnd(ptxt));
-  if till^ = #10 then dec(till);
-  if till^ = #13 then dec(till);
+    till := pred(bos);
+    if till = NIL then
+      till:=pred(strEnd(ptxt));
+    if till^ = #10 then dec(till);
+    if till^ = #13 then dec(till);
 
-  base:=default(TtplSection);
-  base.txt:=getStr(ptxt, till);
-  base.ts:=now();
-  ss:=split('|',cur_section);
-  cur_section:=popString(ss);
-  if not parseFlagsAndAcceptSection(ss) then
-    exit;
+    base := default(TtplSection);
+    base.txt := getStr(ptxt, till);
+    base.ts := now();
+    ss := split('|', cur_section);
+    cur_section := popString(ss);
+    if not parseFlagsAndAcceptSection(ss) then
+      exit;
 
-  prepend:=startsStr('^', cur_section);
-  append:=ansiStartsStr('+', cur_section);
-  add:=prepend or append;
-  if add then
-    delete(cur_section,1,1);
+    prepend := startsStr('^', cur_section);
+    append := ansiStartsStr('+', cur_section);
+    add := prepend or append;
+    if add then
+      delete(cur_section,1,1);
 
   // there may be several section names separated by =
-  ss:=split('=', cur_section);
+    ss := split('=', cur_section);
   // handle the main section specific case
-  if ss = NIL then
-    addString('', ss);
+    if ss = NIL then
+      addString('', ss);
   // assign to every name the same txt
-  for var si in ss do
-    begin
-    s:=trim(si);
-    sect:=getSection(s, FALSE);
-    from:=NIL;
-    if sect = NIL then // not found
-      begin
-      if add then
-        from:=getSection(s);
-      sect:=newSection(s);
-      end
-    else
-      if add then
-        from:=sect;
-    if from<>NIL then
-      begin // inherit from it
-      if append then
-        sect.txt:=from.txt+base.txt
+    for var si in ss do
+     begin
+      s:=trim(si);
+      sect:=getSection(s, FALSE);
+      from:=NIL;
+      if sect = NIL then // not found
+        begin
+        if add then
+          from:=getSection(s);
+        sect:=newSection(s);
+        end
       else
-        sect.txt:=base.txt+CRLF+from.txt;
-      sect.nolog:=from.nolog or base.nolog;
-      sect.public:=from.public or base.public;
-      sect.noList:=from.noList or base.noList;
-      continue;
-      end;
-    sect^:=base;
-    sect.name:=s; // restore this lost attribute
-    end;
+        if add then
+          from:=sect;
+      if from<>NIL then
+        begin // inherit from it
+        if append then
+          sect.txt := from.txt+base.txt
+         else
+          sect.txt := base.txt+CRLF+from.txt;
+        sect.nolog:=from.nolog or base.nolog;
+        sect.public:=from.public or base.public;
+        sect.noList:=from.noList or base.noList;
+        continue;
+        end;
+      sect^:=base;
+      sect.name:=s; // restore this lost attribute
+     end;
   end; // saveInSection
 
 //const
@@ -937,19 +1051,20 @@ begin
   srcU := srcU + txt;
   cur_section := '';
   ptxt := @txt[1];
-first:=TRUE;
+  first := TRUE;
   repeat
-  findNextSection();
-  if not first or (trim(getStr(ptxt, pred(bos))) > '') then
-    saveInSection();
-  if bos = NIL then break;
-  cur_section:=next_section;
-  inc(bos, length(cur_section)); // get faster to the end of line
-  ptxt:=succ(ansiStrPos(bos, #10)); // get to the end of line (and then beyond)
-  first:=FALSE;
+    findNextSection();
+    if not first or (trim(getStr(ptxt, pred(bos))) > '') then
+      saveInSection();
+    if bos = NIL then
+      break;
+    cur_section := next_section;
+    inc(bos, length(cur_section)); // get faster to the end of line
+    ptxt:=succ(ansiStrPos(bos, #10)); // get to the end of line (and then beyond)
+    first:=FALSE;
   until ptxt = NIL;
-if assigned(onChange) then
-  onChange(self);
+  if assigned(onChange) then
+    onChange(self);
 end; // appendString
 
 procedure Ttpl.setOver(v: Ttpl);
@@ -958,13 +1073,15 @@ begin
 end; // setOver
 
 function Ttpl.getSections(): TStringDynArray;
+var
+  i: Integer;
 begin
   {$IFNDEF USE_MORMOT_COLLECTIONS}
   result := sections2.Keys.ToArray();
   {$ELSE USE_MORMOT_COLLECTIONS}
   SetLength(Result, sections2.Data.Keys.Count);
   if Length(Result) > 0 then
-    for var I := Low(Result) to High(Result) do
+    for I := Low(Result) to High(Result) do
       Result[i] := PString(sections2.Data.Keys.ItemPtr(i))^;
   {$ENDIF USE_MORMOT_COLLECTIONS}
 end;
@@ -974,6 +1091,10 @@ begin
   result := self
 end;
 
+function Ttpl.anyMacroMarkerIn: Boolean;
+begin
+  Result := parserLib.anyMacroMarkerIn(Self.fullTextS);
+end;
 
 constructor Ttlv.create(const data: RawByteString);
 begin
@@ -1087,12 +1208,57 @@ begin
 end;
 
 function TconnDataMain.getFilesSelection(): TStringDynArray;
+var
+  i: Integer;
 begin
   result:=NIL;
-  for var i: integer :=0 to postvars.count-1 do
+  for i :=0 to postvars.count-1 do
     if sameText('selection', postvars.names[i]) then
       addString(getTill('#', postvars.valueFromIndex[i]), result) // omit #anchors
 end; // getFilesSelection
+
+function TconnDataMain.getLastRequested: String;
+begin
+  if (conn.reply.bodyMode=RBM_RAW)or(conn.reply.bodyMode=RBM_TEXT) then
+    Result := decodeURL(conn.httpRequest.url)
+   else
+    Result := lastFN;
+end;
+
+function TconnDataMain.isReplyFinished: Boolean;
+begin
+  Result := (conn.httpState <> HCS_REPLYING_BODY) or
+  (conn.bytesSentLastItem = conn.bytesPartial);
+end;
+
+function TconnDataMain.isDownloading: boolean;
+begin
+  result := assigned(Self) and Self.countAsDownload
+     and (Self.conn.httpState in [HCS_REPLYING_BODY, HCS_REPLYING_HEADER, HCS_REPLYING])
+end; // isDownloading
+
+function TconnDataMain.isSendingFile: Boolean;
+begin
+  result := Assigned(Self)
+    and (Self.conn.httpState = HCS_REPLYING_BODY)
+    and (Self.conn.reply.bodyMode in [RBM_FILE, RBM_STREAM])
+    and (Self.downloadingWhat in [DW_FILE, DW_ARCHIVE])
+end; // isSendingFile
+
+function TconnDataMain.isReceivingFile: Boolean;
+begin
+  result := assigned(Self) and (Self.conn.httpState = HCS_POSTING) and (Self.uploadSrc > '')
+end;
+
+function TconnDataMain.getFileName(): String;
+begin
+  if isSendingFile then
+    result := lastFN
+   else if isReceivingFile then
+    result := uploadSrc
+   else
+    result := '-'
+end;
 
 procedure TconnDataMain.logout();
 begin
@@ -1109,7 +1275,7 @@ begin
   conn.disconnect();
 end; // disconnect
 
-class function TconnDataMain.getSafeHost(cd:TconnDataMain):string;
+class function TconnDataMain.getSafeHost(cd: TconnDataMain): String;
 begin
   result := '';
   if cd = NIL then
@@ -1128,35 +1294,37 @@ class function Tsession.sanitizeSID(s:TSessionId):TSessionId;
 //begin result:=reReplace(s, '[\D\W]', '', '!') end;
 begin result:=reReplace(s, '[^0-9a-zA-Z]', '', '!') end;
 
-constructor Tsession.create(const sid:string='');
+constructor Tsession.create(srv: ThttpSrv; const sid: String='');
 begin
-id:=sid;
-if Length(id) < 10 then
-  id:=getNewSID();
+  id := sid;
+  if Length(id) < 10 then
+    id := getNewSID();
+  fSrv := srv;
 //sessions.Add(id, self);
-init;
+  init;
 end;
 procedure Tsession.init;
 begin
-created:=now();
-ttl:=1; // days
-user := '';
-ip := '';
-redirect := '';
-keepAlive();
+  created := now();
+  ttl:=1; // days
+  user := '';
+  ip := '';
+  redirect := '';
+  keepAlive();
 end;
+
 destructor Tsession.Destroy;
 var
   cd: TconnDataMain;
 begin
-for var o in srv.conns do
+  for var o in fSrv.conns do
   begin
-  cd:=ThttpConn(o).data;
-  if cd.sessionID = self.id then
-    cd.sessionID := '';
+    cd := ThttpConn(o).data;
+    if cd.sessionID = self.id then
+      cd.sessionID := '';
   end;
 //sessions.remove(id);
-freeAndNIL(vars);
+  freeAndNIL(vars);
 end;
 
 procedure Tsession.keepAlive();
@@ -1185,14 +1353,15 @@ begin
   vars.addPair(k,v);
 end;
 
-procedure Tsession.setTTL(t:Tdatetime);
+procedure Tsession.setTTL(t: Tdatetime);
 begin
-ttl:=t;
-keepAlive();
+  ttl:=t;
+  keepAlive();
 end;
 
-constructor Tsessions.create;
+constructor Tsessions.create(srv: ThttpSrv);
 begin
+  fSrv := srv;
   {$IFNDEF USE_MORMOT_COLLECTIONS}
   fS2 := TSessId2Sess.Create();
   {$ELSE USE_MORMOT_COLLECTIONS}
@@ -1217,7 +1386,7 @@ end;
 
 function Tsessions.createSession(sId: TSessionId = ''): Tsession;
 begin
-  result := Tsession.create(sid);
+  result := Tsession.create(fSrv, sid);
   fS2.Add(result.id, result);
 end;
 
@@ -1292,7 +1461,9 @@ end;
 procedure Tsessions.checkExpired;
 var
   now_: TDateTime;
+ {$IFNDEF USE_MORMOT_COLLECTIONS}
   sId: TSessionId;
+ {$ENDIF USE_MORMOT_COLLECTIONS}
 begin
   now_ := now();
   {$IFNDEF USE_MORMOT_COLLECTIONS}
@@ -1309,6 +1480,294 @@ begin
   {$ENDIF USE_MORMOT_COLLECTIONS}
 end;
 
+constructor TPars2.create;
+begin
+  fCount := 0;
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  fD2 := TParsVal.Create;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  fD2 := Collections.NewKeyValue<String, String>;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+  setLength(fA, 0);
+end;
+
+destructor TPars2.Destroy;
+begin
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+  fD2.Free;
+  {$ELSE USE_MORMOT_COLLECTIONS}
+  fD2 := NIL;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+  SetLength(fA, 0);
+  fCount := 0;
+end;
+
+procedure TPars2.Add(const s: String);
+var
+  i, idx: Integer;
+begin
+  idx := Length(fA);
+  SetLength(fA, idx+1);
+  fCount := idx+1;
+  fA[idx].full := s;
+  i := AnsiPos('=', s);
+  if (i > 0)and(i<125) then
+    begin
+      fA[idx].k := copy(s, 1, i-1);
+      fA[idx].v := copy(s, i+1, length(s))
+    end
+   else
+    begin
+//      fA[idx].k := s;
+      fA[idx].k := '';
+      fA[idx].v := '';
+    end;
+  if fA[idx].k > '' then
+  {$IFNDEF USE_MORMOT_COLLECTIONS}
+    fD2.AddOrSetValue(fA[idx].k, fA[idx].v);
+  {$ELSE USE_MORMOT_COLLECTIONS}
+    fD2[fA[idx].k] := fA[idx].v;
+  {$ENDIF USE_MORMOT_COLLECTIONS}
+end;
+
+procedure TPars2.Delete(idx: Integer);
+var
+  I: Integer;
+begin
+  if idx >= fCount then
+    Exit;
+  if fA[idx].k > '' then
+    fD2.Remove(fA[idx].k);
+  if idx < (fCount-1) then
+    for I := idx to fCount-2 do
+      fA[i] := fA[i+1];
+  dec(fCount);
+  SetLength(fA, fCount);
+end;
+
+function TPars2.get(idx: Integer): UnicodeString;
+begin
+  Result := fA[idx].full;
+end;
+
+function TPars2.getNames(idx: Integer): String;
+begin
+  Result := fA[idx].k;
+end;
+
+procedure TPars2.setItem(idx: Integer; const s: UnicodeString);
+var
+  k, v: string;
+  i: Integer;
+begin
+  i := AnsiPos('=', s);
+  if (i > 0)and(i<126) then
+    begin
+      k := copy(s, 1, i-1);
+      v := copy(s, i+1, length(s))
+    end
+   else
+    begin
+//      k := s;
+      k := '';
+      v := '';
+    end;
+
+  if k = fA[idx].k then
+    begin
+      if k > '' then
+//        fD.AddOrSetValue(k, v);
+        fD2[k] := v;
+    end
+   else
+    begin
+      if fA[idx].k > '' then
+        fD2.Remove(fA[idx].k);
+      if k > '' then
+        fD2.Add(k, v);
+      fA[idx].k := k;
+    end;
+
+  fA[idx].v := v;
+  fA[idx].full := s;
+end;
+
+function TPars2.TryGetValue(const k: String; var v: String): Boolean;
+begin
+  Result := fD2.TryGetValue(k, v);
+end;
+
+function TPars2.ContainsKey(const k: String): Boolean;
+begin
+  Result := fD2.ContainsKey(k);
+end;
+
+procedure TPars2.clear;
+begin
+  fCount := 0;
+  SetLength(fA, 0);
+  fD2.clear;
+end;
+
+function TPars2.ToArray: TStringDynArray;
+var
+  i: integer;
+begin
+  if Length(fA) = 0 then
+    Exit(NIL);
+  try
+    setLength(result, Length(fA));
+      for i:=0 to Length(fA)-1 do
+        result[i] := fA[i].full;
+  except
+    result:=NIL
+    end
+end; // ToArray
+
+function TPars2.parEx(const name: string; doTrim: boolean=TRUE): string;
+begin
+  result:='';
+  if name > '' then
+    begin
+//      i:=pars.IndexOfName(name);
+      if Self.TryGetValue(name, Result) then
+        if doTrim then
+          Exit(trim(result))
+         else
+          exit;
+    end;
+  raise Exception.create('invalid parameter index');
+end; // parEx
+
+function TPars2.tryParToInt(const name: string; var val: Integer): Boolean;
+var
+  s: String;
+begin
+  result := false;
+  if name > '' then
+    begin
+      if Self.TryGetValue(name, s) then
+       begin
+        Result := TryStrToInt(s, val);
+       end;
+    end;
+end; // tryParToInt
+
+function TPars2.parExI(idx: integer; const name: string=''; doTrim: boolean=TRUE): string;
+//  var
+//    i: integer;
+begin
+  result:='';
+  if name > '' then
+    begin
+//      i:=pars.IndexOfName(name);
+      if Self.TryGetValue(name, Result) then
+        if doTrim then
+          Exit(trim(result))
+         else
+          exit;
+    end;
+  if (idx < 0) // no numeric index accept
+  or (idx >= Self.count) // invalid index
+  or (name > '') and (Self.names[idx] > '') and not anycharIn(' '#13#10, Self.names[idx]) // this numerical index was already taken by a valid mnemonic name
+  then
+    raise Exception.create('invalid parameter index');
+  result := Self[idx];
+  if doTrim then
+    result := trim(result);
+end; // parExI
+
+function TPars2.parExNE(idx: integer; const name: string=''; doTrim: boolean=TRUE): UnicodeString;
+//  var
+//    i: integer;
+begin
+  result := '';
+  if name > '' then
+    begin
+      if Self.TryGetValue(name, Result) then
+        if doTrim then
+          Exit(trim(result))
+         else
+          exit;
+    end;
+  if (idx < 0) // no numeric index accept
+  or (idx >= Self.count) // invalid index
+  or (name > '') and (Self.names[idx] > '') and not anycharIn(' '#13#10, Self.names[idx]) // this numerical index was already taken by a valid mnemonic name
+  then
+    Exit('');
+  result := Self[idx];
+  if doTrim then
+    result := trim(result);
+end; // parExNE
+
+function TPars2.parExNE(const name: string; doTrim: boolean=TRUE): String; // No Exception
+begin
+  Result := '';
+  if name > '' then
+    begin
+      if Self.TryGetValue(name, Result) then
+        if doTrim then
+          Exit(trim(result))
+         else
+          exit;
+    end;
+end;
+
+// note this function works on N parameters
+function TPars2.parExist(const names: array of string): Boolean;
+var
+  i: integer;
+begin
+  result := FALSE;
+  for i:=0 to length(names)-1 do
+    if not Self.ContainsKey(names[i]) then
+      exit;
+  result := TRUE;
+end; // parExist
+
+function TPars2.parExist(const name: string): Boolean;
+begin
+  result := Self.ContainsKey(name);
+end; // parExist
+
+function TPars2.parExistVal(const name: String; var val: String; doTrim: boolean=TRUE): boolean;
+begin
+  Result := false;
+  val := '';
+  if name > '' then
+    begin
+      Result := Self.TryGetValue(name, val);
+      if Result then
+        if doTrim then
+          val := trim(val)
+    end;
+end; // parExistVal
+
+constructor TperIp.create(srv: ThttpSrv);
+begin
+  fSrv := srv;
+  limiter := TspeedLimiter.create();
+  srv.limiters.add(limiter);
+end;
+
+destructor TperIp.Destroy;
+begin
+  fSrv.limiters.remove(limiter);
+  limiter.free;
+end;
+
+function objByIP(srv: ThttpSrv; const ip: String): TperIp;
+var
+  i: integer;
+begin
+  i := ip2obj.indexOf(ip);
+  if i < 0 then
+    i := ip2obj.add(ip);
+  if ip2obj.objects[i] = NIL then
+    ip2obj.objects[i] := TperIp.create(srv);
+  result := ip2obj.objects[i] as TperIp;
+end; // objByIP
+
 function conn2dataMain(p: Tobject): TconnDataMain; inline; overload;
 begin
   if p = NIL then
@@ -1317,7 +1776,7 @@ begin
     result := TconnDataMain((p as ThttpConn).data)
 end; // conn2dataMain
 
-function conn2dataMain(i: integer): TconnDataMain; inline; overload;
+function conn2dataMain(srv: ThttpSrv; i: integer): TconnDataMain; inline; overload;
 begin
   try
     if i < srv.conns.count then
@@ -1329,35 +1788,16 @@ begin
   end
 end; // conn2dataMain
 
-function isDownloading(data: TconnDataMain): boolean;
-begin
-  result := assigned(data) and data.countAsDownload
-     and (data.conn.state in [HCS_REPLYING_BODY, HCS_REPLYING_HEADER, HCS_REPLYING])
-end; // isDownloading
-
-function isSendingFile(data: TconnDataMain): Boolean;
-begin
-  result := Assigned(data)
-    and (data.conn.state = HCS_REPLYING_BODY)
-    and (data.conn.reply.bodyMode in [RBM_FILE, RBM_STREAM])
-    and (data.downloadingWhat in [DW_FILE, DW_ARCHIVE])
-end; // isSendingFile
-
-function isReceivingFile(data: TconnDataMain): Boolean;
-begin
-  result := assigned(data) and (data.conn.state = HCS_POSTING) and (data.uploadSrc > '')
-end;
-
 function getETA(data: TconnDataMain): String;
 begin
-  if (data.conn.state in [HCS_REPLYING_BODY, HCS_POSTING])
+  if (data.conn.httpState in [HCS_REPLYING_BODY, HCS_POSTING])
    and (data.eta.idx > ETA_FRAME) then
     result := elapsedToStr(data.eta.result)
    else
     result := '-'
 end; // getETA
 
-function countIPs(onlyDownloading: boolean=FALSE; usersInsteadOfIps: boolean=FALSE): integer;
+function countIPs(srv: ThttpSrv; onlyDownloading: boolean=FALSE; usersInsteadOfIps: boolean=FALSE): integer;
 var
   i: integer;
   d: TconnDataMain;
@@ -1367,26 +1807,26 @@ begin
   ips := NIL;
   while i < srv.conns.count do
     begin
-    d := conn2dataMain(i);
-    if not onlyDownloading or isDownloading(d) then
+    d := conn2dataMain(srv, i);
+    if Assigned(d) and (not onlyDownloading or d.isDownloading) then
       addUniqueString(if_(usersInsteadOfIps, d.usr, d.address), ips);
     inc(i);
     end;
-  result:=length(ips);
+  result := length(ips);
 end; // countIPs
 
-function countConnectionsByIP(const ip: String): Integer;
+function countConnectionsByIP(srv: ThttpSrv; const ip: String): Integer;
 var
   i: integer;
 begin
-result:=0;
-i:=0;
-while i < srv.conns.count do
-  begin
-  if conn2dataMain(i).address = ip then
-  	inc(result);
-  inc(i);
-  end;
+  result:=0;
+  i:=0;
+  while i < srv.conns.count do
+    begin
+    if conn2dataMain(srv, i).address = ip then
+      inc(result);
+    inc(i);
+    end;
 end; // countConnectionsByIP
 
 function getGraphPic(cd: TconnDataMain; w, h: Integer): RawByteString;
@@ -1407,7 +1847,7 @@ var
   end; // addColor
 
 begin
-  options := copy(decodeURL(cd.conn.request.url), 12, MAXINT);
+  options := copy(decodeURL(cd.conn.httpRequest.url), 12, MAXINT);
   delete(options, pos('?',options), MAXINT);
   bmp := Tbitmap.create(w, h);
 //  bmp.SetSize(graphBox.Width, graphBox.Height);
@@ -1443,10 +1883,19 @@ begin
   bmp.free;
   if cd = NIL then
     exit;
-  cd.conn.addHeader('Cache-Control', 'no-cache');
+  cd.conn.addHeader(RawByteString('Cache-Control'), 'no-cache');
   if refresh > '' then
     cd.conn.addHeader('Refresh', refresh);
 end; // getGraphPic
+
+function newMacroTableVal: TMacroTableVal;
+begin
+ {$IFNDEF USE_MORMOT_COLLECTIONS}
+  Result := TMacroTableVal.Create;
+ {$ELSE USE_MORMOT_COLLECTIONS}
+  Result := Collections.NewKeyValue<String, UnicodeString>;
+ {$ENDIF USE_MORMOT_COLLECTIONS}
+end;
 
 
 

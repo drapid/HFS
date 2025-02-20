@@ -32,14 +32,14 @@ type
     Fmaster: boolean;
     Ferror: string;
     Fworking: boolean;
-    function hook(var msg:TMessage):boolean;
+    function hook(var msg: TMessage): Boolean;
   public
-    onSlaveParams: procedure(params:string);
-    property error:string read Ferror;
-    property master:boolean read Fmaster;
-    property working:boolean read Fworking;
+    onSlaveParams: procedure(const params: String);
+    property error: String read Ferror;
+    property master: Boolean read Fmaster;
+    property working: Boolean read Fworking;
 
-    function init(id:string):boolean; // FALSE on error
+    function init(id: String): Boolean; // FALSE on error
     procedure sendParams();
     end;
 
@@ -60,32 +60,35 @@ setlength(result, 5000);
 setlength(result, globalGetAtomName(atom, @result[1], length(result)));
 end; // atomToStr
 
-function Tmono.hook(var msg:TMessage):boolean;
+function Tmono.hook(var msg: TMessage): Boolean;
 begin
-result:=master and (msg.msg = msgID) and (msg.wparam = MSG_PARAMS);
-if not result or not assigned(onSlaveParams) then exit;
-msg.Result:=1;
-onSlaveParams(atomToStr(msg.lparam));
-GlobalDeleteAtom(msg.LParam);
+  result := master and (msg.msg = msgID) and (msg.wparam = MSG_PARAMS);
+  if not result or not assigned(onSlaveParams) then
+    exit;
+  msg.Result := 1;
+  onSlaveParams(atomToStr(msg.lparam));
+  GlobalDeleteAtom(msg.LParam);
 end; // hook
 
-function Tmono.init(id:string):boolean;
+function Tmono.init(id: String): Boolean;
 begin
-result:=FALSE;
-msgID:=registerWindowMessage(pchar(id));
-application.HookMainWindow(hook);
+  result := FALSE;
+  msgID := RegisterWindowMessage(pchar(id));
+ {$IFNDEF FPC}
+  application.HookMainWindow(hook);
+ {$ENDIF ~FPC}
 // the mutex is auto-released when the application terminates
-if createMutex(nil, True, pchar(id)) = 0 then
-  begin
-  setlength(Ferror,1000);
-  setlength(Ferror, FormatMessage(
-    FORMAT_MESSAGE_FROM_SYSTEM+FORMAT_MESSAGE_IGNORE_INSERTS, NIL,
-    GetLastError(), 0, @Ferror[1], length(Ferror), NIL) );
-  exit;
-  end;
-Fmaster:= GetLastError() <> ERROR_ALREADY_EXISTS;
-Fworking:=TRUE;
-result:=TRUE;
+  if CreateMutex(nil, True, pchar(id)) = 0 then
+   begin
+    setlength(Ferror,1000);
+    setlength(Ferror, FormatMessage(
+      FORMAT_MESSAGE_FROM_SYSTEM+FORMAT_MESSAGE_IGNORE_INSERTS, NIL,
+      GetLastError(), 0, @Ferror[1], length(Ferror), NIL) );
+    exit;
+   end;
+  Fmaster := GetLastError() <> ERROR_ALREADY_EXISTS;
+  Fworking := TRUE;
+  result := TRUE;
 end; // init
 
 procedure Tmono.sendParams();
@@ -97,7 +100,7 @@ s:=initialPath+#13+paramStr(0);
 for i:=1 to paramCount() do
   s:=s+#13+paramStr(i);
 // the master will delete the atom
-postMessage(HWND_BROADCAST, msgId, MSG_PARAMS, globalAddAtom(pchar(s)));
+postMessage(HWND_BROADCAST, msgId, MSG_PARAMS, GlobalAddAtom(pchar(s)));
 end; // sendParams
 
 initialization

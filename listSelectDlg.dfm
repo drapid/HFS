@@ -10,9 +10,7 @@ object listSelectFrm: TlistSelectFrm
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = False
   Position = poMainFormCenter
-  PixelsPerInch = 96
   TextHeight = 13
   object listBox: TCheckListBox
     Left = 0
@@ -20,7 +18,7 @@ object listSelectFrm: TlistSelectFrm
     Width = 183
     Height = 136
     Align = alClient
-    ItemHeight = 13
+    ItemHeight = 17
     TabOrder = 0
   end
   object Panel1: TPanel

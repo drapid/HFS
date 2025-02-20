@@ -26,34 +26,26 @@ HTTP Server Lib
 {$I- }
 
 unit HSlib;
+{$INCLUDE defs.inc }
 {$I NoRTTI.inc}
 
 interface
 
 uses
-  classes, messages,
+  classes, messages, sysutils, strUtils, inifiles, types,
+  Forms, extctrls,
+  OverbyteIcsWSocket,
+  OverbyteIcsWSocketS,
  {$IFNDEF FPC}
-  winprocs,
+{$IFDEF USE_SSL}
+  OverbyteIcsSslBase,
+{$ENDIF USE_SSL}
  {$ENDIF ~FPC}
-  mormot.core.base,
- {$IFDEF FMX}
-  FMX.Graphics, System.UITypes, FMX.Types,
- {$ELSE ~FMX}
-  Graphics,
-  Forms,
-  extctrls,
- {$ENDIF FMX}
-  sysutils,
-  contnrs, strUtils, winsock, inifiles, types,
- {$IFDEF FPC}
-  WSocket
- {$ELSE ~FPC}
-  OverbyteIcsWSocket
- {$ENDIF FPC}
+  contnrs
   ;
 
 const
-  VERSION = '2.11.0';
+  VERSION = '2.12.0';
 
 type
   ThttpSrv=class;
@@ -81,7 +73,8 @@ type
     HE_POST_VAR,        // single variable available
     HE_POST_END,        // POST section terminated
     HE_LAST_BYTE_DONE,  // useful to count full downloads
-    HE_CANT_OPEN_FILE   // error
+    HE_CANT_OPEN_FILE,  // error
+    HE_DESTROID         // Destroid socket
   );
 
   ThttpConnState=(
@@ -118,11 +111,11 @@ type
     fHeader: RawByteString;            // full raw header (optional)
     fAdditionalHeaders: RawByteString; // these are appended to predefined headers (opt)
     procedure setBody(const b: RawByteString);
-    procedure setBodyU(const b: String);
-    function  getBodyU: String;
+    procedure setBodyU(const b: UnicodeString);
+    function  getBodyU: UnicodeString;
     procedure setHeader(const h: RawByteString);
-    procedure setHeaderU(const h: String);
-    function  getHeaderU: String;
+    procedure setHeaderU(const h: UnicodeString);
+    function  getHeaderU: UnicodeString;
    public
     mode: ThttpReplyMode;
     contentType: RawByteString;       // ContentType header (optional)
@@ -134,7 +127,8 @@ type
       RBM_STREAM        // refer to bodyStream
     );
     bodyStream: Tstream;   // note: the stream is automatically freed
-    IsGZiped: Boolean; // Is body GZiped
+    IsCompressed: Boolean; // Is body Compressed
+    comprType: RawByteString; // Is body GZiped or ZStd or Br
     isBodyUTF8: Boolean;   // Is body UTF8 string
     firstByte, lastByte: int64;  // body interval for partial replies (206)
     realm,           // this will appear in the authentication dialog
@@ -146,9 +140,9 @@ type
     procedure Clear;
     procedure ClearAdditionalHeaders;
     property Body: RawByteString read bodyBr write setBody;
-    property BodyU: String read getBodyU write setBodyU;
+    property BodyU: UnicodeString read getBodyU write setBodyU;
     property header: RawByteString read fHeader write setHeader;
-    property headerU: String read getHeaderU write setHeaderU;
+    property headerU: UnicodeString read getHeaderU write setHeaderU;
    end;
 
   ThttpRequest = record
@@ -169,23 +163,27 @@ type
     varname,                // post variable name
     filename: string;       // name of posted file
     mode: (PM_NONE, PM_URLENCODED, PM_MULTIPART);
-    end;
+   end;
 
   TspeedLimiter = class
   // connections can be bound to a limiter. The limiter is a common limited
   // resource (the bandwidth) that is consumed.
-  protected
+   protected
     P_maxSpeed: integer;              // this is the limit we set. MAXINT means disabled.
     procedure setMaxSpeed(v:integer);
-  public
+   public
     availableBandwidth: integer;    // this is the resource itself
     property maxSpeed: integer read P_maxSpeed write setMaxSpeed;
     constructor create(max:integer=MAXINT);
-    end;
+  end;
 
-  ThttpConn = class
+{$IFDEF USE_SSL}
+  ThttpConn = class(TSslWSocketClient)
+{$ELSE ~USE_SSL}
+  ThttpConn = class(TWSocketClient)
+{$ENDIF USE_SSL}
   protected
-    srv: ThttpSrv;          // reference to the server
+    P_srv: ThttpSrv;        // reference to the server
     stream: Tstream;
     P_address: string;
     P_port: string;
@@ -213,16 +211,17 @@ type
 
     buffer: RawByteString;       // internal buffer for incoming data
     // event handlers
+    procedure StartConnection; OverRide;
     procedure disconnected(Sender: TObject; Error: Word);
     procedure dataavailable(Sender: TObject; Error: Word);
-    procedure senddata(sender:Tobject; bytes:integer);
-    procedure datasent(sender:Tobject; error:word);
-    function  fullBodySize():int64;
-    function  partialBodySize():int64;
-    function  sendNextChunk(max:integer=MAXINT):integer;
-    function  getBytesToSend():int64;
-    function  getBytesToPost():int64;
-    function  getBytesGot():int64;
+    procedure senddata(sender: TObject; bytes: Integer);
+    procedure datasent(sender: TObject; error: word);
+    function  fullBodySize(): Int64;
+    function  partialBodySize(): Int64;
+    function  sendNextChunk(max: Integer=MAXINT): Integer;
+    function  getBytesToSend(): Int64;
+    function  getBytesToPost(): Int64;
+    function  getBytesGot(): Int64;
     procedure notify(ev:ThttpEvent);
     procedure tryNotify(ev:ThttpEvent);
     procedure calculateSpeed();
@@ -235,10 +234,14 @@ type
     procedure clearRequest();
     procedure clearReply();
     procedure setSndbuf(v: Integer);
+    function  getICSBufSize: Integer;
+    procedure setICSBufSize(v: Integer);
+    function  getIsDisconnected: Boolean;
+    function  getIsSendingStream: Boolean;
   public
-    sock: Twsocket;             // client-server communication socket
-    state: ThttpConnState;      // what is doing now with this
-    request: ThttpRequest;      // it requests
+//    sock: Twsocket;             // client-server communication socket
+    httpState: ThttpConnState;  // what is doing now with this
+    httpRequest: ThttpRequest;  // it requests
     reply: ThttpReply;          // we serve
     post: ThttpPost;            // it posts
     data: pointer;              // user data
@@ -263,8 +266,10 @@ type
     function  getCookie(const k: String): String;
     procedure setCookie(const k, v: String; pairs: array of string; const extra: String='');
     procedure delCookie(const k: String);
+    function  isAcceptEncoding(const enc: String): Boolean;
     function  getBuffer(): RawByteString;
     function  initInputStream(): boolean;
+    procedure socketSetNoDelay;
     property address: String read P_address;      // other peer ip address
     property port: String read P_port;            // other peer port
     property v6: Boolean read P_v6;
@@ -284,7 +289,11 @@ type
     property destroying: boolean read P_destroying;
     property dontFree: boolean read getDontFree;
     property getLockCount: integer read lockCount;
+    property icsBufSize: integer read getICSBufSize write setICSBufSize;
     property sndBuf: integer read P_sndBuf write setSndBuf;
+    property hsrv: ThttpSrv read P_srv;
+    property isDisconnected: Boolean read getIsDisconnected;
+    property isSendingStream: Boolean read getIsSendingStream;
    end;
 
   ThttpSrv = class
@@ -301,17 +310,35 @@ type
     function  getActive():boolean;
     procedure setActive(v:boolean);
     procedure connected(Sender: TObject; Error: Word);
+    procedure OnClientConnect(Sender: TObject;
+                              Client: TWSocketClient;
+                              Error: Word);
+    procedure OnClientDisconnect(Sender: TObject;
+                              Client: TWSocketClient;
+                              Error: Word);
     procedure disconnected(Sender: TObject; Error: Word);
-    procedure bgexception(Sender: TObject; E:Exception; var CanClose:Boolean);
-    procedure setAutoFree(v:boolean);
-    procedure notify(ev:ThttpEvent; conn:ThttpConn);
+    procedure bgexception(Sender: TObject; E: Exception; var CanClose: Boolean);
+    procedure setAutoFree(v: Boolean);
+    procedure notify(ev: ThttpEvent; conn: ThttpConn);
     procedure hertzEvent();
-    procedure timerEvent(sender:Tobject);
+    procedure timerEvent(sender: TObject);
     procedure calculateSpeed();
     procedure processDisconnecting();
+ {$IFDEF USE_SSL}
+    procedure ClientVerifyPeer(Sender        : TObject;
+                               var Ok        : Integer;
+                               Cert          : TX509Base);
+    procedure SslServerSslHandshakeDone(Sender: TObject; ErrCode: Word; PeerCert: TX509Base;
+      var Disconnect: Boolean);
+ {$ENDIF USE_SSL}
+//    procedure WMSslNotTrusted(var Msg: TMessage); message WM_SSL_NOT_TRUSTED;
   public
-//    sock: TwsocketServer;     // listening multiple sockets
-    sock: Twsocket;     // listening socket
+{$IFDEF USE_SSL}
+    sock: TSslWSocketServer;     // listening multiple sockets With SSL
+{$ELSE ~USE_SSL}
+    sock: TWsocketServer;     // listening multiple sockets
+{$ENDIF USE_SSL}
+//    sock: Twsocket;     // listening socket
     conns,          // full list of connected clients
     disconnecting,  // list of pending disconnections
     offlines,       // disconnected clients to be freed
@@ -319,7 +346,7 @@ type
     limiters: TobjectList;
     data: pointer;      // user data
     persistentConnections: boolean;  // if FALSE disconnect clients after they're served
-    onEvent: procedure(event:ThttpEvent; conn:ThttpConn) of object;
+    onEvent: procedure(event: ThttpEvent; conn: ThttpConn) of object;
     constructor create(); overload;
     destructor Destroy(); override;
     property active:boolean read getActive write setActive; // r we listening?
@@ -329,10 +356,10 @@ type
     property speedIn:real read P_speedIn;  // (bytes_recvd/s)
     property speedOut:real read P_speedOut;  // (bytes_sent/s)
     property autoFreeDisconnectedClients: boolean read P_autoFree write setAutoFree;
-    function start(onAddress:string='*'):boolean; // returns true if all is ok
+    function start(const onAddress: String='*'): Boolean; // returns true if all is ok
     procedure stop();
-    procedure disconnectAll(wait:boolean=FALSE);
-    procedure freeConnList(l:TobjectList);
+    procedure disconnectAll(wait: Boolean=FALSE);
+    procedure freeConnList(l: TObjectList);
    end;
 
 const
@@ -347,51 +374,28 @@ const
     'Ignore', 'Unallowed method', 'Redirect', 'Overload', 'Request too large',
     'Moved permanently', 'Not Modified');
 
-// decode/decode url
-function decodeURL(const url: String; utf8: Boolean=TRUE): String; OverLoad;
-function decodeURL(const url: RawByteString): String; OverLoad;
-function encodeURL(const url: String; nonascii: Boolean=TRUE; spaces: Boolean=TRUE;
-  htmlEncoding: Boolean=FALSE):string; OverLoad;
-function encodeURL(const url: RawByteString; nonascii: Boolean=TRUE; spaces: Boolean=TRUE;
-  unicode: boolean=FALSE): RawByteString; OverLoad;
-// returns true if address is not suitable for the internet
-function isLocalIP(const ip: String): Boolean;
-// an ip address where we are listening
-function getIP(): String;
-// ensure a string ends with a specific string
-procedure includeTrailingString(var s: String; const ss: String); OverLoad;
-procedure includeTrailingString(var s: RawByteString; const ss: RawByteString); OverLoad;
-// gets unicode code for specified character
-function charToUnicode(c: WideChar): dword; OverLoad;
-function charToUnicode(c: AnsiChar): dword; OverLoad;
-// this version of pos() is able to skip the pattern if inside quotes
-{$IFDEF UNICODE}
-function nonQuotedPos(const ss, s: String; ofs: Integer=1; const quote: String='"'; const unquote: String='"'): Integer; OverLoad;
-{$ENDIF UNICODE}
-function nonQuotedPos(const ss, s: RawByteString; ofs: integer=1; const quote: RawByteString='"'; const unquote: RawByteString='"'): Integer; OverLoad;
-// case insensitive version
-//function ipos(ss, s:string; ofs:integer=1):integer; overload;
-function getNameOf(const s: String): String; OverLoad; // colon included
-function getNameOf(const s: RawByteString): RawByteString; OverLoad; // colon included
-function namePos(const name: string; const headers:string; from:integer=1):integer; OverLoad;
-function namePos(const name: RawByteString; const headers: RawByteString; from: integer=1):integer; OverLoad;
-
 implementation
 
 uses
   Windows,
+ {$IFNDEF FPC}
+  mormot.core.base,
+ {$ENDIF ~FPC}
 {$IFDEF UNICODE}
   AnsiStrings,
 //  AnsiClasses,
 {$ENDIF UNICODE}
+  OverbyteIcsTypes,
+  math,
   RDUtils, Base64,
+  HSUtils,
   srvConst;
 
 const
   HEADER_LIMITER: RawByteString = CRLFA+CRLFA;
   MAX_REQUEST_LENGTH = 64*1024;
   MAX_INPUT_BUFFER_LENGTH = 256*1024;
-  HexCharsW :set of Char = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+  HexCharsW: set of Char = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
                             'A', 'B', 'C', 'D', 'E', 'F']; //
   // used as body content when the user did not specify any
   HRM2BODY: array [ThttpReplyMode] of AnsiString = (
@@ -413,260 +417,6 @@ const
   );
 var
   freq: int64;
-
-procedure includeTrailingString(var s:string; const ss:string);
-begin if copy(s, length(s)-length(ss)+1, length(ss)) <> ss then s:=s+ss end;
-
-procedure includeTrailingString(var s: RawByteString; const ss: RawByteString);
-begin
-  if copy(s, length(s)-length(ss)+1, length(ss)) <> ss then
-    s:=s+ss
-end;
-
-function charToUnicode(c: WideChar):dword;
-begin stringToWideChar(c,@result,4) end;
-
-function charToUnicode(c: AnsiChar):dword;
-begin stringToWideChar(c,@result,4) end;
-
-function isLocalIP(const ip:string):boolean;
-var
-  r: record d,c,b,a:byte end;
-begin
-  if ip = '::1' then
-    exit(TRUE);
- {$IFDEF FPC}
-  dword(r) := WSocket_ntohl(WSocket_inet_addr(@ip));
- {$ELSE FPC}
-  dword(r) := dword(WSocket_ntohl(WSocket_inet_addr(ansiString(ip))));
- {$ENDIF FPC}
-result:=(r.a in [0,10,23,127])
-  or (r.a = 192) and ((r.b = 168) or (r.b = 0) and (r.c = 2))
-  or (r.a = 169) and (r.b = 254)
-  or (r.a = 172) and (r.b in [16..31])
-end; // isLocalIP
-
-function min(a,b:integer):integer;
-begin if a < b then result:=a else result:=b end;
-
-
-
-{$IFDEF UNICODE}
-function nonQuotedPos(const ss, s: String; ofs: Integer=1; const quote: String='"'; const unquote: String='"'): Integer; OverLoad;
-var
-  qpos: integer;
-begin
-  repeat
-    result := posEx(ss, s, ofs);
-    if result = 0 then
-      exit;
-
-    repeat
-      qpos := posEx(quote, s, ofs);
-      if qpos = 0 then
-        exit; // there's no quoting, our result will fit
-      if qpos > result then
-        exit; // the quoting doesn't affect the piece, accept the result
-      ofs := posEx(unquote, s, qpos+1);
-      if ofs = 0 then
-        exit; // it is not closed, we don't consider it quoting
-      inc(ofs);
-    until ofs > result; // this quoting was short, let's see if we have another
-  until false;
-end; // nonQuotedPos
-{$ENDIF UNICODE}
-
-function nonQuotedPos(const ss, s: RawByteString; ofs: integer=1; const quote: RawByteString='"'; const unquote: RawByteString='"'):integer; OverLoad;
-var
-  qpos: integer;
-begin
-  repeat
-  result:=posEx(ss, s, ofs);
-  if result = 0 then exit;
-
-    repeat
-    qpos:=posEx(quote, s, ofs);
-    if qpos = 0 then exit; // there's no quoting, our result will fit
-    if qpos > result then exit; // the quoting doesn't affect the piece, accept the result
-    ofs:=posEx(unquote, s, qpos+1);
-    if ofs = 0 then exit; // it is not closed, we don't consider it quoting
-    inc(ofs);
-    until ofs > result; // this quoting was short, let's see if we have another
-  until false;
-end; // nonQuotedPos
-
-function decodeURL(const url: string; utf8: boolean=TRUE):string;
-var
-  i, l: integer;
-  c: char;
-  resA: RawByteString;
-  ca: AnsiChar;
-  hv: Boolean;
-begin
-  setLength(result, length(url));
-  if length(url) = 0 then
-    Exit;
-  setLength(resA, length(url));
-  l := 0;
-  i := 1;
-  while i<=length(url) do
-    begin
-      hv := False;
-      if (url[i] = '%') and (i+2 <= length(url)) then
-        if (url[i+1] in HexCharsW) and
-           (url[i+2] in HexCharsW) then
-      try
-        if utf8 then
-          ca := AnsiChar(strToInt( '$'+url[i+1]+url[i+2] ))
-         else
-          c := char(strToInt( '$'+url[i+1]+url[i+2] ));
-        inc(i,2); // three chars for one
-        hv := True;
-       except
-        hv := False;
-      end;
-
-     if not hv then
-       if utf8 then
-         ca := AnsiChar(url[i])
-        else
-         c := url[i];
-
-     inc(i);
-     inc(l);
-        if utf8 then
-          resA[l] := ca
-         else
-          result[l] := c;
-    end;
-  if utf8 then
-    begin
-     setLength(resA, l);
-     Result := UnUTF(resA);
-    end
-   else
-    setLength(result, l);
-end; // decodeURL
-
-function decodeURL(const url: RawByteString):string;
-var
-  i, l: integer;
-  resA: RawByteString;
-  c: AnsiChar;
-begin
-  setLength(result, length(url));
-  setLength(resA, length(url));
-  l := 0;
-  i := 1;
-  while i<=length(url) do
-    begin
-      if (url[i] = '%') and (i+2 <= length(url)) then
-        try
-          c := AnsiChar(strToIntA(RawByteString('$')+url[i+1]+url[i+2] ));
-          inc(i,2); // three chars for one
-        except
-          c := url[i];
-        end
-      else
-       c := url[i];
-
-      inc(i);
-      inc(l);
-      resA[l] := c;
-    end;
-  setLength(resA, l);
-  Result := UnUTF(resA);
-end; // decodeURL
-
-
-function encodeURL(const url:string; nonascii:boolean=TRUE; spaces:boolean=TRUE;
-  htmlEncoding:boolean=FALSE):string;
-var
-  i: integer;
-  encodePerc, encodeHTML: TcharSetW;
-  encodePercA: TcharSetA;
-  a: RawByteString;
-begin
-result:='';
-if url = '' then
-  exit;
-encodeHTML:=[];
-encodePercA := [];
-if nonascii then
-  encodePercA:=[#0..#31,'#','%','?','"','''','&','<','>',':'] + [#128..#255];
-encodePerc:=[#0..#31,'#','%','?','"','''','&','<','>',':'];
-// actually ':' needs encoding only in relative url
-if spaces then include(encodePerc,' ');
-if not htmlEncoding then
-  begin
-  encodePerc:=encodePerc+encodeHTML;
-  encodeHTML:=[];
-  end;
-if nonascii then
-  begin
-  a:=UTF8encode(url); // couldn't find a better way to force url to have the UTF8 encoding
-  for i:=1 to length(a) do
-    if a[i] in encodePercA then
-      result:=result+'%'+intToHex(ord(a[i]),2)
-    else if a[i] in encodeHTML then
-      result:=result+'&#'+intToStr(charToUnicode(a[i]))+';'
-    else
-      result:=result+a[i];
-  end
- else
-for i:=1 to length(url) do
-	if url[i] in encodePerc then
-    result:=result+'%'+intToHex(ord(url[i]),2)
-  else if url[i] in encodeHTML then
-    result:=result+'&#'+intToStr(charToUnicode(url[i]))+';'
-  else
-    result:=result+url[i];
-end; // encodeURL
-
-function encodeURL(const url: RawByteString; nonascii:boolean=TRUE; spaces:boolean=TRUE;
-  unicode:boolean=FALSE): RawByteString;
-var
-  i: integer;
-  encodePerc, encodeUni: set of AnsiChar;
-begin
-  result := '';
-  encodeUni := [];
-  if nonascii then
-    encodeUni:=[#128..#255];
-  encodePerc := [#0..#31,'#','%','?','"','''','&','<','>',':'];
-  // actually ':' needs encoding only in relative url
-  if spaces then
-    include(encodePerc,' ');
-  if not unicode then
-   begin
-    encodePerc:=encodePerc+encodeUni;
-    encodeUni:=[];
-   end;
-  for i:=1 to length(url) do
-	  if url[i] in encodePerc then
-      result := result+'%'+IntToHexA(ord(url[i]),2)
-     else if url[i] in encodeUni then
-      result := result+'&#'+IntToStrA(Byte(url[i]))+';'
-  else
-    result := result+url[i];
-end; // encodeURL
-
-function getIP(): String;
-var
-  i: integer;
-  ips: Tstrings;
-begin
-  ips := LocalIPlist();
-  case ips.count of
-    0: result := '';
-    1: result := ips[0];
-    else
-      i:=0;
-      while (i < ips.count-1) and isLocalIP(ips[i]) do
-        inc(i);
-      result := ips[i];
-    end;
-end; // getIP
 
 function replyHeader_IntPositive(const name: String; int: Int64): String;
 begin
@@ -698,19 +448,21 @@ procedure THTTPReply.setBody(const b: RawByteString);
 begin
   bodyBr := b;
   isBodyUTF8 := False;
-  IsGZiped := False;
+  IsCompressed := False;
+  comprType := '';
 end;
 
-procedure THTTPReply.setBodyU(const b: String);
+procedure THTTPReply.setBodyU(const b: UnicodeString);
 begin
   bodyBr := UTF8Encode(b);
   isBodyUTF8 := True;
-  IsGZiped := False;
+  IsCompressed := False;
+  comprType := '';
 end;
 
-function THTTPReply.getBodyU: String;
+function THTTPReply.getBodyU: UnicodeString;
 begin
-  if not IsGZiped then
+  if not IsCompressed then
     begin
       if isBodyUTF8 then
         Result := UTF8ToString(bodyBr)
@@ -721,7 +473,7 @@ begin
     Result := '' ; // ToDo ZDecompress
 end;
 
-procedure THTTPReply.setHeaderU(const h: String);
+procedure THTTPReply.setHeaderU(const h: UnicodeString);
 begin
   fHeader := UTF8Encode(h);
   includeTrailingString(fHeader, CRLFA);
@@ -757,7 +509,7 @@ begin
     end;
 end;
 
-function THTTPReply.getHeaderU: String;
+function THTTPReply.getHeaderU: UnicodeString;
 begin
   Result := UnUTF(fHeader);
 end;
@@ -767,7 +519,8 @@ begin
   fHeader:='';
   bodyMode := RBM_RAW;
   bodyBr := '';
-  IsGZiped := false;
+  IsCompressed := False;
+  comprType := '';
   fAdditionalHeaders := '';
   mode:=HRM_IGNORE;
 //  firstByte:=request.firstByte;
@@ -783,7 +536,7 @@ end;
 
 /////// SERVER
 
-function ThttpSrv.start(onAddress: String='*'): Boolean;
+function ThttpSrv.start(const onAddress: String='*'): Boolean;
 begin
   result := FALSE;
   if active or not assigned(sock) then
@@ -791,12 +544,29 @@ begin
   try
     if onAddress = '[*]' then
       begin
-        sock.addr := '[0::0]'
+        sock.addr := '[0::0]';
+       {$IFDEF USE_IPv6}
+        sock.SocketFamily := sfIPv6;
+       {$ENDIF USE_IPv6}
       end
      else
       begin
-        if onAddress = '' then onAddress:='*';
-        if (onAddress = '') or (onAddress = '*') then
+        if onAddress = '' then
+          begin
+            sock.addr := '0.0.0.0';
+          {$IFDEF USE_IPv6}
+            sock.MultiListenSockets.Clear();
+            with Sock.MultiListenSockets.Add do
+              begin
+                Addr := '[0::0]';
+                port := self.port;
+                SocketFamily := sfIPv6;
+              end;
+          {$ENDIF USE_IPv6}
+          end
+//          onAddress:='*';
+        else if //(onAddress = '') or
+          (onAddress = '*') then
           sock.addr := '0.0.0.0'
          else
           sock.addr := onAddress;
@@ -804,24 +574,35 @@ begin
     sock.port := port;
   //  sock.proto:='6';
     sock.proto := 'tcp';
+ {$IFDEF USE_IPv6}
     sock.SocketFamily := sfAny;
-    sock.listen();
+ {$ENDIF USE_IPv6}
+
+ {$IFDEF USE_SSL}
+    sock.SslEnable      := False;
+ {$ENDIF USE_SSL}
+{
+    SslContext1.SslCertFile          := CertFileEdit.Text;
+    SslContext1.SslPassPhrase        := PassPhraseEdit.Text;
+    SslContext1.SslPrivKeyFile       := PrivKeyFileEdit.Text;
+    SslContext1.SslCAFile            := CAFileEdit.Text;
+    SslContext1.SslCAPath            := CAPathEdit.Text;
+    SslContext1.SslVerifyPeer        := VerifyPeerCheckBox.Checked;
+}
+//    sock.SetAcceptableHostsList(AcceptableHostsEdit.Text);
+//    sock.Listen;
+
+ {$IFDEF USE_IPv6}
+    if onAddress = '' then
+      sock.MultiListen
+     else
+ {$ENDIF USE_IPv6}
+      sock.listen();
+
     if port = '0' then
       P_port := sock.getxport();
     result := TRUE;
 
-  {
-    if onAddress = '*' then
-      try
-        sock.MultiListenSockets.Clear();
-        with sock.MultiListenSockets.Add do
-          begin
-          addr := '::';
-          Port := sock.port
-          end;
-        sock.MultiListen();
-      except end;
-  }
     notify(HE_OPEN, NIL);
    except
   end;
@@ -829,64 +610,179 @@ end; // start
 
 procedure ThttpSrv.stop();
 begin
-if assigned(sock) then
- begin
-  try sock.Close() except end;
-//  try sock.multiListenSockets.clear() except end;
- end;
+  if assigned(sock) then
+ {$IFDEF USE_IPv6}
+   begin
+    try
+      sock.MultiClose
+     except
+    end;
+    try
+      sock.multiListenSockets.clear()
+     except
+    end;
+   end;
+ {$ELSE ~USE_IPv6}
+   try
+     sock.Close
+    except
+   end;
+ {$ENDIF USE_IPv6}
 end;
+
+{$IFDEF USE_IPv6}
+procedure ThttpSrv.SslServerSslHandshakeDone(Sender: TObject; ErrCode: Word; PeerCert: TX509Base;
+  var Disconnect: Boolean);
+begin
+// ToDo write log
+end;
+
+procedure ThttpSrv.ClientVerifyPeer(Sender: TObject;
+  var Ok: Integer; Cert: TX509Base);
+var
+    Issuer : String;
+begin
+    Issuer := Cert.IssuerOneLine;
+{    if Ok <> 0 then
+        Display('Received certificate. Issuer = "' + Issuer + '"')
+    else begin
+        if Cert.VerifyResult = X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN then begin
+            if FTrustedList.IndexOf(Issuer) >= 0 then begin
+                Display('Received certificate. Issuer = "' + Issuer + '"');
+                Display('We trust this one');
+                Ok := 1;
+                Exit;
+            end;
+            FNotTrusted := Issuer;
+            (Sender as TSslWSocket).CloseDelayed;
+            PostMessage(Handle, WM_SSL_NOT_TRUSTED, 0, 0);
+            Exit;
+        end;
+        Display('Can''t verify certificate:');
+        Display('  Issuer = "' + Issuer + '"');
+        Display('  Error  = ' + IntToStr(Cert.VerifyResult) + ' (' + Cert.VerifyErrMsg + ')');
+    end;
+}
+end;
+ {$ENDIF USE_IPv6}
 
 procedure ThttpSrv.connected(Sender: TObject; Error: Word);
 begin
-  if error=0 then
-    ThttpConn.create(self, sender as Twsocket)
+//  if error=0 then
+//    ThttpConn.create(self, sender as Twsocket)
+end;
+
+procedure ThttpSrv.OnClientConnect(Sender: TObject;
+                              Client: TWSocketClient;
+                              Error: Word);
+var
+  i: Integer;
+begin
+  ThttpConn(Client).P_srv := Self;
+
+  ThttpConn(Client).httpRequest.headers := ThashedStringList.create;
+  ThttpConn(Client).httpRequest.headers.nameValueSeparator := ':';
+  ThttpConn(Client).limiters := TObjectList.create;
+  ThttpConn(Client).limiters.ownsObjects := FALSE;
+  ThttpConn(Client).P_address := Client.GetPeerAddr();
+  ThttpConn(Client).P_port := Client.GetPeerPort();
+ {$IFDEF USE_IPv6}
+  ThttpConn(Client).P_v6 := sock.SocketFamily = sfIPv6;
+ {$ELSE ~USE_IPv6}
+  ThttpConn(Client).P_v6 := false;
+ {$ENDIF USE_IPv6}
+  ThttpConn(Client).httpState := HCS_IDLE;
+
+ {$IFDEF USE_SSL}
+  ThttpConn(Client).OnSslVerifyPeer := ClientVerifyPeer;
+  ThttpConn(Client).SslEnable := false;
+ {$ENDIF USE_SSL}
+
+  conns.add(ThttpConn(Client));
+  ThttpConn(Client).clearRequest();
+  ThttpConn(Client).clearReply();
+  QueryPerformanceCounter(ThttpConn(Client).lastSpeedTime);
+
+  i := sizeOf(ThttpConn(Client).P_sndBuf);
+  if WSocket_getsockopt(Client.HSocket, SOL_SOCKET, SO_SNDBUF, @ThttpConn(Client).P_sndBuf, i) <> NO_ERROR then
+    ThttpConn(Client).P_sndBuf:=0;
+
+  Self.notify(HE_CONNECTED, ThttpConn(Client));
+  if ThttpConn(Client).reply.mode <> HRM_CLOSE then
+    exit;
+  ThttpConn(Client).dontFulFil := TRUE;
+  ThttpConn(Client).disconnect();
 end;
 
 procedure ThttpSrv.disconnected(Sender: TObject; Error: Word);
 begin notify(HE_CLOSE, NIL) end;
 
+procedure ThttpSrv.OnClientDisconnect(Sender: TObject;
+                              Client: TWSocketClient;
+                              Error: Word);
+begin
+  ThttpConn(Client).httpState := HCS_DISCONNECTED;
+//  Self.disconnecting.Add(ThttpConn(Client));
+  disconnecting.Remove(ThttpConn(Client));
+  q.remove(ThttpConn(Client));
+  conns.remove(ThttpConn(Client));
+  offlines.Remove(ThttpConn(Client));
+  notify(HE_DISCONNECTED, ThttpConn(Client));
+end;
+
 constructor ThttpSrv.create();
 begin
-//sock:=TWSocketServer.create(NIL);
-  sock := TWSocket.create(NIL);
+{$IFDEF USE_SSL}
+  sock := TSslWSocketServer.create(NIL);
+{$ELSE ~USE_SSL}
+  sock := TWSocketServer.create(NIL);
+{$ENDIF USE_SSL}
+//  sock := TWSocket.create(NIL);
   sock.OnSessionAvailable := connected;
   sock.OnSessionClosed := disconnected;
   sock.OnBgException := bgexception;
 //  sock.MultiThreaded := True;
+  sock.ClientClass := ThttpConn;
+  sock.OnClientConnect := Self.OnClientConnect;
+  sock.OnClientDisconnect := Self.OnClientDisconnect;
+ {$IFDEF USE_SSL}
+  sock.OnSslHandshakeDone := SslServerSslHandshakeDone;
+ {$ENDIF USE_SSL}
 
-conns:=TobjectList.create;
-conns.OwnsObjects:=FALSE;
-offlines:=TobjectList.create;
-offlines.OwnsObjects:=FALSE;
-q:=TobjectList.create;
-q.OwnsObjects:=FALSE;
-disconnecting:=TobjectList.create;
-disconnecting.OwnsObjects:=FALSE;
-limiters:=TobjectList.create;
-limiters.OwnsObjects:=FALSE;
-timer:=Ttimer.create(NIL);
-timer.OnTimer:=timerEvent;
-timer.Interval:=1000 div TIMER_HZ;
-timer.Enabled:=TRUE;
-Port:='80';
-autoFreeDisconnectedClients:=TRUE;
-persistentConnections:=TRUE;
+  conns := TobjectList.create;
+  conns.OwnsObjects := FALSE;
+  offlines := TobjectList.create;
+  offlines.OwnsObjects:=FALSE;
+  q := TobjectList.create;
+  q.OwnsObjects := FALSE;
+  disconnecting := TobjectList.create;
+  disconnecting.OwnsObjects := FALSE;
+  limiters := TobjectList.create;
+  limiters.OwnsObjects := FALSE;
+  timer := Ttimer.create(NIL);
+  timer.OnTimer := timerEvent;
+  timer.Interval := 1000 div TIMER_HZ;
+  timer.Enabled := TRUE;
+//  sock.SetAcceptableHostsList()
+  Port := '80';
+  autoFreeDisconnectedClients := TRUE;
+  persistentConnections := TRUE;
 end; // create
 
 destructor ThttpSrv.destroy();
 begin
-freeAndNIL(timer);
-stop();
-disconnectAll(TRUE);
-processDisconnecting();
-freeAndNIL(sock);
-freeConnList(conns);
-freeAndNIL(conns);
-freeAndNIL(disconnecting);
-freeAndNIL(offlines);
-freeAndNIL(q);
-freeAndNIL(limiters);
-inherited;
+  freeAndNIL(timer);
+  stop();
+  disconnectAll(TRUE);
+  processDisconnecting();
+  freeAndNIL(sock);
+  freeConnList(conns);
+  freeAndNIL(conns);
+  freeAndNIL(disconnecting);
+  freeAndNIL(offlines);
+  freeAndNIL(q);
+  freeAndNIL(limiters);
+  inherited;
 end; // destroy
 
 procedure ThttpSrv.hertzEvent();
@@ -908,11 +804,21 @@ var
   c: ThttpConn;
   i: integer;
 begin
+  if disconnecting.Count = 0 then
+    Exit;
   i := disconnecting.Count-1;
   while i >= 0 do
   begin
-    c := disconnecting[i] as ThttpConn;
-    dec(i);
+    if disconnecting.Count > i then
+      begin
+       c := disconnecting[i] as ThttpConn;
+       dec(i);
+      end
+     else
+      begin
+       dec(i);
+       continue;
+      end;
     if c.dontFree then
       continue;
     c.processInputBuffer(); // serve, till the end.
@@ -924,7 +830,7 @@ begin
   end;
 end; // processDisconnecting
 
-procedure ThttpSrv.timerEvent(sender:Tobject);
+procedure ThttpSrv.timerEvent(sender: TObject);
 
   procedure processPipelines();
   var
@@ -936,7 +842,7 @@ procedure ThttpSrv.timerEvent(sender:Tobject);
        begin
          try
            with ThttpConn(conns[i]) do
-            if (state in [HCS_IDLE, HCS_DISCONNECTED]) and (buffer > '') then
+            if (httpState in [HCS_IDLE, HCS_DISCONNECTED]) and (buffer > '') then
               processInputBuffer();
           except
          end;
@@ -964,29 +870,29 @@ procedure ThttpSrv.timerEvent(sender:Tobject);
           if c = NIL then
             continue;
 
-      try
-        chunkSize:= RDUtils.ifThen(c.paused, 0, MAXINT);
-        if not c.ignoreSpeedLimit then
-          for i:=0 to c.limiters.Count-1 do
-            with c.limiters[i] as TspeedLimiter do
-              if availableBandwidth >= 0 then
-                chunkSize:=min(chunkSize, availableBandwidth);
-        if chunkSize <= 0 then
-          begin
-          toQ.add(c);
-          continue;
+          try
+            chunkSize:= RDUtils.ifThen(c.paused, 0, MAXINT);
+            if not c.ignoreSpeedLimit then
+              for i:=0 to c.limiters.Count-1 do
+                with c.limiters[i] as TspeedLimiter do
+                  if availableBandwidth >= 0 then
+                    chunkSize := min(chunkSize, availableBandwidth);
+            if chunkSize <= 0 then
+              begin
+              toQ.add(c);
+              continue;
+              end;
+            if c.destroying or (c.httpState = HCS_DISCONNECTED)
+             or (c = NIL) or (c.State <> wsConnected) then
+              continue;
+            // serve the pending connection with a data chunk
+            chunkSize := c.sendNextChunk(chunkSize);
+            for i:=0 to c.limiters.Count-1 do
+              with c.limiters[i] as TspeedLimiter do
+                dec(availableBandwidth, chunkSize);
+           except
           end;
-        if c.destroying or (c.state = HCS_DISCONNECTED)
-        or (c.sock = NIL) or (c.sock.State <> wsConnected) then
-          continue;
-        // serve the pending connection with a data chunk
-        chunkSize:=c.sendNextChunk(chunkSize);
-        for i:=0 to c.limiters.Count-1 do
-          with c.limiters[i] as TspeedLimiter do
-            dec(availableBandwidth, chunkSize);
-       except
-       end;
-      end;
+        end;
       q.assign(toQ, laOR);
      finally
       toQ.Free
@@ -1015,7 +921,7 @@ begin
   if assigned(conn) then
   begin
     inc(conn.lockCount);
-    conn.sock.pause();
+    conn.pause();
   end;
 // event handler shall not break our thing
   try
@@ -1025,13 +931,15 @@ begin
     if assigned(conn) then
       begin
       dec(conn.lockCount);
-      conn.sock.resume();
+      conn.resume();
       end;
   end;
 end;
 
 function Thttpsrv.getActive():boolean;
-begin result:=assigned(sock) and (sock.State=wsListening) end;
+begin
+  result := assigned(sock) and (sock.State=wsListening)
+end;
 
 procedure ThttpSrv.setActive(v:boolean);
 begin
@@ -1083,16 +991,16 @@ var
   clone: Tlist;
 begin
 // on disconnection <conns> list changes. clone it for safer enumeration.
-clone:=Tlist.Create;
-clone.Assign(conns);
+  clone := Tlist.Create;
+  clone.Assign(conns);
 // cast disconnection
-for i:=0 to clone.count-1 do
-  ThttpConn(clone[i]).disconnect();
-if wait then
   for i:=0 to clone.count-1 do
-    if conns.IndexOf(clone[i]) >= 0 then
-      ThttpConn(clone[i]).sock.WaitForClose();
-clone.free;
+    ThttpConn(clone[i]).disconnect();
+  if wait then
+    for i:=0 to clone.count-1 do
+      if conns.IndexOf(clone[i]) >= 0 then
+        ThttpConn(clone[i]).WaitForClose();
+  clone.free;
 end; // disconnectAll
 
 procedure ThttpSrv.setAutoFree(v:boolean);
@@ -1108,35 +1016,42 @@ var
   i: integer;
 begin
 // init socket
+{
   sock := Twsocket.create(NIL);
 //  sock.MultiThreaded := True;
   if acceptingSock <> NIL then
     sock.Dup(acceptingSock.accept())
    else
     sock.Dup(server.sock.accept());
+
   sock.OnDataAvailable := dataavailable;
   sock.OnSessionClosed := disconnected;
   sock.onSendData := senddata;
   sock.onDataSent := datasent;
   sock.LineMode := FALSE;
 
-  srv := server;
+  P_srv := server;
 
-  request.headers := ThashedStringList.create;
-  request.headers.nameValueSeparator := ':';
+  httpRequest.headers := ThashedStringList.create;
+  httpRequest.headers.nameValueSeparator := ':';
   limiters := TObjectList.create;
   limiters.ownsObjects:=FALSE;
   P_address := sock.GetPeerAddr();
   P_port := sock.GetPeerPort();
-  P_v6 := sock.SocketFamily = sfIPv6;
-  state := HCS_IDLE;
-  srv.conns.add(self);
+}
+ {$IFDEF USE_IPv6}
+  P_v6 := acceptingSock.SocketFamily = sfIPv6;
+ {$ELSE ~USE_IPv6}
+  P_v6 := false;
+ {$ENDIF USE_IPv6}
+  httpState := HCS_IDLE;
+  P_srv.conns.add(self);
   clearRequest();
   clearReply();
   QueryPerformanceCounter(lastSpeedTime);
 
   i := sizeOf(P_sndBuf);
-  if WSocket_getsockopt(sock.HSocket, SOL_SOCKET, SO_SNDBUF, @P_sndBuf, i) <> NO_ERROR then
+  if WSocket_getsockopt(HSocket, SOL_SOCKET, SO_SNDBUF, @P_sndBuf, i) <> NO_ERROR then
     P_sndBuf:=0;
 
   server.notify(HE_CONNECTED, self);
@@ -1146,23 +1061,46 @@ begin
   disconnect();
 end;
 
+procedure ThttpConn.StartConnection;
+begin
+  Self.OnDataAvailable := dataavailable;
+  Self.OnSessionClosed := disconnected;
+  Self.onSendData := senddata;
+  Self.onDataSent := datasent;
+  Self.LineMode := FALSE;
+
+//  P_srv := FServer;
+end;
+
 destructor ThttpConn.destroy;
 begin
   if dontFree then
     raise exception.Create('still in use');
-  P_destroying:=TRUE;
-  if assigned(sock) then
+  P_destroying := TRUE;
+  if assigned(Self) then
     try
-      sock.Shutdown(SD_BOTH);
-      sock.WaitForClose();
+     {$IFDEF FPC}
+      Self.Shutdown(0);
+     {$ELSE FPC}
+      Self.Shutdown(SD_BOTH);
+     {$ENDIF FPC}
+      Self.WaitForClose();
      except
     end;
-  if assigned(srv) and assigned(srv.offlines) then
-    srv.offlines.remove(self);
-  freeAndNIL(request.headers);
-  freeAndNIL(request.cookies);
+  if assigned(P_srv) and assigned(P_srv.offlines) then
+    P_srv.offlines.remove(self);
+
+  P_srv.q.remove(Self);
+  P_srv.conns.remove(Self);
+  P_srv.offlines.Remove(Self);
+  P_srv.disconnecting.Remove(Self);
+
+  P_srv.notify(HE_DESTROID, Self);
+
+  freeAndNIL(httpRequest.headers);
+  freeAndNIL(httpRequest.cookies);
   freeAndNil(stream);
-  freeAndNIL(sock);
+//  freeAndNIL(sock);
   freeAndNIL(limiters);
   inherited;
 end; // destroy
@@ -1190,33 +1128,47 @@ end; // calculateSpeed
 
 procedure ThttpConn.disconnected(Sender: TObject; Error: Word);
 begin
-state:=HCS_DISCONNECTED;
-srv.disconnecting.Add(self);
+  httpState := HCS_DISCONNECTED;
+  P_srv.disconnecting.Add(self);
 end;
 
 function ThttpConn.getHeader(const h: String): String;
 begin
   result := '';
-  if request.method = HM_UNK then
+  if httpRequest.method = HM_UNK then
     exit;
-  result := trim(request.headers.values[h]);
+  result := trim(httpRequest.headers.values[h]);
 end; // getHeader
 
+function ThttpConn.isAcceptEncoding(const enc: String): Boolean;
+var
+  accHdr: String;
+begin
+  accHdr := getHeader('Accept-Encoding');
+  result := ipos(enc, accHdr) > 0
+end; // isAcceptEncoding
+
 function ThttpConn.getBuffer(): RawByteString;
-begin result:=buffer end;
+begin
+  result:=buffer
+end;
 
 function ThttpConn.getCookie(const k: String): String;
 begin
-result:='';
-if request.method = HM_UNK then exit;
-if request.cookies = NIL then
+  result:='';
+  if httpRequest.method = HM_UNK then
+    exit;
+  if httpRequest.cookies = NIL then
   begin
-  request.cookies:=ThashedStringList.create;
-  request.cookies.delimiter:=';';
-  request.cookies.QuoteChar:=#0;
-  request.cookies.delimitedText:=getHeader('cookie');
+    httpRequest.cookies := ThashedStringList.create;
+    with httpRequest.cookies do
+     begin
+       delimiter:=';';
+       QuoteChar:=#0;
+       delimitedText := getHeader('cookie');
+     end;
   end;
-result:=decodeURL(trim(request.cookies.values[k]));
+  result := decodeURL(trim(httpRequest.cookies.values[k]));
 end; // getCookie
 
 procedure ThttpConn.delCookie(const k: String);
@@ -1241,29 +1193,29 @@ end; // setCookie
 
 procedure ThttpConn.clearRequest();
 begin
-request.method:=HM_UNK;
-request.ver:='';
-request.url:='';
-request.firstByte:=-1;
-request.lastByte:=-1;
-request.headers.clear();
-freeAndNIL(request.cookies);
-request.user:='';
-request.pwd:='';
+  httpRequest.method := HM_UNK;
+  httpRequest.ver:='';
+  httpRequest.url:='';
+  httpRequest.firstByte:=-1;
+  httpRequest.lastByte:=-1;
+  httpRequest.headers.clear();
+  freeAndNIL(httpRequest.cookies);
+  httpRequest.user:='';
+  httpRequest.pwd:='';
 end; // clearRequest
 
 procedure ThttpConn.clearReply();
 begin
   reply.Clear;
   reply.mode:=HRM_IGNORE;
-  reply.firstByte:=request.firstByte;
-  reply.lastByte:=request.lastByte;
+  reply.firstByte := httpRequest.firstByte;
+  reply.lastByte := httpRequest.lastByte;
   reply.realm:='Password protected resource';
 end; // clearReply
 
 procedure ThttpConn.processInputBuffer();
 
-  function parseHeader():boolean;
+  function parseHeader(): Boolean;
   var
 //    r, s: string;
     h, h2: String;
@@ -1271,90 +1223,100 @@ procedure ThttpConn.processInputBuffer();
     u: String;
     i : integer;
   begin
-  result:=FALSE;
-  r:=request.full;
+    result := FALSE;
+    r := httpRequest.full;
 
-  // find first blank space
-  for i:=1 to 10 do
-    if i > length(r) then exit
-    else if r[i]=' ' then break;
+    // find first blank space
+    for i:=1 to 10 do
+      if i > length(r) then
+        exit
+       else if r[i]=' ' then
+        break;
 
-  clearRequest();
-  post.header:='';
-  post.mode:=PM_NONE;
+    clearRequest();
+    post.header:='';
+    post.mode:=PM_NONE;
 
-  sR:=uppercase(chop(i, 1, r));
-  if sR='GET' then request.method:=HM_GET else
-  if sR='POST' then request.method:=HM_POST else
-  if sR='HEAD' then request.method:=HM_HEAD else;
+    sR := uppercase(chop(i, 1, r));
+    if sR='GET' then
+      httpRequest.method := HM_GET
+     else if sR='POST' then
+      httpRequest.method := HM_POST
+     else if sR='HEAD' then
+      httpRequest.method := HM_HEAD
+     else;
 
-  request.url:= UnUTF(chop(RawByteString(' '), r));
+    httpRequest.url := UnUTF(chop(RawByteString(' '), r));
 
-  sR:=uppercase(chopLine(r));
-  // if 'HTTP/' is not found, chop returns S
-  if chop(RawByteString('HTTP/'),sR) = '' then request.ver:=sR;
+    sR := uppercase(chopLine(r));
+    // if 'HTTP/' is not found, chop returns S
+    if chop(RawByteString('HTTP/'),sR) = '' then
+      httpRequest.ver := sR;
 
-  request.headers.text:=UnUTF(r);
+    httpRequest.headers.text := UnUTF(r);
 
-  h:=getHeader('Range');
-  if ansiStartsText('bytes=', h) then
-    begin
-    delete(h,1,6);
-    h2 := chop('-',h);
-    try
-      if h2>'' then request.firstByte:=strToInt64(h2);
-      if h>'' then request.lastByte:=strToInt64(h);
-    except end;
-    end;
+    h := getHeader('Range');
+    if ansiStartsText('bytes=', h) then
+      begin
+        delete(h,1,6);
+        h2 := chop('-',h);
+        try
+          if h2>'' then
+            httpRequest.firstByte:=strToInt64(h2);
+          if h>'' then
+            httpRequest.lastByte:=strToInt64(h);
+         except
+        end;
+      end;
 
-  h:=getHeader('Authorization');
-  if AnsiStartsText('Basic', h) then
-    begin
-    delete(h,1,6);
-//    s:= base64decode(s);
-    u := UnUTF(Base64DecodeString(h));
+    h := getHeader('Authorization');
+    if AnsiStartsText('Basic', h) then
+      begin
+        delete(h,1,6);
+    //    s:= base64decode(s);
+        u := UnUTF(Base64DecodeString(h));
 
-    request.user:=trim(chop(':',u));
-    request.pwd:=u;
-    end;
+        httpRequest.user := trim(chop(':',u));
+        httpRequest.pwd := u;
+      end;
 
-  h := getHeader('Connection');
-  persistent := srv.persistentConnections and
-    (ansiStartsText('Keep-Alive', h) or (request.ver >= '1.1') and (ipos('close', h)=0));
+    h := getHeader('Connection');
+    persistent := P_srv.persistentConnections and
+      (ansiStartsText('Keep-Alive', h) or (httpRequest.ver >= '1.1') and (ipos('close', h)=0));
 
-  h := getHeader('Content-Type');
-  if ansiStartsText('application/x-www-form-urlencoded', h) then
-    post.mode := PM_URLENCODED
-  else if ansiStartsText('multipart/form-data', h) then
-    begin
-      post.mode := PM_MULTIPART;
-      chop('boundary=', h);
-      post.boundary  := '--'+UTF8Encode(h);
-    end;
-  post.length := StrToInt64Def(getHeader('Content-Length'), 0);
-  // the browser may not support 2GB+ files. This workaround works only for files under 4GB.
-  if post.length < 0 then
-    inc(post.length, int64(2) shl 31);
+    h := getHeader('Content-Type');
+    if ansiStartsText('application/x-www-form-urlencoded', h) then
+      post.mode := PM_URLENCODED
+    else if ansiStartsText('multipart/form-data', h) then
+      begin
+        post.mode := PM_MULTIPART;
+        chop('boundary=', h);
+        post.boundary  := '--'+UTF8Encode(h);
+      end;
+    post.length := StrToInt64Def(getHeader('Content-Length'), 0);
+    // the browser may not support 2GB+ files. This workaround works only for files under 4GB.
+    if post.length < 0 then
+      inc(post.length, int64(2) shl 31);
 
-  result := TRUE;
+    result := TRUE;
   end; // parseHeader
 
   procedure handlePostMultipart();
 
-    procedure handleLeftData(i:integer);
+    procedure handleLeftData(i: Integer);
     begin
-    // the data processed below is related to the previous file
-    post.data:=chop(i, length(post.boundary), buffer);
-    // if data was found, we must trim the CRLF between data and boundary
-    setlength(post.data, length(post.data)-2);
-    // we expect this data to have a filename, otherwise it is just discarded
-    if post.filename > '' then
-      tryNotify(HE_POST_MORE_FILE)
-    else if post.varname > '' then
-      tryNotify(HE_POST_VAR);
-    FbytesPostedLastItem:=bytesPosted-length(buffer)-lastPostItemPos-length(post.boundary)-2;
-    if post.filename > '' then
-      tryNotify(HE_POST_END_FILE);
+      // the data processed below is related to the previous file
+      post.data := chop(i, length(post.boundary), buffer);
+      // if data was found, we must trim the CRLF between data and boundary
+      setlength(post.data, length(post.data)-2);
+      // we expect this data to have a filename, otherwise it is just discarded
+      if post.filename > '' then
+        tryNotify(HE_POST_MORE_FILE)
+       else if post.varname > '' then
+        tryNotify(HE_POST_VAR);
+      FbytesPostedLastItem:=bytesPosted-length(buffer)-lastPostItemPos-length(post.boundary)-2;
+      if post.filename > '' then
+        tryNotify(HE_POST_END_FILE);
     end; // handleLeftData
 
   var
@@ -1363,83 +1325,84 @@ procedure ThttpConn.processInputBuffer();
     cU: UnicodeString;
   begin
     repeat
-    { When the buffer is stuffed with file bytes only, we can avoid calling pos() and chop().
-    // Unexpectedly this did not speed up anything. I report the try so you don't waste your time.
-    if (bytesPosted < post.length-length(post.boundary)) and (post.filename > '') then
-      begin
-      post.data:=buffer;
-      buffer:='';
-      notify(HE_POST_MORE_FILE);
-      break;
-      end;
-    }
+      { When the buffer is stuffed with file bytes only, we can avoid calling pos() and chop().
+      // Unexpectedly this did not speed up anything. I report the try so you don't waste your time.
+      if (bytesPosted < post.length-length(post.boundary)) and (post.filename > '') then
+        begin
+        post.data:=buffer;
+        buffer:='';
+        notify(HE_POST_MORE_FILE);
+        break;
+        end;
+      }
 
-    // a boundary point at a (sub)header or to the end of the post section
-    i:=pos(post.boundary, buffer);
-    if i = 0 then
-      begin
-      if post.filename = '' then
-        post.data:=post.data+chop(length(buffer)-length(post.boundary), 0, buffer)
-      else
-        // no boundary, this is a chunk of the file we are receiving. notify the listener
-        // only about the data we are sure it doesn't overlap a possibly coming boundary }
+      // a boundary point at a (sub)header or to the end of the post section
+      i:=pos(post.boundary, buffer);
+      if i = 0 then
         begin
-        post.data:=chop(length(buffer)-length(post.boundary), 0, buffer);
-        if post.data > '' then
-          tryNotify(HE_POST_MORE_FILE);
-        end;
-      break;
-      end;
-    // was it the end of the post section?
-    if copy(buffer, i+length(post.boundary), 4) = RawByteString('--')+CRLFA then
-      begin
-      handleLeftData(i);
-      chop(RawByteString('--'+CRLFA), buffer);
-      tryNotify(HE_POST_END);
-      state:=HCS_REPLYING;
-      post.filename:='';
-      break;
-      end;
-    // we wait for the header to be complete
-    if posEx(HEADER_LIMITER, buffer, i+length(post.boundary)) = 0 then
-      break;
-    handleLeftData(i);
-    post.filename:='';
-    post.data:='';
-    post.header:=chop(HEADER_LIMITER, buffer);
-    chopLine(post.header);
-    // parse the header part
-    s:=post.header;
-    while s > '' do
-      begin
-      l:=chopLine(s);
-      if l = '' then continue;
-      k:=chop(RawByteString(':'), l);
-      if not sameText(k, RawByteString('Content-Disposition')) then // we are not interested in other fields
-        continue;
-      k:=trim(chop(';', l));
-      if not sameText(k, RawByteString('form-data')) then
-        continue;
-      while l > '' do
-        begin
-        c:=chop(nonQuotedPos(RawByteString(';'), l), l);
-        k:=trim(chop(RawByteString('='), c));
-        cU:=UnUTF(ansiDequotedStr(c,'"'));
-        if sameText(k, RawByteString('filename')) then
+        if post.filename = '' then
+          post.data:=post.data+chop(length(buffer)-length(post.boundary), 0, buffer)
+        else
+          // no boundary, this is a chunk of the file we are receiving. notify the listener
+          // only about the data we are sure it doesn't overlap a possibly coming boundary }
           begin
-          delete(cU, 1, lastDelimiter('/\',cU));
-          post.filename:=cU;
-          end
-         else
-        if sameText(k, RawByteString('name')) then
-          post.varname:=cU;
+          post.data:=chop(length(buffer)-length(post.boundary), 0, buffer);
+          if post.data > '' then
+            tryNotify(HE_POST_MORE_FILE);
+          end;
+        break;
         end;
-      end;
-    lastPostItemPos:=bytesPosted-length(buffer);
-    if post.filename = '' then
-      continue;
-    firstPostFile:=FALSE;
-    tryNotify(HE_POST_FILE);
+      // was it the end of the post section?
+      if copy(buffer, i+length(post.boundary), 4) = RawByteString('--')+CRLFA then
+        begin
+        handleLeftData(i);
+        chop(RawByteString('--'+CRLFA), buffer);
+        tryNotify(HE_POST_END);
+        httpState := HCS_REPLYING;
+        post.filename:='';
+        break;
+        end;
+      // we wait for the header to be complete
+      if posEx(HEADER_LIMITER, buffer, i+length(post.boundary)) = 0 then
+        break;
+      handleLeftData(i);
+      post.filename:='';
+      post.data:='';
+      post.header:=chop(HEADER_LIMITER, buffer);
+      chopLine(post.header);
+      // parse the header part
+      s:=post.header;
+      while s > '' do
+        begin
+        l:=chopLine(s);
+        if l = '' then
+          continue;
+        k:=chop(RawByteString(':'), l);
+        if not sameText(k, RawByteString('Content-Disposition')) then // we are not interested in other fields
+          continue;
+        k:=trim(chop(';', l));
+        if not sameText(k, RawByteString('form-data')) then
+          continue;
+        while l > '' do
+          begin
+          c:=chop(nonQuotedPos(RawByteString(';'), l), l);
+          k:=trim(chop(RawByteString('='), c));
+          cU:=UnUTF(ansiDequotedStr(c,'"'));
+          if sameText(k, RawByteString('filename')) then
+            begin
+            delete(cU, 1, lastDelimiter('/\',cU));
+            post.filename:=cU;
+            end
+           else
+          if sameText(k, RawByteString('name')) then
+            post.varname:=cU;
+          end;
+        end;
+      lastPostItemPos:=bytesPosted-length(buffer);
+      if post.filename = '' then
+        continue;
+      firstPostFile:=FALSE;
+      tryNotify(HE_POST_FILE);
     until false;
   end; // handlePostMultipart
 
@@ -1457,7 +1420,7 @@ procedure ThttpConn.processInputBuffer();
   if bytesToPost <= 0 then
     begin
     tryNotify(HE_POST_END);
-    state:=HCS_REPLYING
+    httpState := HCS_REPLYING
     end;
   end; // handlePostData
 
@@ -1465,84 +1428,86 @@ procedure ThttpConn.processInputBuffer();
   var
     i, sepLen: integer;
   begin
-  // try to identify header length and position
-  i:=pos(HEADER_LIMITER, buffer);
-  sepLen:=4;
-  if i <= 0 then
-    begin
-    // support for non-standard line separator
-    i:=pos(RawByteString(#13#13), buffer);
-    sepLen:=2;
-    end;
-  if i <= 0 then
-    begin
-    // no full header yet
-    if pos(RawByteString(#3),buffer) > 0 then // search for a CTRL+C issued with a telnet session
+    // try to identify header length and position
+    i:=pos(HEADER_LIMITER, buffer);
+    sepLen:=4;
+    if i <= 0 then
       begin
-      reply.mode:=HRM_CLOSE;
-      disconnect();
+      // support for non-standard line separator
+      i:=pos(RawByteString(#13#13), buffer);
+      sepLen:=2;
       end;
-    if length(buffer) > MAX_REQUEST_LENGTH then // and check for max length
+    if i <= 0 then
       begin
-      reply.mode:=HRM_TOO_LARGE;
-      sendHeader(replyheader_mode(reply.mode));
+      // no full header yet
+      if pos(RawByteString(#3),buffer) > 0 then // search for a CTRL+C issued with a telnet session
+        begin
+        reply.mode:=HRM_CLOSE;
+        disconnect();
+        end;
+      if length(buffer) > MAX_REQUEST_LENGTH then // and check for max length
+        begin
+        reply.mode:=HRM_TOO_LARGE;
+        sendHeader(replyheader_mode(reply.mode));
+        end;
+      exit;
       end;
-    exit;
-    end;
-  request.full:=chop(i,sepLen,buffer);
-  if not parseHeader() then exit;
-  notify(HE_GOT_HEADER);
-  if request.method <> HM_POST then
-    begin
-    state:=HCS_REPLYING;
-    exit;
-    end;
-  state:=HCS_POSTING;
-  firstPostFile:=TRUE;
-  postDataReceived:=length(buffer);
-  handlePostData();
+    httpRequest.full := chop(i,sepLen,buffer);
+    if not parseHeader() then exit;
+    notify(HE_GOT_HEADER);
+    if httpRequest.method <> HM_POST then
+      begin
+      httpState := HCS_REPLYING;
+      exit;
+      end;
+    httpState := HCS_POSTING;
+    firstPostFile:=TRUE;
+    postDataReceived:=length(buffer);
+    handlePostData();
   end; // handleHeaderData
 
   function replyHeader_OK(contentLength:int64=-1): RawByteString;
   begin
-  result:=replyheader_code(200)
-    +format(RawByteString('Content-Length: %d')+CRLFA, [contentLength]);
+    result:=replyheader_code(200)
+      +format(RawByteString('Content-Length: %d')+CRLFA, [contentLength]);
   end; // replyHeader_OK
 
   function replyHeader_PARTIAL( firstB, lastB, totalB:int64): RawByteString;
   begin
-  result:=replyheader_code(206)
-    +format(RawByteString('Content-Range: bytes %d-%d/%d')+CRLFA+RawByteString('Content-Length: %d')+CRLFA,
+    result:=replyheader_code(206)
+      +format(RawByteString('Content-Range: bytes %d-%d/%d')+CRLFA+RawByteString('Content-Length: %d')+CRLFA,
           [firstB, lastB, totalB, lastB-firstB+1 ])
   end; // replyheader_PARTIAL
 
 begin
-if buffer = '' then exit;
-if state = HCS_IDLE then
+  if buffer = '' then
+    exit;
+  if httpState = HCS_IDLE then
   begin
-  state:=HCS_REQUESTING;
-  reply.contentType:='text/html; charset=utf-8';
-  notify(HE_REQUESTING);
+    httpState := HCS_REQUESTING;
+    reply.contentType:='text/html; charset=utf-8';
+    notify(HE_REQUESTING);
   end;
-case state of
-  HCS_REPLYING,
-  HCS_REPLYING_HEADER,
-  HCS_REPLYING_BODY: exit; // wait until the job is done
-  HCS_POSTING: handlePostData();
-  HCS_REQUESTING: handleHeaderData();
+  case httpState of
+    HCS_REPLYING,
+    HCS_REPLYING_HEADER,
+    HCS_REPLYING_BODY: exit; // wait until the job is done
+    HCS_POSTING: handlePostData();
+    HCS_REQUESTING: handleHeaderData();
   end;
-if state <> HCS_REPLYING then exit;
+  if httpState <> HCS_REPLYING then
+    exit;
 // handle reply
-clearReply();
-inc(P_requestCount);
-notify(HE_REQUESTED);
-if not initInputStream() then
+  clearReply();
+  inc(P_requestCount);
+  notify(HE_REQUESTED);
+  if not initInputStream() then
   begin
-  reply.mode:=HRM_INTERNAL_ERROR;
-  reply.contentType:='text/html; charset=utf-8';
-  notify(HE_CANT_OPEN_FILE);
+    reply.mode:=HRM_INTERNAL_ERROR;
+    reply.contentType:='text/html; charset=utf-8';
+    notify(HE_CANT_OPEN_FILE);
   end;
-notify(HE_STREAM_READY);
+  notify(HE_STREAM_READY);
 case reply.mode of
   HRM_CLOSE: disconnect();
   HRM_IGNORE: ;
@@ -1561,7 +1526,7 @@ case reply.mode of
   HRM_REPLY, HRM_REPLY_HEADER:
     if stream = NIL then
       sendHeader( replyHeader_code(404) )
-    else if (request.firstByte >= bytesFullBody) or (request.lastByte >= bytesFullBody) then
+    else if (httpRequest.firstByte >= bytesFullBody) or (httpRequest.lastByte >= bytesFullBody) then
       sendHeader( replyHeader_code(400) )
     else if reply.header > '' then
         sendHeader()
@@ -1579,17 +1544,24 @@ var
 begin
   if error <> 0 then
     exit;
-  s := sock.ReceiveStrA();
+ {$IFDEF FPC}
+  s := Self.ReceiveStr();
+ {$ELSE ~FPC}
+  s := Self.ReceiveStrA();
+ {$ENDIF FPC}
   inc(brecvd, length(s));
-  inc(srv.brecvd, length(s));
+  inc(P_srv.brecvd, length(s));
   if (s = '') or dontFulFil then
     exit;
-  if state = HCS_POSTING then
+  if httpState = HCS_POSTING then
     inc(postDataReceived, length(s));
   if length(buffer)+length(s) > MAX_INPUT_BUFFER_LENGTH then
   begin
     disconnect();
-    try sock.Abort() except end; // please, brutally
+    try
+      Self.Abort()
+     except
+    end; // please, brutally
     exit;
   end;
   buffer := buffer+s;
@@ -1600,20 +1572,21 @@ end; // dataavailable
 
 procedure ThttpConn.senddata(sender: Tobject; bytes: integer);
 begin
-if bytes <= 0 then exit;
-inc(bsent, bytes);
-inc(srv.bsent, bytes);
-if state = HCS_REPLYING_BODY then
-  begin
-  inc(bsent_body, bytes);
-  inc(bsent_bodies, bytes);
-  end;
-notify(HE_SENT);
+  if bytes <= 0 then
+    exit;
+  inc(bsent, bytes);
+  inc(P_srv.bsent, bytes);
+  if httpState = HCS_REPLYING_BODY then
+    begin
+      inc(bsent_body, bytes);
+      inc(bsent_bodies, bytes);
+    end;
+  notify(HE_SENT);
 end; // senddata
 
 procedure ThttpConn.datasent(sender: Tobject; error: word);
 
-  function toBeQueued():boolean;
+  function toBeQueued(): Boolean;
   var
     i: integer;
   begin
@@ -1629,66 +1602,75 @@ procedure ThttpConn.datasent(sender: Tobject; error: word);
 var
   notifyReplied: boolean;
 begin
-if not (state in [HCS_REPLYING_HEADER, HCS_REPLYING_BODY]) then exit;
+  if not (httpState in [HCS_REPLYING_HEADER, HCS_REPLYING_BODY]) then
+    exit;
 
-if (state = HCS_REPLYING_HEADER) and (reply.mode <> HRM_REPLY_HEADER) then
-  begin // the header is never sent splitted, so we know that at this stage we already sent it all
-  state:=HCS_REPLYING_BODY;
-  // set up a default body for errors with no body set
-  if ((stream = NIL) or (stream.size = 0)) and (reply.mode <> HRM_REPLY) then
-    begin
-    reply.bodyMode := RBM_TEXT;
-    reply.Body := HRM2BODY[reply.mode];
-    if reply.mode in [HRM_REDIRECT, HRM_MOVED] then
-      reply.bodyU := stringReplace(reply.bodyU, '%url%', reply.url, [rfReplaceAll]);
-    initInputStream();
+  if (httpState = HCS_REPLYING_HEADER) and (reply.mode <> HRM_REPLY_HEADER) then
+    begin // the header is never sent splitted, so we know that at this stage we already sent it all
+      httpState := HCS_REPLYING_BODY;
+    // set up a default body for errors with no body set
+      if ((stream = NIL) or (stream.size = 0)) and (reply.mode <> HRM_REPLY) then
+      begin
+        reply.bodyMode := RBM_TEXT;
+        reply.Body := HRM2BODY[reply.mode];
+        if reply.mode in [HRM_REDIRECT, HRM_MOVED] then
+          reply.bodyU := stringReplace(reply.bodyU, '%url%', reply.url, [rfReplaceAll]);
+        initInputStream();
+      end;
     end;
-  end;
-if (state = HCS_REPLYING_BODY) and (bytesToSend > 0) then
-  begin
-  if toBeQueued() then srv.q.add(self)
-  else sendNextChunk();
-  exit;
-  end;
-notifyReplied:=FALSE;
-if (state in [HCS_REPLYING_HEADER, HCS_REPLYING_BODY, HCS_DISCONNECTED])
-and (bytesToSend = 0) then
-  begin
-  notifyReplied:=TRUE;
-  state:=HCS_IDLE;
-  end;
-
-if not persistent or not (reply.mode in [HRM_REPLY, HRM_REPLY_HEADER]) then
-  disconnect()
-else
-  // we must check the socket state, because a disconnection could happen while
-  // this method is executing }
-  if sock.State <> wsClosed then state:=HCS_IDLE;
-if notifyReplied then
-  begin
-  notify(HE_REPLIED);
-  if stream.position = stream.size then
+  if (httpState = HCS_REPLYING_BODY) and (bytesToSend > 0) then
     begin
-    freeAndNil(stream); // free file handle
-    notify(HE_LAST_BYTE_DONE);
+      if toBeQueued() then
+        P_srv.q.add(self)
+       else
+        sendNextChunk();
+      exit;
     end;
-  end;
-// once the event has been notified, we reset the current counter
-if state = HCS_IDLE then bsent_body:=0;
+  notifyReplied := FALSE;
+  if (httpState in [HCS_REPLYING_HEADER, HCS_REPLYING_BODY, HCS_DISCONNECTED])
+  and (bytesToSend = 0) then
+    begin
+      notifyReplied:=TRUE;
+      httpState := HCS_IDLE;
+    end;
 
-freeAndNil(stream);
+  if not persistent or not (reply.mode in [HRM_REPLY, HRM_REPLY_HEADER]) then
+    disconnect()
+   else
+    // we must check the socket state, because a disconnection could happen while
+    // this method is executing
+    if Self.State <> wsClosed then
+      httpState := HCS_IDLE;
+  if notifyReplied then
+    begin
+      notify(HE_REPLIED);
+      if stream.position = stream.size then
+      begin
+        freeAndNil(stream); // free file handle
+        notify(HE_LAST_BYTE_DONE);
+      end;
+    end;
+  // once the event has been notified, we reset the current counter
+  if httpState = HCS_IDLE then
+    bsent_body:=0;
+
+  freeAndNil(stream);
 end; // datasent
 
 procedure ThttpConn.disconnect();
 begin
   if disconnecting then
     exit;
-  disconnecting:=TRUE;
-  if sock = NIL then
-    exit;
+  disconnecting := TRUE;
+//  if sock = NIL then
+//    exit;
   try
-    sock.Shutdown(SD_BOTH);
-    sock.CloseDelayed();
+   {$IFDEF FPC}
+    Self.Shutdown(0);
+   {$ELSE FPC}
+    Self.Shutdown(SD_BOTH);
+   {$ENDIF FPC}
+    Self.CloseDelayed();
    except
   end;
 end; // disconnect
@@ -1698,8 +1680,10 @@ begin if stream = NIL then result:=0 else result:=stream.Size end;
 
 function ThttpConn.partialBodySize():int64;
 begin
-if (reply.lastByte<0) and (reply.firstByte<0) then result:=bytesFullBody
-else result:=reply.lastByte-reply.firstByte+1
+  if (reply.lastByte<0) and (reply.firstByte<0) then
+    result := bytesFullBody
+   else
+    result := reply.lastByte-reply.firstByte+1
 end; // partialBodySize
 
 function ThttpConn.initInputStream():boolean;
@@ -1707,47 +1691,53 @@ var
   i: integer;
   s: String;
 begin
-result:=FALSE;
-FreeAndNil(stream);
-try
-  case reply.bodyMode of
-//    RBM_RAW: stream := TAnsiStringStream.create(reply.body);
-//    RBM_TEXT: stream := TAnsiStringStream.create(reply.body);
-    RBM_RAW: stream := TRawByteStringStream.create(reply.body);
-    RBM_TEXT: stream := TRawByteStringStream.create(reply.body);
-    RBM_FILE:
-      begin
-        s := reply.bodyU;
-        i := fileopen(s, fmOpenRead+fmShareDenyNone);
-        if i = -1 then
-          exit;
-        stream := TFileStream.Create(i);
-      end;
-    RBM_STREAM: stream := reply.bodyStream;
-    end;
-  with reply do
-    if resumeForbidden or (firstByte < 0) and (lastByte < 0) then
-      begin
-      firstByte:=0;
-      lastbyte:=bytesFullBody-1;
-      end
-    else
-      if lastByte < 0 then lastbyte:=bytesFullBody-1
+  result := FALSE;
+  FreeAndNil(stream);
+  try
+    case reply.bodyMode of
+  //    RBM_RAW: stream := TAnsiStringStream.create(reply.body);
+  //    RBM_TEXT: stream := TAnsiStringStream.create(reply.body);
+      RBM_RAW: stream := TRawByteStringStream.create(reply.body);
+      RBM_TEXT: stream := TRawByteStringStream.create(reply.body);
+      RBM_FILE:
+        begin
+          s := reply.bodyU;
+         {$IFDEF FPC}
+          stream := TFileStream.Create(s, fmOpenRead+fmShareDenyNone);
+         {$ELSE ~FPC}
+          i := fileopen(s, fmOpenRead+fmShareDenyNone);
+          if i = -1 then
+            exit;
+          stream := TFileStream.Create(i);
+         {$ENDIF FPC}
+        end;
+      RBM_STREAM: stream := reply.bodyStream;
+     end;
+    with reply do
+      if resumeForbidden or (firstByte < 0) and (lastByte < 0) then
+        begin
+          firstByte := 0;
+          lastbyte := bytesFullBody-1;
+        end
       else
-        if firstbyte < 0 then
-          begin
-          firstByte := bytesFullBody-lastByte;
-          lastByte := bytesFullBody;
-          end;
+        if lastByte < 0 then
+          lastbyte:=bytesFullBody-1
+         else
+          if firstbyte < 0 then
+            begin
+              firstByte := bytesFullBody-lastByte;
+              lastByte := bytesFullBody;
+            end;
 
-  if (reply.firstByte > 0) and (reply.mode = HRM_REPLY) then
-    stream.Seek(request.firstByte, soBeginning);
+    if (reply.firstByte > 0) and (reply.mode = HRM_REPLY) then
+      stream.Seek(httpRequest.firstByte, soBeginning);
 
-  result := TRUE;
-except end;
+    result := TRUE;
+   except
+  end;
 end; // initInputStream
 
-function ThttpConn.sendNextChunk(max:integer=MAXINT):integer;
+function ThttpConn.sendNextChunk(max: Integer=MAXINT): Integer;
 var
   n, toSend: int64;
   buf: RawByteString;
@@ -1775,12 +1765,20 @@ begin
   n := stream.read(buf[1], n);
   setLength(buf, n);
   try
-    result:=sock.SendStr(buf)
+    result := Self.SendStr(buf)
    except
   end; // the socket may be accidentally closed
   if result < n then
     stream.Seek(n-result, soCurrent);
 end; // sendNextChunk
+
+procedure ThttpConn.socketSetNoDelay;
+var
+  i: Integer;
+begin
+  i := -1;
+  WSocket_setsockopt(Self.HSocket, IPPROTO_TCP, TCP_NODELAY, @i, sizeOf(i));
+end;
 
 function ThttpConn.getBytesToSend():int64;
 begin result:=bytesPartial-bsent_body end;
@@ -1792,33 +1790,33 @@ function ThttpConn.getbytesGot():int64;
 begin result:=length(buffer) end;
 
 procedure ThttpConn.notify(ev:ThttpEvent);
-begin srv.notify(ev, self) end;
+begin P_srv.notify(ev, self) end;
 
 procedure ThttpConn.tryNotify(ev:ThttpEvent);
-begin try srv.notify(ev, self) except end end;
+begin try P_srv.notify(ev, self) except end end;
 
 procedure ThttpConn.sendheader(const h: string);
 begin
-  state:=HCS_REPLYING_HEADER;
+  httpState := HCS_REPLYING_HEADER;
   if reply.header = '' then
     reply.headerU := h;
   reply.headerAdd(reply.fAdditionalHeaders);
 
   try
-     sock.sendStr(reply.header+CRLFA);
+     Self.sendStr(reply.header+CRLFA);
    except
   end;
 end; // sendHeader
 
 procedure ThttpConn.sendheader(const h: RawByteString='');
 begin
-  state:=HCS_REPLYING_HEADER;
+  httpState := HCS_REPLYING_HEADER;
   if reply.header = '' then
     reply.header := h;
   reply.headerAdd(reply.fAdditionalHeaders);
 
   try
-     sock.sendStr(reply.header+CRLFA);
+     Self.sendStr(reply.header+CRLFA);
    except
   end;
 end; // sendHeader
@@ -1853,66 +1851,42 @@ end;
 function ThttpConn.replyHeader_mode(mode:ThttpReplyMode): RawByteString;
 begin result:=replyHeader_code(HRM2CODE[mode]) end;
 
-function getNameOf(const s:string):string; // colon included
-begin result:=copy(s, 1, pos(':', s)) end;
-
-function getNameOf(const s: RawByteString): RawByteString; // colon included
-begin result:=copy(s, 1, pos(RawByteString(':'), s)) end;
-
-// return 0 if not found
-function namePos(const name:string; const headers:string; from:integer=1):integer;
-begin
-result:=from;
-  repeat
-  result:=ipos(name, headers, result);
-  until (result<=1) // both not found and found at the start of the string
-    or (headers[result-1] = #10) // or start of the line
-end; // namePos
-
-function namePos(const name: RawByteString; const headers: RawByteString; from: integer=1):integer; OverLoad;
-begin
- result := from;
-  repeat
-    result := ipos(name, headers, result);
-  until (result<=1) // both not found and found at the start of the string
-    or (headers[result-1] = #10) // or start of the line
-end; // namePos
-
 // return true if the operation succeded
-function ThttpConn.setHeaderIfNone(const s:string):boolean;
+function ThttpConn.setHeaderIfNone(const s: String): Boolean;
 var
   name: RawByteString;
 begin
   name := StrToUTF8(getNameOf(s));
-if name = '' then
-  raise Exception.Create('Missing colon');
-result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
-if result then
-  addHeader(s, FALSE); // with FALSE it's faster
+  if name = '' then
+    raise Exception.Create('Missing colon');
+  result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
+  if result then
+    addHeader(s, FALSE); // with FALSE it's faster
 end; // setHeaderIfNone
 
-function ThttpConn.setHeaderIfNone(const s: RawByteString):boolean;
+function ThttpConn.setHeaderIfNone(const s: RawByteString): Boolean;
 var
   name: RawByteString;
 begin
   name := getNameOf(s);
-if name = '' then
-  raise Exception.Create('Missing colon');
-result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
-if result then
-  addHeader(s, FALSE); // with FALSE it's faster
+  if name = '' then
+    raise Exception.Create('Missing colon');
+  result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
+  if result then
+    addHeader(s, FALSE); // with FALSE it's faster
 end; // setHeaderIfNone
 
 // return true if the operation succeded
-function ThttpConn.setHeaderIfNone(const name: RawByteString; const s: string):boolean;
+function ThttpConn.setHeaderIfNone(const name: RawByteString; const s: String): Boolean;
 begin
-if name = '' then
-  raise Exception.Create('Missing colon');
-result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
-if result then
-  addHeader(name, StrToUTF8(s), FALSE); // with FALSE it's faster
+  if name = '' then
+    raise Exception.Create('Missing colon');
+  result := namePos(name, reply.fAdditionalHeaders) = 0; // empty text will also be considered as existing
+  if result then
+    addHeader(name, StrToUTF8(s), FALSE); // with FALSE it's faster
 end; // setHeaderIfNone
 
+// return true if the operation succeded
 function ThttpConn.setHeaderIfNone(const name: RawByteString; const s: RawByteString): Boolean;
 begin
   if name = '' then
@@ -1978,23 +1952,44 @@ begin
   reply.fAdditionalHeaders := reply.fAdditionalHeaders + hr + ': ' + StrToUTF8(v) + CRLFA;
 end; // addHeader
 
-function ThttpConn.getDontFree():boolean;
+function ThttpConn.getDontFree(): Boolean;
 begin result:=lockCount > 0 end;
 
-procedure ThttpConn.setSndbuf(v:integer);
+procedure ThttpConn.setSndbuf(v: Integer);
 begin
-if P_sndBuf = v then exit;
-P_sndBuf:=v;
-WSocket_setsockopt(sock.HSocket, SOL_SOCKET , SO_SNDBUF, @v, SizeOf(v));
+  if P_sndBuf = v then
+    exit;
+  P_sndBuf := v;
+  WSocket_setsockopt(Self.HSocket, SOL_SOCKET , SO_SNDBUF, @v, SizeOf(v));
 end;
 
-constructor TspeedLimiter.create(max:integer=MAXINT);
+procedure ThttpConn.setICSBufSize(v: Integer);
+begin
+  Self.BufSize := v;
+end;
+
+function ThttpConn.getICSBufSize: Integer;
+begin
+  Result := Self.BufSize;
+end;
+
+function ThttpConn.getIsDisconnected: Boolean;
+begin
+  Result := httpState = HCS_DISCONNECTED;
+end;
+
+function ThttpConn.getIsSendingStream: Boolean;
+begin
+  Result := reply.bodyMode = RBM_STREAM;
+end;
+
+constructor TspeedLimiter.create(max: Integer=MAXINT);
 begin maxSpeed:=max end;
 
-procedure TspeedLimiter.setMaxSpeed(v:integer);
+procedure TspeedLimiter.setMaxSpeed(v: Integer);
 begin
-P_maxSpeed:=v;
-availableBandwidth:=min(availableBandwidth, v);
+  P_maxSpeed:=v;
+  availableBandwidth:=min(availableBandwidth, v);
 end;
 
 INITIALIZATION

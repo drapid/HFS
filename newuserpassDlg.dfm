@@ -11,10 +11,8 @@ object newuserpassFrm: TnewuserpassFrm
   Font.Height = -11
   Font.Name = 'MS Sans Serif'
   Font.Style = []
-  OldCreateOrder = False
   Position = poMainFormCenter
   OnShow = FormShow
-  PixelsPerInch = 96
   TextHeight = 13
   object userBox: TLabeledEdit
     Left = 104
@@ -22,10 +20,11 @@ object newuserpassFrm: TnewuserpassFrm
     Width = 121
     Height = 21
     EditLabel.Width = 48
-    EditLabel.Height = 13
+    EditLabel.Height = 21
     EditLabel.Caption = 'Username'
     LabelPosition = lpLeft
     TabOrder = 0
+    Text = ''
   end
   object pwdBox: TLabeledEdit
     Left = 104
@@ -33,11 +32,12 @@ object newuserpassFrm: TnewuserpassFrm
     Width = 121
     Height = 21
     EditLabel.Width = 46
-    EditLabel.Height = 13
+    EditLabel.Height = 21
     EditLabel.Caption = 'Password'
     LabelPosition = lpLeft
     PasswordChar = '*'
     TabOrder = 1
+    Text = ''
   end
   object pwd2Box: TLabeledEdit
     Left = 104
@@ -45,11 +45,12 @@ object newuserpassFrm: TnewuserpassFrm
     Width = 121
     Height = 21
     EditLabel.Width = 85
-    EditLabel.Height = 13
+    EditLabel.Height = 21
     EditLabel.Caption = 'Re-type password'
     LabelPosition = lpLeft
     PasswordChar = '*'
     TabOrder = 2
+    Text = ''
   end
   object okBtn: TButton
     Left = 104

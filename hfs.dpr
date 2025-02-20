@@ -29,73 +29,78 @@ uses
   {$IFDEF EX_DEBUG}
   ftmExceptionForm,
   {$ENDIF }
-  monoLib,
   Forms,
   windows,
   types,
+  hsLib in 'srv\hsLib.pas',
   RDUtils,
   sysUtils,
   main in 'main.pas' {mainFrm},
   newuserpassDlg in 'newuserpassDlg.pas' {newuserpassFrm},
   optionsDlg in 'optionsDlg.pas' {optionsFrm},
   utillib in 'utillib.pas',
-  longinputDlg in 'longinputDlg.pas' {longinputFrm},
-  folderKindDlg in 'folderKindDlg.pas' {folderKindFrm},
-  shellExtDlg in 'shellExtDlg.pas' {shellExtFrm},
-  diffDlg in 'diffDlg.pas' {diffFrm},
-  classesLib in 'classesLib.pas',
+  monoLib in 'lib\monoLib.pas',
+  regexpr in 'lib\regexpr.pas',
+  longinputDlg in 'lib\longinputDlg.pas' {longinputFrm},
+  folderKindDlg in 'lib\folderKindDlg.pas' {folderKindFrm},
+  shellExtDlg in 'lib\shellExtDlg.pas' {shellExtFrm},
+  diffDlg in 'lib\diffDlg.pas' {diffFrm},
+  purgeDlg in 'lib\purgeDlg.pas' {purgeFrm},
   ipsEverDlg in 'ipsEverDlg.pas' {ipsEverFrm},
-  hslib in 'srv\hslib.pas',
+  HSUtils in 'srv\HSUtils.pas',
   parserLib in 'srv\parserLib.pas',
-  purgeDlg in 'purgeDlg.pas' {purgeFrm},
-  listSelectDlg in 'listSelectDlg.pas' {listSelectFrm},
-  filepropDlg in 'filepropDlg.pas' {filepropFrm},
-  runscriptDlg in 'runscriptDlg.pas' {runScriptFrm},
-  scriptLib in 'scriptLib.pas',
-  hfsJclOthers in 'jcl\hfsJclOthers.pas',
+  scriptLib in 'srv\scriptLib.pas',
   fileLib in 'srv\fileLib.pas',
-  hfsGlobal in 'hfsGlobal.pas',
-  hfsVars in 'hfsVars.pas',
-  langLib in 'langLib.pas',
-  progFrmLib in 'progFrmLib.pas',
   srvUtils in 'srv\srvUtils.pas',
   serverLib in 'srv\serverLib.pas',
   IconsLib in 'srv\IconsLib.pas' {IconsDM: TDataModule},
   srvClassesLib in 'srv\srvClassesLib.pas',
   srvConst in 'srv\srvConst.pas',
   srvVars in 'srv\srvVars.pas',
-  netUtils in 'netUtils.pas';
+  netUtils in 'srv\netUtils.pas',
+  listSelectDlg in 'listSelectDlg.pas' {listSelectFrm},
+  filepropDlg in 'filepropDlg.pas' {filepropFrm},
+  runscriptDlg in 'runscriptDlg.pas' {runScriptFrm},
+  hfsJclOthers in 'jcl\hfsJclOthers.pas',
+  hfsGlobal in 'hfsGlobal.pas',
+  hfsVars in 'hfsVars.pas',
+  langLib in 'langLib.pas',
+  progFrmLib in 'lib\progFrmLib.pas',
+  hfs.tray in 'hfs.tray.pas',
+  HFS.Macroses in 'HFS.Macroses.pas';
 
 {$R *.res}
 
-  procedure processSlaveParams(params:string);
+  procedure processSlaveParams(const params: String);
   var
     ss: TStringDynArray;
   begin
-  if mainfrm = NIL then exit;
-  ss:=split(#13,params);
-  processParams_before(ss);
-  mainfrm.processParams_after(ss);
+    if mainfrm = NIL then
+      exit;
+    ss := split(#13, params);
+    processParams_before(ss);
+    mainfrm.processParams_after(ss);
   end;
 
-  function isSingleInstance():boolean;
+  function isSingleInstance(): boolean;
   var
-    params:TStringDynArray;
-    ini, tpl:string;
+    params: TStringDynArray;
+    ini, tpl: string;
   begin
-  result:=FALSE;
-  // the -i parameter affects loadCfg()
-  params:=paramsAsArray();
-  processParams_before(params, 'i');
-  loadCfg(ini, tpl);
-  chop('only-1-instance=', ini);
-  if ini = '' then exit;
-  ini:=chopLine(ini);
-  result:=sameText(ini, 'yes');
+    result := FALSE;
+    // the -i parameter affects loadCfg()
+    params := paramsAsArray();
+    processParams_before(params, 'i');
+    loadCfg(ini, tpl);
+    chop('only-1-instance=', ini);
+    if ini = '' then
+      exit;
+    ini := chopLine(ini);
+    result := sameText(ini, 'yes');
   end; // isSingleInstance
 
 begin
-  mono.onSlaveParams:=processSlaveParams;
+  mono.onSlaveParams := processSlaveParams;
   if not holdingKey(VK_CONTROL) then
     begin
     if not mono.init('HttpFileServer') then

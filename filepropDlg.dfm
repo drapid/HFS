@@ -245,7 +245,7 @@ object filepropFrm: TfilepropFrm
       object filesfilterBox: TLabeledEdit
         Left = 10
         Top = 32
-        Width = 365
+        Width = 357
         Height = 21
         Anchors = [akLeft, akTop, akRight]
         EditLabel.Width = 46
@@ -255,11 +255,12 @@ object filepropFrm: TfilepropFrm
         TabOrder = 0
         Text = ''
         OnEnter = textinputEnter
+        ExplicitWidth = 365
       end
       object foldersfilterBox: TLabeledEdit
         Left = 10
         Top = 78
-        Width = 365
+        Width = 357
         Height = 21
         Anchors = [akLeft, akTop, akRight]
         EditLabel.Width = 60
@@ -269,11 +270,12 @@ object filepropFrm: TfilepropFrm
         TabOrder = 1
         Text = ''
         OnEnter = textinputEnter
+        ExplicitWidth = 365
       end
       object deffileBox: TLabeledEdit
         Left = 10
         Top = 125
-        Width = 365
+        Width = 357
         Height = 21
         Hint = 
           'When a folder is browsed, the default file mask is used to find ' +
@@ -287,11 +289,12 @@ object filepropFrm: TfilepropFrm
         TabOrder = 2
         Text = ''
         OnEnter = textinputEnter
+        ExplicitWidth = 365
       end
       object uploadfilterBox: TLabeledEdit
         Left = 10
         Top = 171
-        Width = 365
+        Width = 357
         Height = 21
         Hint = 'Uploaded files are allowed only complying with this file mask'
         Anchors = [akLeft, akTop, akRight]
@@ -302,11 +305,12 @@ object filepropFrm: TfilepropFrm
         TabOrder = 3
         Text = ''
         OnEnter = textinputEnter
+        ExplicitWidth = 365
       end
       object dontconsiderBox: TLabeledEdit
         Left = 10
         Top = 218
-        Width = 365
+        Width = 357
         Height = 21
         Hint = 
           'Files matching this filemask are not considered for global downl' +
@@ -319,6 +323,7 @@ object filepropFrm: TfilepropFrm
         TabOrder = 4
         Text = ''
         OnEnter = textinputEnter
+        ExplicitWidth = 365
       end
     end
     object otherTab: TTabSheet
@@ -338,7 +343,7 @@ object filepropFrm: TfilepropFrm
       object realmBox: TLabeledEdit
         Left = 10
         Top = 32
-        Width = 365
+        Width = 357
         Height = 21
         Hint = 
           'The realm string is shown on the user/pass dialog of the browser' +
@@ -352,6 +357,7 @@ object filepropFrm: TfilepropFrm
         TabOrder = 0
         Text = ''
         OnEnter = textinputEnter
+        ExplicitWidth = 365
       end
       object iconBox: TComboBoxEx
         Left = 10
@@ -385,7 +391,7 @@ object filepropFrm: TfilepropFrm
       393
       35)
     object okBtn: TButton
-      Left = 152
+      Left = 144
       Top = 6
       Width = 75
       Height = 25
@@ -394,9 +400,10 @@ object filepropFrm: TfilepropFrm
       Default = True
       ModalResult = 1
       TabOrder = 0
+      ExplicitLeft = 152
     end
     object cancelBtn: TButton
-      Left = 313
+      Left = 305
       Top = 6
       Width = 75
       Height = 25
@@ -404,9 +411,10 @@ object filepropFrm: TfilepropFrm
       Caption = 'Cancel'
       ModalResult = 2
       TabOrder = 1
+      ExplicitLeft = 313
     end
     object applyBtn: TButton
-      Left = 232
+      Left = 224
       Top = 6
       Width = 75
       Height = 25
@@ -414,6 +422,7 @@ object filepropFrm: TfilepropFrm
       Caption = '&Apply'
       TabOrder = 2
       OnClick = applyBtnClick
+      ExplicitLeft = 232
     end
   end
 end

@@ -14,5 +14,7 @@
 @IF EXIST "__history\*" del /q __history\*
 @IF EXIST "srv\__history\*" del /q srv\__history\*
 @IF EXIST "srv\*.bak" del /q srv\*.bak
+@IF EXIST "lib\__history\*" del /q lib\__history\*
+@IF EXIST "lib\*.bak" del /q lib\*.bak
 
 @rem exit

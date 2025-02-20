@@ -3,7 +3,7 @@ unit runscriptDlg;
 interface
 
 uses
-  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls;
 
 type
@@ -34,14 +34,19 @@ procedure TrunScriptFrm.runBtnClick(Sender: TObject);
 var
   tpl: Ttpl;
 begin
-tpl:=Ttpl.create;
-try
+  tpl := Ttpl.create;
   try
-    tpl.fullText := loadFile(tempScriptFilename);
-    resultBox.text:=runScript(mainFrm.fileSrv, tpl[''], NIL, tpl);
-    sizeLbl.Caption:=getTill(':', sizeLbl.Caption)+': '+intToStr(length(resultBox.text));
-  except on e:Exception do resultBox.text:=e.message end;
-finally tpl.free end;
+    try
+      tpl.fullText := loadFile(tempScriptFilename);
+      resultBox.text := runScript(mainFrm.fileSrv, tpl[''], NIL, tpl);
+      sizeLbl.Caption := getTill(':', sizeLbl.Caption)+': '+intToStr(length(resultBox.text));
+     except
+      on e:Exception do
+        resultBox.text:=e.message
+    end;
+   finally
+    tpl.free
+  end;
 end;
 
 end.

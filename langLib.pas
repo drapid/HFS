@@ -19,6 +19,7 @@
 }
 unit langLib;
 {$I forRnQConfig.inc}
+{$INCLUDE defs.inc }
 {$I NoRTTI.inc}
 
 interface
@@ -47,10 +48,10 @@ begin
 else
 }
 //  if useLang and Assigned(LangVar) then
-    result:=getTranslation(s);
+    result := getTranslation(s);
 end; // trans
 
-(*procedure trans2(var s:string); inline;
+(*procedure trans2(var s: String); inline;
 begin
 {if AnsiStartsStr('___',s) then
   result:=getTranslation(copy(s,4,9999))
@@ -103,6 +104,9 @@ procedure translateComponent(c: Tcomponent; window: Tform);
   end; // tstrings_trans
 var
   i, k: integer;
+ {$IFDEF FPC}
+  cc: TCollectionItem;
+ {$ENDIF FPC}
 begin
    if c is Tmenu then
     with c as Tmenu do
@@ -130,7 +134,7 @@ begin
       end
    else if c is TListView then
       begin  // itemindex is lost during translation
-       for var cc in TListView(c).Columns do
+       for {$IFNDEF FPC}var{$ENDIF ~FPC} cc in TListView(c).Columns do
          TListColumn(cc).Caption := trans(TListColumn(cc).Caption)
       end
 {    else if c is TVirtualDrawTree then
@@ -149,7 +153,7 @@ else if c is Tchecklistbox then with c as Tchecklistbox do
     begin
      hint := trans(hint);
      if caption > '' then
-      caption :=trans(caption)
+      caption := trans(caption)
     end
 ;
 

@@ -1,7 +1,6 @@
 object IconsDM: TIconsDM
-  Height = 438
-  Width = 582
-  PixelsPerInch = 168
+  Height = 250
+  Width = 333
   object ImgCollection: TImageCollection
     Images = <
       item
@@ -2078,8 +2077,8 @@ object IconsDM: TIconsDM
               BFC4BD7FA63F07C04F411C591AB3BB949E0000000049454E44AE426082}
           end>
       end>
-    Left = 168
-    Top = 83
+    Left = 96
+    Top = 47
   end
   object images: TVirtualImageList
     Images = <
@@ -2289,8 +2288,8 @@ object IconsDM: TIconsDM
         Name = '40'
       end>
     ImageCollection = ImgCollection
-    Left = 56
-    Top = 74
+    Left = 32
+    Top = 42
   end
   object BtnImgCollection: TImageCollection
     Images = <
@@ -2418,7 +2417,7 @@ object IconsDM: TIconsDM
               E037859162FE16D065810000000049454E44AE426082}
           end>
       end>
-    Left = 294
-    Top = 84
+    Left = 168
+    Top = 48
   end
 end

@@ -6,9 +6,12 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, ComCtrls, StdCtrls, ExtCtrls, CheckLst, types, Grids, Vcl.Mask,
   ValEdit, strutils, math,
-  hslib, serverLib, fileLib, hfsGlobal;
+  hslib, serverLib, srvClassesLib, fileLib, hfsGlobal;
 
 type
+
+  { TfilepropFrm }
+
   TfilepropFrm = class(TForm)
     pages: TPageControl;
     permTab: TTabSheet;
@@ -267,7 +270,7 @@ begin
   iconBox.clear();
   iconBox.Enabled := FALSE;
   addiconBtn.Enabled := FALSE;
-  i := if_(fileTree.SelectionCount > 1, -1, selectedFile.getIconForTreeview(spUseSysIcons in fileSrv.getSP));
+  i := if_(fileTree.SelectionCount > 1, -1, selectedFile.getIconForTreeview(spUseSysIcons in fileSrv.SP));
   iconBox.itemsEx.addItem('Default', i, i, -1, 0, NIL);
   iconOfs := iconBox.ItemsEx.count;
   for i:=0 to IconsDM.images.Count-1 do
@@ -332,17 +335,17 @@ begin
 
       end;
 
-    // collect usernames
-    for act:=low(act) to high(act) do
-      addUniqueArray(users[act], f.accounts[act]);
-    end;
+  // collect usernames
+  for act:=low(act) to high(act) do
+    addUniqueArray(users[act], f.accounts[act]);
+  end;
 
   for act:=low(act) to high(act) do
-    begin
-    savePerm[act]:=FALSE;
+   begin
+    savePerm[act] := FALSE;
     if act in actions then
       actionTabs.tabs.add(FILEACTION2STR[act]);
-    end;
+   end;
 
   if mainFrm.easyMode then
     onlyForExperts(mainFrm.easyMode, [browsableChk, commentTab, realmBox, dontconsiderChk, maskTab, dontlogChk, hideextChk]);
@@ -360,9 +363,9 @@ end;
 
 procedure TfilepropFrm.goToAccountsBtnClick(Sender: TObject);
 begin
-showOptions(optionsFrm.accountsPage, mainfrm.modalOptionsChk.checked);
-updateAccountsBox();
-actionTabsChange(NIL);
+  showOptions(optionsFrm.accountsPage, mainfrm.modalOptionsChk.checked);
+  updateAccountsBox();
+  actionTabsChange(NIL);
 end;
 
 procedure TfilepropFrm.allBtnClick(Sender: TObject);
@@ -370,39 +373,43 @@ var
   i: integer;
   b: boolean;
 begin
-if accountsBox.items.Count = 0 then exit;
-with accountsBox.Items[0] do
-  begin
-  b:=not checked;
-  checked:=b;
-  end;
-for i:=1 to accountsBox.items.count-1 do
-  accountsBox.Items[i].checked:=b;
+  if accountsBox.items.Count = 0 then
+    exit;
+  with accountsBox.Items[0] do
+    begin
+      b:=not checked;
+      checked:=b;
+    end;
+  for i:=1 to accountsBox.items.count-1 do
+    accountsBox.Items[i].checked := b;
 end;
 
 procedure TfilepropFrm.anonChkClick(Sender: TObject);
 var
   s: string;
 begin
-savePerm[currAction]:=TRUE;
-if sender = anonChk then s:=USER_ANONYMOUS
-else if sender = anyAccChk then
-  begin
-  s:=USER_ANY_ACCOUNT;
-  accountsBox.enabled:=not anyAccChk.Checked;
-  end
-else if sender = anyoneChk then
-  begin
-  s:=USER_ANYONE;
-  accountsBox.enabled:=not anyoneChk.Checked;
-  anonChk.enabled:=accountsBox.enabled;
-  anyAccChk.enabled:=accountsBox.enabled;
-  newaccBtn.Enabled:=accountsBox.enabled;
-  end;
-allBtn.Enabled:=accountsBox.enabled;
-with sender as Tcheckbox do
-  if checked then addUniqueString(s, users[currAction])
-  else removeString(s, users[currAction]);
+  savePerm[currAction] := TRUE;
+  if sender = anonChk then
+    s := USER_ANONYMOUS
+  else if sender = anyAccChk then
+    begin
+      s:=USER_ANY_ACCOUNT;
+      accountsBox.enabled := not anyAccChk.Checked;
+    end
+  else if sender = anyoneChk then
+    begin
+      s:=USER_ANYONE;
+      accountsBox.enabled:=not anyoneChk.Checked;
+      anonChk.enabled:=accountsBox.enabled;
+      anyAccChk.enabled:=accountsBox.enabled;
+      newaccBtn.Enabled:=accountsBox.enabled;
+    end;
+  allBtn.Enabled := accountsBox.enabled;
+  with sender as Tcheckbox do
+    if checked then
+      addUniqueString(s, users[currAction])
+     else
+      removeString(s, users[currAction]);
 end;
 
 procedure TfilepropFrm.applyBtnClick(Sender: TObject);
@@ -413,43 +420,47 @@ var
 
   procedure applyFlag(flag:TfileAttribute; cb:TCheckBox);
   begin
-  if (cb.State = cbGrayed)
-  or not cb.Enabled
-  or not cb.Visible then exit;
+    if (cb.State = cbGrayed)
+    or not cb.Enabled
+    or not cb.Visible then exit;
 
-  if cb.Checked then include(f.flags, flag)
-  else exclude(f.flags, flag);
+    if cb.Checked then
+      include(f.flags, flag)
+     else
+      exclude(f.flags, flag);
   end; // applyFlag
 
-  procedure applyText(var v:string; box:TCustomEdit);
+  procedure applyText(var v: String; box:TCustomEdit);
   begin
-  if box.modified then
-    v:=box.Text;
+    if box.modified then
+      v := box.Text;
   end; // applyText
 
 begin
-for act:=low(act) to high(act) do
-  sortArray(users[act]);
+  for act:=low(act) to high(act) do
+    sortArray(users[act]);
 
   if mainFrm.filesBox.SelectionCount > 0 then
-for i:=0 to mainFrm.filesBox.SelectionCount-1 do
+  for i:=0 to mainFrm.filesBox.SelectionCount-1 do
   begin
-  f:=mainFrm.filesBox.Selections[i].data;
+    f := mainFrm.filesBox.Selections[i].data;
 
-  for act:=low(act) to high(act) do
+   for act:=low(act) to high(act) do
     if savePerm[act]
     and ((act <> FA_UPLOAD) or f.isRealFolder())
     and ((act <> FA_DELETE) or f.isFolder()) then
       begin
 
-      // The following is because we monitor every upload path
-      if (act = FA_UPLOAD)
-      and ((f.accounts[act] = NIL) <> (users[act] = NIL)) then // something has changed
+        // The following is because we monitor every upload path
+        if (act = FA_UPLOAD)
+         and ((f.accounts[act] = NIL) <> (users[act] = NIL)) then // something has changed
         // WARNING: toggleString() can't be used here, it's not equivalent
-        if users[act] <> NIL then addString(f.resource, uploadPaths)
-        else removeString(f.resource, uploadPaths);
+          if users[act] <> NIL then
+            addString(f.resource, uploadPaths)
+           else
+            removeString(f.resource, uploadPaths);
 
-      f.accounts[act]:=users[act];
+        f.accounts[act] := users[act];
       end;
 
   applyText(f.comment, commentBox);
@@ -495,14 +506,15 @@ procedure TfilepropFrm.newaccBtnClick(Sender: TObject);
 var
   acc: Paccount;
 begin
-acc:=createAccountOnTheFly();
-if acc = NIL then exit;
-with accountsBox.Items.add() do
-  begin
-  caption:=acc.user;
-  data:=acc;
-  checked:=TRUE;
-  end;
+  acc := createAccountOnTheFly();
+  if acc = NIL then
+    exit;
+  with accountsBox.Items.add() do
+    begin
+      caption:=acc.user;
+      data:=acc;
+      checked:=TRUE;
+    end;
 end;
 
 procedure TfilepropFrm.textinputEnter(Sender: TObject);
@@ -539,12 +551,13 @@ var
   i: integer;
   a: Paccount;
 begin
-accountsBox.clear();
-for i:=0 to length(accounts)-1 do
+  accountsBox.clear();
+  for i:=0 to length(accounts)-1 do
   begin
-  a:=@accounts[i];
-  if not a.enabled then continue;
-  accountsBox.addItem(a.user, Tobject(a));
+    a:=@accounts[i];
+    if not a.enabled then
+      continue;
+    accountsBox.addItem(a.user, Tobject(a));
   end;
 end; // updateAccountsBox
 
